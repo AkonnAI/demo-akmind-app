@@ -1,101 +1,260 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
+import type { DemoUser } from "@/types/demo";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+
+const LANDING_URL =
+  process.env.NEXT_PUBLIC_LANDING_URL ?? "https://www.akmind.com";
+
+const STAR_LAYOUT = Array.from({ length: 50 }, (_, i) => ({
+  left: `${((i * 37) % 97) + 1}%`,
+  top: `${((i * 59) % 94) + 3}%`,
+  size: 1.5 + (i % 4) * 0.55,
+  duration: 2.2 + (i % 5) * 0.35,
+  delay: ((i * 0.21) % 2.8) + (i % 3) * 0.15,
+}));
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function HomeContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlToken = searchParams.get("token");
+  const urlError = searchParams.get("error");
+
+  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<DemoUser | null>(null);
+  const [loading, setLoading] = useState(!!urlToken);
+  const [manualToken, setManualToken] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const tryLoadUser = useCallback(async (t: string) => {
+    setLoading(true);
+    setError(null);
+    setUser(null);
+    setToken(t);
+    try {
+      const res = await fetch(`/api/demo/user?token=${encodeURIComponent(t)}`);
+      if (!res.ok) {
+        setError("Invalid or expired token");
+        setToken(null);
+        setUser(null);
+        return;
+      }
+      const data = (await res.json()) as DemoUser;
+      setUser(data);
+      setToken(t);
+    } catch {
+      setError("Invalid or expired token");
+      setToken(null);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (urlError === "no-token") {
+      setError("A demo token is required to open the demo.");
+    }
+  }, [urlError]);
+
+  useEffect(() => {
+    if (!urlToken) {
+      setLoading(false);
+      setToken(null);
+      setUser(null);
+      if (urlError !== "no-token") setError(null);
+      return;
+    }
+    void tryLoadUser(urlToken);
+  }, [urlToken, tryLoadUser, urlError]);
+
+  const validateManualAndGo = async () => {
+    const t = manualToken.trim();
+    if (!t) {
+      setError("Enter your demo token");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/demo/user?token=${encodeURIComponent(t)}`);
+      if (!res.ok) {
+        setError("Invalid or expired token");
+        setLoading(false);
+        return;
+      }
+      setUser(await res.json());
+      setToken(t);
+      router.push(`/demo?token=${encodeURIComponent(t)}`);
+    } catch {
+      setError("Invalid or expired token");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const starLayer = useMemo(
+    () =>
+      STAR_LAYOUT.map((s, i) => (
+        <span
+          key={i}
+          className="star-field-dot"
+          style={{
+            left: s.left,
+            top: s.top,
+            width: s.size,
+            height: s.size,
+            animationDuration: `${s.duration}s`,
+            animationDelay: `${s.delay}s`,
+          }}
         />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+      )),
+    []
+  );
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  return (
+    <div className="relative min-h-screen w-full overflow-hidden bg-[#050510]">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {starLayer}
+      </div>
+
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-12">
+        <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="bg-indigo-600 p-8 text-center">
+            <p className="text-3xl font-bold text-white">⚡ AKMIND</p>
+            <p className="mt-1 text-sm text-indigo-200">
+              Dream. Discover. Shine.
+            </p>
+          </div>
+
+          <div className="p-8">
+            {loading && (
+              <div className="flex flex-col items-center gap-3 py-8">
+                <div className="h-10 w-10 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
+                <p className="text-sm text-slate-500">Loading your demo…</p>
+              </div>
+            )}
+
+            {!loading && error && (
+              <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center">
+                <p className="text-sm font-semibold text-red-800">{error}</p>
+                <Link
+                  href={LANDING_URL}
+                  className="mt-2 inline-block text-sm font-medium text-indigo-600 underline"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Book a free demo at akmind.com →
+                </Link>
+              </div>
+            )}
+
+            {!loading && user && token && (
+              <>
+                <div className="flex justify-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-xl font-bold text-indigo-600">
+                    {initials(user.childName)}
+                  </div>
+                </div>
+                <h2 className="mt-4 text-center text-2xl font-bold text-slate-900">
+                  Welcome, {user.childName}!
+                </h2>
+                <p className="mt-1 text-center text-slate-500">
+                  Ready to explore AI?
+                </p>
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  {[
+                    "✅ Welcome to AI",
+                    "🎮 History of AI + Game",
+                    "🤖 AI vs Humans + Game",
+                    "⚡ Types of AI + Game",
+                  ].map((label) => (
+                    <span
+                      key={label}
+                      className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="mt-6 w-full rounded-xl bg-indigo-600 py-4 text-lg font-bold text-white transition hover:bg-indigo-700"
+                  onClick={() =>
+                    router.push(`/demo?token=${encodeURIComponent(token)}`)
+                  }
+                >
+                  Start Demo →
+                </button>
+              </>
+            )}
+
+            {!loading && !user && (
+              <>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Enter your demo token
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Check your email for your unique token
+                </p>
+                <input
+                  type="text"
+                  className="mt-4 w-full rounded-xl border border-slate-200 p-3 font-mono text-slate-900 outline-none ring-indigo-500 focus:border-indigo-300 focus:ring-2"
+                  placeholder="e.g. abc123xyz456"
+                  value={manualToken}
+                  onChange={(e) => setManualToken(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void validateManualAndGo();
+                  }}
+                />
+                <button
+                  type="button"
+                  className="mt-3 w-full rounded-xl bg-indigo-600 py-3 font-semibold text-white transition hover:bg-indigo-700"
+                  onClick={() => void validateManualAndGo()}
+                >
+                  Access Demo →
+                </button>
+                <p className="mt-6 text-center text-sm text-slate-400">
+                  Don&apos;t have a token?
+                </p>
+                <div className="mt-2 text-center">
+                  <Link
+                    href={LANDING_URL}
+                    className="font-medium text-indigo-600 underline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Book a free demo at akmind.com →
+                  </Link>
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#050510]">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
+        </div>
+      }
+    >
+      <HomeContent />
+    </Suspense>
   );
 }

@@ -1,0 +1,182 @@
+[
+  {
+    "email": "test-verify@example.com",
+    "name": "Test Parent",
+    "childName": "Kid",
+    "phone": "5551234",
+    "demoToken": "15421cc9f7c94ad0",
+    "demoStarted": false,
+    "demoCompleted": false,
+    "lessonsComplete": [],
+    "quizScores": {
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0
+    },
+    "xp": 0,
+    "badgeEarned": false,
+    "id": "16f2c62a-fb94-4b96-a666-1d8600c85a71",
+    "createdAt": "2026-03-26T15:03:41.497Z"
+  },
+  {
+    "email": "ui-test-d6630871@ex.com",
+    "name": "Parent UI",
+    "childName": "Alex",
+    "phone": "555",
+    "demoToken": "607c8361c35240fe",
+    "demoStarted": false,
+    "demoCompleted": false,
+    "lessonsComplete": [],
+    "quizScores": {
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0
+    },
+    "xp": 0,
+    "badgeEarned": false,
+    "id": "78006fbe-30f3-4631-a338-d482896b2e92",
+    "createdAt": "2026-03-26T15:11:26.388Z"
+  },
+  {
+    "email": "jamie.rivera@example.com",
+    "name": "Jamie Rivera",
+    "childName": "Sofia",
+    "phone": "5550100",
+    "demoToken": "a3f91e8b2c4d5678",
+    "demoStarted": false,
+    "demoCompleted": false,
+    "lessonsComplete": [],
+    "quizScores": {
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0
+    },
+    "xp": 0,
+    "badgeEarned": false,
+    "id": "c4e8b1a2-9f3d-4e6c-b8a1-2d5f7e9c0a3b",
+    "createdAt": "2026-03-24T10:22:00.000Z"
+  },
+  {
+    "email": "marcus.chen@example.com",
+    "name": "Marcus Chen",
+    "childName": "Leo",
+    "phone": "5550101",
+    "demoToken": "8b47f2a1e9c03d56",
+    "demoStarted": false,
+    "demoCompleted": false,
+    "lessonsComplete": [],
+    "quizScores": {
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0
+    },
+    "xp": 0,
+    "badgeEarned": false,
+    "id": "91d2f4e8-6b1a-4c7d-9e3f-8a5b2c1d0e6f",
+    "createdAt": "2026-03-25T08:15:33.120Z"
+  },
+  {
+    "email": "elena.volkov@example.com",
+    "name": "Elena Volkov",
+    "childName": "Mira",
+    "phone": "5550102",
+    "demoToken": "f1e2d3c4b5a69780",
+    "demoStarted": false,
+    "demoCompleted": false,
+    "lessonsComplete": [],
+    "quizScores": {
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0
+    },
+    "xp": 0,
+    "badgeEarned": false,
+    "id": "3a7c9e2d-5f4b-41a8-8c6d-1e9b7f3a2d50",
+    "createdAt": "2026-03-26T09:00:00.000Z"
+  },
+  {
+    "email": "devon.okafor@example.com",
+    "name": "Devon Okafor",
+    "childName": "Kai",
+    "phone": "5550103",
+    "demoToken": "2d8c4b1a9f0e3d72",
+    "demoStarted": false,
+    "demoCompleted": false,
+    "lessonsComplete": [],
+    "quizScores": {
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0
+    },
+    "xp": 0,
+    "badgeEarned": false,
+    "id": "7b2e9c4a-1d8f-4e63-a5b7-9c2d4f8e1a60",
+    "createdAt": "2026-03-20T14:45:22.881Z"
+  },
+  {
+    "email": "priya.nair-demo@akmind.test",
+    "name": "Priya Nair",
+    "childName": "Ananya",
+    "phone": "5550104",
+    "demoToken": "6e5d4c3b2a1908f7",
+    "demoStarted": true,
+    "demoCompleted": true,
+    "lessonsComplete": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "quizScores": {
+      "1": 33,
+      "2": 80,
+      "3": 60,
+      "4": 80
+    },
+    "xp": 1400,
+    "badgeEarned": true,
+    "id": "ea41c8b3-6d2e-4f9a-bc12-567890abcdef",
+    "createdAt": "2026-03-23T11:30:45.000Z"
+  },
+  {
+    "email": "sam.taylor+demo@example.com",
+    "name": "Sam Taylor",
+    "childName": "Jordan",
+    "phone": "5550105",
+    "demoToken": "c9b8a7d6e5f40321",
+    "demoStarted": false,
+    "demoCompleted": false,
+    "lessonsComplete": [],
+    "quizScores": {
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0
+    },
+    "xp": 0,
+    "badgeEarned": false,
+    "id": "0f1e2d3c-4b5a-6978-8990-a1b2c3d4e5f6",
+    "createdAt": "2026-03-22T16:20:11.456Z"
+  },
+  {
+    "email": "hebelniraj015@gmail.com",
+    "name": "Hebel",
+    "childName": "Kid",
+    "phone": "+917337802174",
+    "demoToken": "2cebfc7aa7d6411e",
+    "demoStarted": false,
+    "demoCompleted": false,
+    "lessonsComplete": [],
+    "quizScores": {},
+    "xp": 0,
+    "badgeEarned": false,
+    "id": "3af3036b-59f8-447c-82d4-0cdc4c99fe1e",
+    "createdAt": "2026-03-26T21:52:10.316Z"
+  }
+]
