@@ -399,7 +399,7 @@ export default function GameTouchControls({
     <div
       style={{
         position: "fixed",
-        top: 48,
+        top: 52,
         left: 0,
         right: 0,
         bottom: 0,
@@ -407,7 +407,6 @@ export default function GameTouchControls({
         zIndex: 260,
         overflow: "hidden",
       }}
-      className="md:hidden"
     >
       {divideRow}
       {hunterRow}

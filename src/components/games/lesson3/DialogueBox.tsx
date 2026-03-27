@@ -25,9 +25,17 @@ const CHAR_META: Record<CharacterName, { color: string; label: string; initial: 
 export default function DialogueBox({ character, text, onComplete }: DialogueBoxProps) {
   const [displayed, setDisplayed] = useState("");
   const [phase, setPhase] = useState<"typing" | "done">("typing");
+  const [isMobile, setIsMobile] = useState(false);
 
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
+
+  useEffect(() => {
+    setIsMobile(
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && window.innerWidth < 1024)
+    );
+  }, []);
 
   const showFull = useCallback(() => {
     setDisplayed(text);
@@ -82,27 +90,30 @@ export default function DialogueBox({ character, text, onComplete }: DialogueBox
         bottom: 0,
         left: 0,
         right: 0,
-        height: 160,
+        height: "auto",
+        minHeight: isMobile ? 100 : 160,
+        maxHeight: isMobile ? 160 : 200,
         backgroundColor: "rgba(10,10,26,0.96)",
         borderTop: "2px solid #4338ca",
         display: "flex",
         alignItems: "center",
-        gap: 20,
-        padding: "0 24px",
+        gap: isMobile ? 10 : 20,
+        padding: isMobile ? "10px 14px" : "0 24px",
         cursor: "pointer",
         zIndex: 200,
       }}
     >
       {/* ── Portrait ── */}
-      <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+      <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: isMobile ? 3 : 6 }}>
         <div style={{
-          width: 64, height: 64,
+          width: isMobile ? 40 : 64,
+          height: isMobile ? 40 : 64,
           borderRadius: "50%",
           backgroundColor: meta.color,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 26,
+          fontSize: isMobile ? 16 : 26,
           fontWeight: 700,
           color: "#ffffff",
           boxShadow: `0 0 16px ${meta.color}88`,
@@ -111,7 +122,7 @@ export default function DialogueBox({ character, text, onComplete }: DialogueBox
         }}>
           {meta.initial}
         </div>
-        <span style={{ fontSize: 10, fontFamily: "monospace", color: meta.color, letterSpacing: 2, textTransform: "uppercase" }}>
+        <span style={{ fontSize: isMobile ? 8 : 10, fontFamily: "monospace", color: meta.color, letterSpacing: 2, textTransform: "uppercase" }}>
           {meta.label}
         </span>
       </div>
@@ -119,12 +130,12 @@ export default function DialogueBox({ character, text, onComplete }: DialogueBox
       {/* ── Text area ── */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
         <p style={{
-          fontSize: 16,
+          fontSize: isMobile ? 13 : 16,
           color: "#e2e8f0",
           fontFamily: "'Geist', monospace",
-          lineHeight: 1.6,
+          lineHeight: 1.5,
           margin: 0,
-          minHeight: 52,
+          minHeight: isMobile ? 32 : 52,
           whiteSpace: "pre-line",
         }}>
           {displayed}
@@ -134,7 +145,7 @@ export default function DialogueBox({ character, text, onComplete }: DialogueBox
         </p>
 
         {phase === "done" && (
-          <AdvancePrompt />
+          <AdvancePrompt isMobile={isMobile} />
         )}
       </div>
 
@@ -146,16 +157,16 @@ export default function DialogueBox({ character, text, onComplete }: DialogueBox
   );
 }
 
-function AdvancePrompt() {
+function AdvancePrompt({ isMobile = false }: { isMobile?: boolean }) {
   return (
     <p style={{
       fontSize: 11,
       fontFamily: "monospace",
       color: "#6366f1",
-      marginTop: 8,
+      marginTop: isMobile ? 4 : 8,
       animation: "prompt-pulse 1.2s ease-in-out infinite",
     }}>
-      ▶ Press Space to continue
+      {isMobile ? "▶ Tap to continue" : "▶ Press Space to continue"}
     </p>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 
 type CharacterName = "NOVA" | "AX" | "CHAOS_BOT" | "DATA_PHANTOM" | "OVERFIT_MONSTER" | "BLANK_SLATE" | "NARRATOR";
@@ -81,7 +81,13 @@ export default function DialogueBox({
   }, [showFull, onComplete]);
 
   const meta = CHAR_META[character];
-  const isMobile = useMemo(() => typeof window !== "undefined" && window.innerWidth < 768, []);
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    setIsMobile(
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && window.innerWidth < 1024)
+    );
+  }, []);
 
   return (
     <motion.div
