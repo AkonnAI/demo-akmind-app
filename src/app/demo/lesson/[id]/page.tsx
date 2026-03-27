@@ -254,6 +254,11 @@ const GameShell4 = dynamic(
   { ssr: false }
 );
 
+const LandscapeWrapper = dynamic(
+  () => import("@/components/games/shared/LandscapeWrapper"),
+  { ssr: false }
+);
+
 function readCookieToken(): string | null {
   if (typeof document === "undefined") return null;
   const match = /(?:^|; )demo_token=([^;]*)/.exec(document.cookie);
@@ -310,32 +315,19 @@ function LessonPageInner() {
   const [gameComplete, setGameComplete] = useState(false);
   const [gameActive, setGameActive] = useState(false);
 
-  const launchGame = async () => {
-    const isMobile = window.innerWidth < 768 || "ontouchstart" in window;
-    if (isMobile) {
-      try {
-        const el = document.documentElement;
-        if (el.requestFullscreen) {
-          await el.requestFullscreen();
-        } else if ((el as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen) {
-          await (el as HTMLElement & { webkitRequestFullscreen: () => Promise<void> }).webkitRequestFullscreen();
-        }
-        const so = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
-        if (so?.lock) {
-          await so.lock("landscape").catch(() => {});
-        }
-      } catch (e) {
-        console.log("Fullscreen failed:", e);
-      }
-    }
+  const launchGame = () => {
     setGameActive(true);
+    // Best-effort fullscreen (LandscapeWrapper handles the rotation prompt)
+    try {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    } catch {
+      /* silent */
+    }
   };
 
   const exitGame = async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
-      const so2 = screen.orientation as ScreenOrientation & { unlock?: () => void };
-      if (so2?.unlock) so2.unlock();
     } catch {
       /* silent */
     }
@@ -710,36 +702,42 @@ function LessonPageInner() {
         {phase === "game" && lesson.hasGame && (
           <div className="px-0 sm:px-0">
             {gameActive && lessonId === 2 && (
-              <GameShell2
-                onComplete={async () => {
-                  await exitGame();
-                  setGameComplete(true);
-                  setPhase("quiz");
-                }}
-                onExit={exitGame}
-              />
+              <LandscapeWrapper>
+                <GameShell2
+                  onComplete={async () => {
+                    await exitGame();
+                    setGameComplete(true);
+                    setPhase("quiz");
+                  }}
+                  onExit={exitGame}
+                />
+              </LandscapeWrapper>
             )}
 
             {gameActive && lessonId === 3 && (
-              <GameShell3
-                onComplete={async () => {
-                  await exitGame();
-                  setGameComplete(true);
-                  setPhase("quiz");
-                }}
-                onExit={exitGame}
-              />
+              <LandscapeWrapper>
+                <GameShell3
+                  onComplete={async () => {
+                    await exitGame();
+                    setGameComplete(true);
+                    setPhase("quiz");
+                  }}
+                  onExit={exitGame}
+                />
+              </LandscapeWrapper>
             )}
 
             {gameActive && lessonId === 4 && (
-              <GameShell4
-                onComplete={async () => {
-                  await exitGame();
-                  setGameComplete(true);
-                  setPhase("quiz");
-                }}
-                onExit={exitGame}
-              />
+              <LandscapeWrapper>
+                <GameShell4
+                  onComplete={async () => {
+                    await exitGame();
+                    setGameComplete(true);
+                    setPhase("quiz");
+                  }}
+                  onExit={exitGame}
+                />
+              </LandscapeWrapper>
             )}
 
             {gameActive && lessonId !== 2 && lessonId !== 3 && lessonId !== 4 && (

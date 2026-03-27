@@ -175,8 +175,16 @@ export default function TimelineStage({
     scaleTimer: 0,
   });
 
+  const MOBILE_CONTROLS_HEIGHT =
+    typeof navigator !== "undefined" &&
+    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+      ? 120
+      : 0;
   const vpW = typeof window !== "undefined" ? window.innerWidth : 1200;
-  const vpH = typeof window !== "undefined" ? window.innerHeight - 48 : 600;
+  const vpH =
+    typeof window !== "undefined"
+      ? window.innerHeight - 48 - MOBILE_CONTROLS_HEIGHT
+      : 600;
   const groundTop = vpH - GROUND_Y;
 
   const [uiHealth, setUiHealth] = useState(gameData.health);
@@ -744,7 +752,7 @@ export default function TimelineStage({
         ref={canvasRef}
         width={vpW}
         height={vpH}
-        style={{ position: "absolute", top: 0, left: 0 }}
+        style={{ position: "absolute", top: 0, left: 0, touchAction: "none" }}
       />
 
       {/* AX character */}

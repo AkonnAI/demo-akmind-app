@@ -703,7 +703,7 @@ export default function DivideStage({
         </div>
       </div>
 
-      <canvas ref={canvasRef} style={{ display: "block", width: "100%", height: "100%" }} />
+      <canvas ref={canvasRef} style={{ display: "block", width: "100%", height: "100%", touchAction: "none" }} />
       <div
         ref={axWrapRef}
         style={{

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 /* ── Synthetic keyboard event helper ── */
 function fireKey(type: "keydown" | "keyup", key: string, code: string) {
@@ -80,7 +80,7 @@ interface CircleBtnProps {
 }
 
 function CircleBtn({
-  size = 80, bgIdle, bgActive, border, shadow, shadowActive,
+  size = 68, bgIdle, bgActive, border, shadow, shadowActive,
   active, label, sublabel, sublabelColor = "#94a3b8", icon,
   onDown, onUp,
 }: CircleBtnProps) {
@@ -200,16 +200,15 @@ export default function GameTouchControls({
   variant = "default",
   showBossQuizRow = false,
 }: GameTouchControlsProps) {
-  const [touchCapable, setTouchCapable] = useState(false);
+  const [showControls, setShowControls] = useState(false);
   const [pressed, setPressed] = useState<Record<string, boolean>>({});
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const touchIds = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
-    setTouchCapable(
-      typeof window !== "undefined" &&
-        ("ontouchstart" in window || navigator.maxTouchPoints > 0)
-    );
+    // Only show on real phones/tablets — not desktop browsers with touch screens
+    const isTouchDevice =
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
+    setShowControls(isTouchDevice);
   }, []);
 
   const press = useCallback((id: string, down: boolean, key: string, code: string) => {
@@ -217,7 +216,7 @@ export default function GameTouchControls({
     fireKey(down ? "keydown" : "keyup", key, code);
   }, []);
 
-  if (!visible || !touchCapable) return null;
+  if (!visible || !showControls) return null;
 
   const is = (id: string) => !!pressed[id];
 
@@ -415,7 +414,10 @@ export default function GameTouchControls({
     <div
       style={{
         position: "fixed",
-        inset: 0,
+        top: 48,
+        left: 0,
+        right: 0,
+        bottom: 0,
         pointerEvents: "none",
         zIndex: 260,
       }}
@@ -425,8 +427,8 @@ export default function GameTouchControls({
       <div
         style={{
           position: "absolute",
-          left: 20,
-          bottom: 80,
+          left: 16,
+          bottom: 16,
           pointerEvents: "auto",
           display: "flex",
           flexDirection: "column",
@@ -435,9 +437,9 @@ export default function GameTouchControls({
         }}
       >
         {divideRow}
-        <div style={{ position: "relative", display: "inline-block", padding: 8 }}>
+        <div style={{ position: "relative", display: "inline-block", padding: 6 }}>
           <CornerBrackets color="rgba(99,102,241,0.4)" />
-          <div style={{ display: "flex", gap: 12 }}>
+          <div style={{ display: "flex", gap: 10 }}>
             {leftBtn}
             {rightBtn}
           </div>
@@ -448,8 +450,8 @@ export default function GameTouchControls({
       <div
         style={{
           position: "absolute",
-          right: 20,
-          bottom: 80,
+          right: 16,
+          bottom: 16,
           pointerEvents: "auto",
           display: "flex",
           flexDirection: "column",
@@ -459,9 +461,9 @@ export default function GameTouchControls({
       >
         {hunterRow}
         {bossQuizRow}
-        <div style={{ position: "relative", display: "inline-block", padding: 8 }}>
+        <div style={{ position: "relative", display: "inline-block", padding: 6 }}>
           <CornerBrackets color="rgba(34,211,238,0.4)" />
-          <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
             {jumpBtn}
             {fireBtn}
           </div>
