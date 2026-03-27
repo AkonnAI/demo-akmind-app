@@ -16,6 +16,8 @@ interface SoundEngine {
   isMuted: boolean;
 }
 
+const BG_MUSIC = "/sounds/district3-bg.mp3";
+
 const SOUND_FILES: Record<SoundName, string> = {
   correct:     "/sounds/correct.mp3",
   wrong:       "/sounds/wrong.mp3",
@@ -46,7 +48,7 @@ export function useSoundEngine(): SoundEngine {
   useEffect(() => {
     // Init bg music
     try {
-      const bg = new Audio("/sounds/district1-bg.mp3");
+      const bg = new Audio(BG_MUSIC);
       bg.loop = true;
       bg.volume = 0.4;
       bgMusicRef.current = bg;

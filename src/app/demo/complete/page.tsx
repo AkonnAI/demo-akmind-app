@@ -329,7 +329,7 @@ function CompletePageInner() {
           <div className="mt-6 text-center">
             <p className="text-sm text-slate-400">Early Bird Price</p>
             <p className="text-4xl font-black text-indigo-600">
-              ₹18,999
+              ₹29,999/-
               <span className="text-lg font-normal text-slate-400">
                 {" "}
                 /program
@@ -385,7 +385,7 @@ function CompletePageInner() {
                     <span className="font-medium">
                       AI Explorers — Full Program
                     </span>
-                    <span className="text-xl font-bold">₹18,999</span>
+                    <span className="text-xl font-bold">₹29,999/-</span>
                   </div>
                   <p className="mt-1 text-xs text-amber-600">
                     Available from August 2026
@@ -476,7 +476,7 @@ function CompletePageInner() {
                   className="mt-6 w-full rounded-xl bg-indigo-600 py-4 font-bold text-white hover:bg-indigo-700"
                   onClick={handlePayClick}
                 >
-                  Pay ₹18,999 →
+                  Pay ₹29,999/- →
                 </button>
                 <p className="mt-3 text-center text-xs text-slate-400">
                   🔒 Secure payment · Full refund if course doesn&apos;t launch

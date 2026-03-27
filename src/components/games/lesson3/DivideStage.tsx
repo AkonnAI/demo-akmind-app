@@ -192,7 +192,7 @@ export default function DivideStage({
       setMode(m);
       onModeChange?.(m);
       try {
-        playSound("correct");
+        playSound("gateOpen");
       } catch {
         /* silent */
       }
@@ -259,6 +259,11 @@ export default function DivideStage({
   const flashWrongMode = useCallback((needHuman: boolean) => {
     if (wrongWarnActiveRef.current) return;
     wrongWarnActiveRef.current = true;
+    try {
+      playSound("wrong");
+    } catch {
+      /* silent */
+    }
     const msg = needHuman
       ? "⚠ Switch to HUMAN MODE (H key)!"
       : "⚠ Switch to AI MODE (A key)!";
@@ -269,7 +274,7 @@ export default function DivideStage({
       wrongWarnActiveRef.current = false;
       wrongWarnTimerRef.current = null;
     }, 2000);
-  }, []);
+  }, [playSound]);
 
   const openChallenge = (id: ChallengeId) => {
     pausedRef.current = true;

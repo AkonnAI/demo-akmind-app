@@ -126,7 +126,7 @@ export default function GameShell2({ onComplete, onExit }: GameShell2Props) {
   const [xpEarned, setXpEarned] = useState(0);
   const [gameData, setGameData] = useState<GameData>(INITIAL_GAME_DATA);
   const [fading, setFading] = useState(false);
-  const { playBgMusic, toggleMute, isMuted } = useSoundEngine();
+  const { playBgMusic, stopBgMusic, toggleMute, isMuted } = useSoundEngine();
 
   const addXP = (amount: number) => setXpEarned((x) => x + amount);
   const updateGameData = useCallback((updates: Partial<GameData>) => {
@@ -142,8 +142,14 @@ export default function GameShell2({ onComplete, onExit }: GameShell2Props) {
   }, []);
 
   useEffect(() => {
-    if (gameState === "CINEMATIC_INTRO") playBgMusic();
-  }, [gameState, playBgMusic]);
+    if (gameState === "VICTORY" || gameState === "COMPLETE") {
+      stopBgMusic();
+      return;
+    }
+    if (gameState !== "LOADING") {
+      playBgMusic();
+    }
+  }, [gameState, playBgMusic, stopBgMusic]);
 
   useEffect(() => {
     if (gameState === "COMPLETE") onComplete(xpEarned);

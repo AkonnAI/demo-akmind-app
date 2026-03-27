@@ -8,11 +8,11 @@ interface LoadingScreenProps {
 }
 
 const FLAVOR_TEXTS = [
-  "Opening History Vault...",
-  "Calibrating temporal anchors...",
-  "Loading AI Timeline...",
-  "Preparing NOVA archive link...",
-  "Warning: Time Corruptor signature...",
+  "Opening Classification Arena...",
+  "Loading Narrow / General / Super profiles...",
+  "Calibrating ammo-type matrix...",
+  "Preparing NOVA field brief...",
+  "Warning: type mismatch detected...",
 ];
 
 interface Star {
@@ -124,7 +124,6 @@ export default function LoadingScreen({ onLoadComplete }: LoadingScreenProps) {
                 AKMIND ACADEMY
               </p>
 
-              {/* District 2 */}
               <h1
                 style={{
                   color: "#ffffff",
@@ -134,21 +133,23 @@ export default function LoadingScreen({ onLoadComplete }: LoadingScreenProps) {
                   lineHeight: 1.2,
                 }}
               >
-                District 2
+                District 4
               </h1>
 
-              {/* History Vault */}
               <p
                 style={{
-                  color: "#fcd34d",
+                  background: "linear-gradient(90deg, #a78bfa, #fcd34d, #f87171)",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  color: "transparent",
                   fontSize: "24px",
                   margin: "8px 0 4px",
+                  fontWeight: 800,
                 }}
               >
-                The History Vault
+                The Classification Arena
               </p>
 
-              {/* Lesson label */}
               <p
                 style={{
                   color: "#64748b",
@@ -156,7 +157,7 @@ export default function LoadingScreen({ onLoadComplete }: LoadingScreenProps) {
                   margin: 0,
                 }}
               >
-                Lesson 2 — History of AI
+                Lesson 4 — Types of AI: Narrow, General & Super
               </p>
 
               {/* Loading bar */}
@@ -176,7 +177,7 @@ export default function LoadingScreen({ onLoadComplete }: LoadingScreenProps) {
                   style={{
                     height: "100%",
                     width: barStarted ? "100%" : "0%",
-                    background: "linear-gradient(to right, #6366f1, #a855f7)",
+                    background: "linear-gradient(to right, #7c3aed, #a855f7, #ea580c)",
                     borderRadius: "9999px",
                     transition: "width 2500ms linear",
                   }}

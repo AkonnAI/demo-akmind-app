@@ -60,7 +60,15 @@ export default function BossBattle4({
   const ammoRef = useRef<AmmoType>(null);
   const shootCd = useRef(0);
   const frameRef = useRef(0);
-  const axRef = useRef({ x: 80, y: 200, vx: 0, vy: 0, onGround: false, facing: 1 });
+  const axRef = useRef({
+    x: 80,
+    y: 200,
+    vx: 0,
+    vy: 0,
+    onGround: false,
+    facing: 1,
+    invuln: 0,
+  });
   const bossHpRef = useRef(BOSS_HP);
   const projRef = useRef<PBullet[]>([]);
   const batRef = useRef<BProj[]>([]);
@@ -127,11 +135,15 @@ export default function BossBattle4({
 
   const damage = useCallback(
     (n: number) => {
-      const h = Math.max(0, playerHpRef.current - n);
+      if (axRef.current.invuln > 0) return;
+      const before = playerHpRef.current;
+      const h = Math.max(0, before - n);
+      if (h === before) return;
       playerHpRef.current = h;
+      axRef.current.invuln = 45;
       setUiHp(h);
       onUpdateGameData({ health: h });
-      playSound("playerHit");
+      playSound("wrong");
     },
     [onUpdateGameData, playSound]
   );
@@ -142,6 +154,7 @@ export default function BossBattle4({
   onXPRef.current = onXP;
   const playSoundRef = useRef(playSound);
   playSoundRef.current = playSound;
+  const lastBossPhaseRef = useRef<BossKind | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -192,12 +205,20 @@ export default function BossBattle4({
       const by = floor - BOSS_H;
       const phase = bossPhase(fr);
       const phIdx = Math.floor((fr % CYCLE) / PHASE_FR);
+      if (lastBossPhaseRef.current !== phase) {
+        if (lastBossPhaseRef.current !== null) {
+          playSoundRef.current("gateOpen");
+        }
+        lastBossPhaseRef.current = phase;
+      }
 
       if (flagsRef.current.win) {
         ctx.fillStyle = "#020617";
         ctx.fillRect(0, 0, W, H);
         return;
       }
+
+      if (ax.invuln > 0) ax.invuln--;
 
       ax.vx = 0;
       if (keys.has("ArrowLeft")) {
@@ -300,30 +321,39 @@ export default function BossBattle4({
           b.dead = true;
           continue;
         }
-        if (b.kind === "beam") {
-          const yb = b.yBeam ?? b.y;
-          const inBand = ax.y + AX_H > yb - 4 && ax.y < yb + 12;
-          if (inBand && axfeet >= yb - 2) {
-            damageRef.current(10);
-            b.dead = true;
+        if (ax.invuln <= 0) {
+          if (b.kind === "beam") {
+            const yb = b.yBeam ?? b.y;
+            const inBand = ax.y + AX_H > yb - 4 && ax.y < yb + 12;
+            if (inBand && axfeet >= yb - 2) {
+              damageRef.current(10);
+              b.dead = true;
+            }
+          } else if (b.kind === "pellet") {
+            b.x += b.vx;
+            b.y += b.vy;
+            if (
+              b.x > ax.x &&
+              b.x < ax.x + AX_W &&
+              b.y > ax.y &&
+              b.y < ax.y + AX_H
+            ) {
+              damageRef.current(8);
+              b.dead = true;
+            }
+          } else if (b.kind === "shock") {
+            b.x += b.vx;
+            if (ax.onGround && Math.abs(axcx - b.x) < 40 && b.x > ax.x - 20) {
+              damageRef.current(10);
+              b.dead = true;
+            }
           }
-        } else if (b.kind === "pellet") {
-          b.x += b.vx;
-          b.y += b.vy;
-          if (
-            b.x > ax.x &&
-            b.x < ax.x + AX_W &&
-            b.y > ax.y &&
-            b.y < ax.y + AX_H
-          ) {
-            damageRef.current(8);
-            b.dead = true;
-          }
-        } else if (b.kind === "shock") {
-          b.x += b.vx;
-          if (ax.onGround && Math.abs(axcx - b.x) < 40 && b.x > ax.x - 20) {
-            damageRef.current(10);
-            b.dead = true;
+        } else if (b.kind !== "beam") {
+          if (b.kind === "pellet") {
+            b.x += b.vx;
+            b.y += b.vy;
+          } else if (b.kind === "shock") {
+            b.x += b.vx;
           }
         }
       }
@@ -348,30 +378,32 @@ export default function BossBattle4({
 
       for (const p of projRef.current) {
         if (p.dead) continue;
+        const prevX = p.x;
         p.x += p.vx;
         if (p.ammo === "general") {
           p.trail.push({ x: p.x, y: p.y });
           if (p.trail.length > 10) p.trail.shift();
         }
-        if (
-          p.x > bx &&
-          p.x < bx + BOSS_W &&
-          p.y > by &&
-          p.y < by + BOSS_H
-        ) {
-          p.dead = true;
-          if (p.ammo === phase) {
-            bossHpRef.current -= 1;
-            setBossUiHp(bossHpRef.current);
-            playSoundRef.current("bossHit");
-            onXPRef.current(30);
-            if (bossHpRef.current <= 0) {
-              playSoundRef.current("victory");
-              flagsRef.current.win = true;
-              setWinOpen(true);
+        const yHit = p.y > by && p.y < by + BOSS_H;
+        if (yHit) {
+          const minX = Math.min(prevX, p.x);
+          const maxX = Math.max(prevX, p.x);
+          if (maxX >= bx && minX <= bx + BOSS_W) {
+            p.dead = true;
+            const match = p.ammo != null && p.ammo === phase;
+            if (match) {
+              bossHpRef.current -= 1;
+              setBossUiHp(bossHpRef.current);
+              playSoundRef.current("bossHit");
+              onXPRef.current(30);
+              if (bossHpRef.current <= 0) {
+                playSoundRef.current("victory");
+                flagsRef.current.win = true;
+                setWinOpen(true);
+              }
+            } else {
+              playSoundRef.current("enemyHit");
             }
-          } else {
-            playSoundRef.current("wrong");
           }
         }
         if (p.x < -40 || p.x > W + 40) p.dead = true;

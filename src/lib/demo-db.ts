@@ -110,3 +110,24 @@ export function updateDemoUser(
 export function hasUsedDemo(email: string): boolean {
   return getDemoUserByEmail(email) !== null;
 }
+
+const ADMIN_DEV_TOKEN = "admin-akmind-dev-2026";
+
+export function getOrCreateAdminUser(): DemoUser {
+  const existing = getDemoUserByToken(ADMIN_DEV_TOKEN);
+  if (existing) return existing;
+
+  return createDemoUser({
+    email: "admin@akmind.com",
+    name: "Admin",
+    childName: "AX",
+    phone: "0000000000",
+    demoToken: ADMIN_DEV_TOKEN,
+    demoStarted: false,
+    demoCompleted: false,
+    lessonsComplete: [],
+    quizScores: {},
+    xp: 0,
+    badgeEarned: false,
+  });
+}

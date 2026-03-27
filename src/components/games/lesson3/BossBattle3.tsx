@@ -193,7 +193,7 @@ export default function BossBattle3({
       onUpdateGameData({ health: h });
       axRef.current.inv = 40;
       try {
-        playSound("playerHit");
+        playSound("wrong");
       } catch {
         /* silent */
       }
@@ -493,6 +493,11 @@ export default function BossBattle3({
                   b.y = floor - BOSS_H - 10;
                   phaseRef.current = 3;
                   setPhase(3);
+                  try {
+                    playSound("gateOpen");
+                  } catch {
+                    /* silent */
+                  }
                   setPhaseBanner("p3");
                   setTimeout(() => setPhaseBanner(null), 3000);
                   setNovaLine("Final merge — alternate every instinct!");

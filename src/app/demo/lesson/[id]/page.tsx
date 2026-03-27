@@ -354,7 +354,7 @@ function LessonPageInner() {
 
   useEffect(() => {
     setVideoWatched(false);
-    const t = setTimeout(() => setVideoWatched(true), 30_000);
+    const t = setTimeout(() => setVideoWatched(true), 10_000);
     return () => clearTimeout(t);
   }, [lessonId]);
 

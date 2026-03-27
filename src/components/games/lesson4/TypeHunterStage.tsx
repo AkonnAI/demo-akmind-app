@@ -415,7 +415,7 @@ export default function TypeHunterStage({
             healthRef.current = hp;
             setUiHealth(hp);
             onUpdateRef.current({ health: hp });
-            playSoundRef.current("playerHit");
+            playSoundRef.current("wrong");
             ax.invTimer = 30;
           }
 
@@ -438,7 +438,7 @@ export default function TypeHunterStage({
                 pr.vy = -2;
                 pr.bounceBack = true;
                 en.flash = 10;
-                playSoundRef.current("enemyHit");
+                playSoundRef.current("wrong");
                 let hint = "";
                 let col = "#fff";
                 if (pr.ammo === "narrow" && en.kind === "general") {
@@ -468,10 +468,10 @@ export default function TypeHunterStage({
                 en.hp -= 1;
                 en.flash = 14;
                 pr.dead = true;
-                playSoundRef.current("enemyHit");
+                playSoundRef.current("correct");
                 if (en.hp <= 0) {
                   en.dead = true;
-                  playSoundRef.current("enemyDie");
+                  playSoundRef.current("xpCollect");
                   onXPRef.current(25);
                   for (let i = 0; i < 16; i++) {
                     particlesRef.current.push({

@@ -178,6 +178,11 @@ export default function BossBattleLesson2({
         if (bossRef.current.hp <= 6 && bossRef.current.phase === 1) {
           bossRef.current.phase = 2;
           bossRef.current.fireInterval = 160;
+          try {
+            playSound("gateOpen");
+          } catch {
+            /* silent */
+          }
           if (!taunt2TriggeredRef.current) {
             taunt2TriggeredRef.current = true;
             showTaunt("CHAOS_BOT", "Impossible! You actually remember these dates?! Let me make you FORGET!");
@@ -185,6 +190,11 @@ export default function BossBattleLesson2({
         } else if (bossRef.current.hp <= 3 && bossRef.current.phase === 2) {
           bossRef.current.phase = 3;
           bossRef.current.fireInterval = 130;
+          try {
+            playSound("gateOpen");
+          } catch {
+            /* silent */
+          }
           if (!taunt3TriggeredRef.current) {
             taunt3TriggeredRef.current = true;
             showTaunt("CHAOS_BOT", "STOP! If you restore history... everyone will know I was just a buggy prototype! PLEASE!");
@@ -207,7 +217,7 @@ export default function BossBattleLesson2({
         setPlayerHpPct(playerHpRef.current / 100);
         axRef.current.invTimer = 60;
         try {
-          playSound("playerHit");
+          playSound("wrong");
         } catch {
           /* silent */
         }
@@ -330,7 +340,7 @@ export default function BossBattleLesson2({
               setPlayerHpPct(playerHpRef.current / 100);
               ax.invTimer = 45;
               try {
-                playSound("playerHit");
+                playSound("wrong");
               } catch {
                 /* silent */
               }

@@ -190,7 +190,10 @@ export default function TimelineStage({
   const healthRef = useRef(gameData.health);
   const completedRef = useRef(false);
   const rainDropsRef = useRef<RainDrop[] | null>(null);
-  const { playSound, playBgMusic, stopBgMusic } = useSoundEngine();
+  const shootBubbleCdRef = useRef(0);
+  const onXPRef = useRef(onXP);
+  onXPRef.current = onXP;
+  const { playSound } = useSoundEngine();
 
   useEffect(() => {
     healthRef.current = gameData.health;
@@ -220,14 +223,12 @@ export default function TimelineStage({
       scaleY: 1,
       scaleTimer: 0,
     };
-    playBgMusic();
     const t = setTimeout(() => setStageLabel(false), 2200);
     return () => {
       clearTimeout(t);
       cancelAnimationFrame(rafRef.current);
-      stopBgMusic();
     };
-  }, [stage, groundTop, gameData.health, playBgMusic, stopBgMusic]);
+  }, [stage, groundTop, gameData.health]);
 
   const floatTextsRef = useRef<FloatTx[]>([]);
   const floatId = useRef(0);
@@ -281,6 +282,13 @@ export default function TimelineStage({
       setNovaMessage(line);
       setNovaWarn(null);
       playSound("correct");
+      if (progressRef.current === 4) {
+        try {
+          playSound("checkpoint");
+        } catch {
+          /* silent */
+        }
+      }
       if (progressRef.current >= 4 && !completedRef.current) {
         completedRef.current = true;
         setTimeout(onComplete, 600);
@@ -477,7 +485,11 @@ export default function TimelineStage({
             flashRef.current = 10;
             ax.vx = ax.x < b.x ? -4 : 4;
             ax.vy = -5;
-            playSound("wrong");
+            try {
+              playSound("enemyHit");
+            } catch {
+              /* silent */
+            }
           }
         }
 
@@ -487,6 +499,35 @@ export default function TimelineStage({
           if (b.frozenTimer <= 0) {
             b.frozen = false;
             b.dead = true; // disappears after freeze
+          }
+        }
+      }
+
+      if (shootBubbleCdRef.current > 0) shootBubbleCdRef.current--;
+      const zPress = keys.has("z") || keys.has("Z");
+      if (stage === 1 && zPress && shootBubbleCdRef.current <= 0) {
+        shootBubbleCdRef.current = 22;
+        try {
+          playSound("shoot");
+        } catch {
+          /* silent */
+        }
+        const axCx = ax.x + AX_W / 2;
+        const axCy = ax.y + AX_H / 2;
+        for (const b of bubbles) {
+          if (b.dead || b.frozen) continue;
+          const bob = Math.sin(fr * 0.03) * 30;
+          const by = b.baseY + bob;
+          if (Math.abs(b.x - axCx) < 200 && Math.abs(by - axCy) < 100) {
+            b.frozen = true;
+            b.frozenTimer = 160;
+            try {
+              playSound("xpCollect");
+            } catch {
+              /* silent */
+            }
+            onXPRef.current(10);
+            break;
           }
         }
       }
@@ -675,7 +716,7 @@ export default function TimelineStage({
 
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [vpW, vpH, groundTop, handleLandOn, onComplete, playSound, onUpdateGameData]);
+  }, [vpW, vpH, groundTop, stage, handleLandOn, onComplete, playSound, onUpdateGameData]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => keysRef.current.add(e.key);
