@@ -6,13 +6,13 @@ This document is the **single source of truth** for **demo-akmind-app**: what it
 
 ## 1. What this project is
 
-**demo-akmind-app** is a **Next.js 15** web application for the **AKMIND** brand. It delivers a **guided demo “class”** for kids (parent registers → receives a magic link → child progresses through **4 lessons** with **video**, optional **story games**, **quizzes**, **XP**, and a **completion** experience including badge PDF and upsell UI).
+**demo-akmind-app** is a **Next.js 15** web application for the **AKMIND** brand. It delivers a **guided demo "class"** for kids (parent registers → receives a magic link → child progresses through **4 lessons** with **video**, optional **story games**, **quizzes**, **XP**, and a **completion** experience including badge PDF and upsell UI).
 
 **Product goals (as implemented):**
 
 - One-time demo per email (enforced at registration).
 - Token-based access to `/demo/**` (no full user accounts in this repo).
-- Local JSON “database” for demo users (`data/demo-users.json`).
+- Local JSON "database" for demo users (`data/demo-users.json`).
 - Optional Gmail SMTP to email demo links and notify admins.
 - Four thematic lessons aligned with introductory AI curriculum.
 - Three canvas/React **mini-games** (lessons 2–4) loaded with `dynamic(..., { ssr: false })`.
@@ -46,6 +46,8 @@ demo-akmind-app/
 │   ├── app/
 │   │   ├── page.tsx             # Landing: token entry / validation → demo
 │   │   ├── layout.tsx
+│   │   ├── admin/
+│   │   │   └── page.tsx         # Admin dashboard (view users, progress stats)
 │   │   ├── demo/
 │   │   │   ├── page.tsx         # Dashboard: 4 lessons, XP, locks
 │   │   │   ├── complete/
@@ -56,9 +58,12 @@ demo-akmind-app/
 │   │       ├── register/route.ts
 │   │       ├── user/route.ts
 │   │       ├── progress/route.ts
-│   │       └── check/route.ts
+│   │       ├── check/route.ts
+│   │       └── admin/route.ts   # Admin API: list users, reset progress
 │   ├── components/games/
-│   │   ├── shared/              # AXCharacter, NovaCharacter (cross-lesson)
+│   │   ├── shared/
+│   │   │   ├── AXCharacter.tsx  # Master player avatar (all lessons)
+│   │   │   └── NovaCharacter.tsx# Master guide character (all lessons)
 │   │   ├── lesson2/             # History Vault, NPC zone, timeline, boss
 │   │   ├── lesson3/             # The Divide (Human vs AI modes)
 │   │   └── lesson4/             # Classification arena (ammo types + boss)
@@ -129,7 +134,7 @@ Server-side **`DemoUser`** (persisted):
 
 **Storage path:** `{AKMIND_LOCAL_DB_PATH or ./data}/demo-users.json`.
 
-**Token lookup (normalization):** `normalizeDemoToken()` in `demo-db.ts` trims and lowercases tokens for comparisons. `createDemoUser` stores tokens normalized. `GET /api/demo/user` trims the query `token`. This avoids “invalid token” when pasting mixed case or stray spaces.
+**Token lookup (normalization):** `normalizeDemoToken()` in `demo-db.ts` trims and lowercases tokens for comparisons. `createDemoUser` stores tokens normalized. `GET /api/demo/user` trims the query `token`. This avoids "invalid token" when pasting mixed case or stray spaces.
 
 **Demo seed users:** `data/demo-users.json` may include multiple preset rows for QA (emails, `demoToken`, etc.); progress fields are often reset to zero for a clean slate (`demoStarted: false`, empty `lessonsComplete`, `xp: 0`).
 
@@ -163,6 +168,10 @@ Returns sanitized profile: name, childName, optional email/phone, **`lessonsComp
 
 Returns **`{ hasUsedDemo: boolean }`** for form validation.
 
+### `GET /api/demo/admin` (admin only)
+
+Returns full user list (all fields) for the admin dashboard. Protected by admin key header.
+
 **Response helpers:** `src/lib/api-response.ts` (`ok`, `fail`).
 
 ---
@@ -183,6 +192,7 @@ Returns **`{ hasUsedDemo: boolean }`** for form validation.
 | `/demo` | Dashboard: lesson cards, XP, locks, navigate to lesson |
 | `/demo/lesson/[id]` | Lesson flow: video → game (if any) → quiz → results |
 | `/demo/complete` | Requires **`demoCompleted`**; confetti, badge PDF download, payment UI stub; redirects incomplete users to `/demo` |
+| `/admin` | Admin panel: user list, lesson progress, XP, quiz scores |
 
 **Middleware:** All **`/demo/**`** require token (query or cookie).
 
@@ -198,7 +208,7 @@ Content is primarily defined in **`src/app/demo/lesson/[id]/page.tsx`** (`LESSON
 - **Video:** YouTube embed `ad79nYk2keg`.
 - **`hasGame`:** `false`.
 - **`xpReward` (quiz base):** 100 (scaled by quiz accuracy in results).
-- **Flow:** Video → auto “watched” after 30s timer → Quiz → Results → marks lesson done on progress post.
+- **Flow:** Video → auto "watched" after 30s timer → Quiz → Results → marks lesson done on progress post.
 - **Quiz:** 3 questions (AI definition, examples, learning from data).
 
 ### Lesson 2 — History of AI — From Dreams to Machines
@@ -223,10 +233,11 @@ Content is primarily defined in **`src/app/demo/lesson/[id]/page.tsx`** (`LESSON
 - **Video:** `aWKNGWdAMGA`.
 - **`hasGame`:** `true` → **`GameShell4`**.
 - **`GAME_MECHANICS[4]`:** Classify Narrow/General/Super.
-- **Quiz:** 5 questions (assistants, AGI, AGI definition, today’s AI, super AI).
+- **Quiz:** 5 questions (assistants, AGI, AGI definition, today's AI, super AI).
 
-### Quiz scoring & XP (lesson page)
+### Quiz UX
 
+- **Option buttons:** `text-slate-800 font-medium` by default (dark, readable); hover shifts to `indigo-50` background + `indigo-700` text; correct → `green-500` border + `green-50` bg; wrong pick → `red-500` border + `red-50` bg.
 - **`quizXpFromAccuracy`:** 100% → full `xpReward`; ≥80% → 90%; ≥60% → 70%; else 50%.
 - **Total XP posted** on results: **`quizXp + (GAME_BONUS_XP if game complete)`** (200 bonus).
 - **`POST /api/demo/progress`** **adds** that total to stored **`xp`** (cumulative across lessons).
@@ -237,125 +248,205 @@ Content is primarily defined in **`src/app/demo/lesson/[id]/page.tsx`** (`LESSON
 
 ---
 
-## 11. Games — Lesson 2 (`GameShell2`)
+## 11. Shared Character Components
+
+### AXCharacter (`src/components/games/shared/AXCharacter.tsx`)
+
+Master player avatar used by all three game lessons (lesson2, lesson3, lesson4). All lesson-specific copies have been deleted.
+
+**Visual spec:**
+- Container: **44×68px** base, `overflow: visible` (legs extend ~20px below).
+- CSS keyframe animations injected via `<style>` tag: `ax-leftleg`, `ax-rightleg`, `ax-leftarm`, `ax-rightarm`, `ax-bodybob`, `ax-idle`, `ax-hitshake`, `ax-hitflash`, `ax-celebrate`, `ax-armup`, `ax-legkick-l/r`.
+- Three-layer wrapper: outer layout div → mirror wrapper (scaleX for facing, `transformOrigin` at horizontal center) → scale wrapper → animation wrapper.
+
+**Props:**
+
+| Prop | Type | Default | Purpose |
+|------|------|---------|---------|
+| `animation` | `"idle"\|"walk"\|"jump"\|"celebrate"\|"hit"` | required | Active animation state |
+| `facing` | `"left"\|"right"` | `"right"` | Character direction; uses `scaleX(-1)` mirror internally |
+| `size` | `number` | `1` | Scale multiplier (e.g. `1.1`, `1.6`) |
+| `glowColor` | `string` | `"rgba(99,102,241,0.5)"` | Ambient glow under character |
+
+**Usage in game loops:**
+- Track `axAnim` and `axFacing` state with refs (`lastAnimRef`, `lastFacingRef`).
+- Use `queueMicrotask(() => setState(value))` inside `requestAnimationFrame` loops to batch updates without blocking.
+- For canvas-based games: position an absolutely-placed HTML overlay div via `ref.style.transform = translate(sx, sy)` — no re-render per frame.
+- Remove any external `scaleX` from wrapper divs; `facing` prop handles direction internally.
+
+### NovaCharacter (`src/components/games/shared/NovaCharacter.tsx`)
+
+Master guide/narrator character used by all three game lessons. All lesson-specific copies have been deleted.
+
+**Visual spec (holographic robot head):**
+- Antenna with gold tip + `nova-antenna-ping` pulse animation.
+- Head: `linear-gradient(135deg, #1a1a2e, #0f3460)` fill; **`#fbbf24`** (gold) border.
+- Scanline overlay inside head (subtle `repeating-linear-gradient`).
+- Cyan visor strip with `nova-visor-flicker` animation.
+- **Hexagon eyes:** `clipPath: polygon(25% 0%, 75% 0%, 100% 50%, ...)`, color `#22d3ee`; inner highlight circle.
+- **LED mouth:** 3 LED dots driven by `tick` state (180ms `setInterval`); `getLed(col, expression, tick)` returns gold `#fbbf24` or dim `rgba(251,191,36,0.2)` based on animated pattern rows per expression.
+- **Side panels:** gold border/inset glow; 3 indicator dots per panel that sequence via `tick % 3`.
+- **Neck connector** at bottom.
+- **3 orbital sparkles:** `nova-orbit` CSS keyframe with staggered `animation-delay` offsets.
+- Float animation: Framer Motion `y: [0, -8*size, 0]`, 2.5s loop.
+
+**Props:**
+
+| Prop | Type | Default | Purpose |
+|------|------|---------|---------|
+| `expression` | `"idle"\|"happy"\|"explaining"\|"warning"\|"celebrating"` | required | Drives LED mouth pattern, eye/sparkle color, head animation |
+| `size` | `number` | `1` | Scale multiplier |
+
+**Expression behavior:**
+- `warning`: `nova-warn-blink` pulses gold border shadow; eyes flicker with `nova-visor-flicker`.
+- `celebrating`: `nova-celebrate-pulse` cyan/indigo box-shadow; purple eyes + sparkles.
+- `idle/explaining/happy`: standard cyan palette; continuous LED mouth cycling.
+
+---
+
+## 11a. Games — Lesson 2 (`GameShell2`)
 
 **Shell:** `src/components/games/lesson2/GameShell2.tsx`
 
-**States (`gameTypes.ts`):**  
+**States (`gameTypes.ts`):**
 `LOADING` → `CINEMATIC_INTRO` → **`NPC_EXPLORE`** → `STAGE_1` → **`STAGE_CUTSCENE`** → `STAGE_2` → `BOSS_INTRO` → `BOSS_BATTLE` → `VICTORY` → `COMPLETE`.
 
-**Shared pieces:** `LoadingScreen`, `CinematicIntro2`, **`NPCExploreZone2`**, **`StageCutscene2`**, `TimelineStage`, `BossBattleLesson2`, `VictoryScreenLesson2`, `DialogueBox` (lesson 2), `NovaCharacter` (**`src/components/games/shared/NovaCharacter.tsx`**), `ChaosBotCharacter`, `useSoundEngine`.
+**Shared pieces:** `LoadingScreen`, `CinematicIntro2`, **`NPCExploreZone2`**, **`StageCutscene2`**, `TimelineStage`, `BossBattleLesson2`, `VictoryScreenLesson2`, `DialogueBox`, `shared/NovaCharacter`, `ChaosBotCharacter`, `useSoundEngine`.
 
-### `DialogueBox` (lesson 2 only)
+### `DialogueBox` (lesson 2)
 
 Path: `src/components/games/lesson2/DialogueBox.tsx`
 
 | Prop | Purpose |
 |------|---------|
-| `startFull?: boolean` | Skip typewriter; show full text immediately (cinematics / cutscenes). |
-| `dock?: "viewport" \| "panel"` | Default **`viewport`**: `position: fixed`, height **160**. **`panel`**: `position: absolute`, height **200**, docks inside a cinematic column so dialogue does not cover characters. |
+| `character` | `"NOVA"\|"AX"\|"CHAOS_BOT"\|"DATA_PHANTOM"\|"OVERFIT_MONSTER"\|"BLANK_SLATE"\|"NARRATOR"` — drives portrait color + label |
+| `text` | Dialogue string; typewriter effect (25ms/char) unless `startFull` |
+| `onComplete` | Called when Space/click in `done` phase |
+| `startFull?` | Skip typewriter; show full text immediately (cinematics) |
+| `dock?` | `"viewport"` (default): `position: fixed`, height 160. `"panel"`: `position: absolute`, height 200, sits inside cinematic column layout |
 
 ### Cinematic (`CinematicIntro2`)
 
 Path: `src/components/games/lesson2/CinematicIntro2.tsx`
 
-- **Layout:** Each panel uses **`min-height: 100vh`**, **`flexDirection: column`**, **`justifyContent: space-between`**: upper **`flex: 1`** stage (characters), lower **200px** slot with **`DialogueBox dock="panel"`**.
-- **Panel 0:** City skyline with `CitySkyline stripBottom={200}` so buildings sit above the dialogue strip.
-- **Panel 2 (Time Corruptor):** Background **`radial-gradient(circle at center, rgba(120,53,15,0.4) 0%, #050510 70%)`**, **`AmberRiseParticles`** (10 dots, `ci2-amber-rise` float-up), NOVA **`left: 25%`**, **`size={0.9}`**, rotating clock **`left: 75%`** / **`bottom: 20`** in the stage band (mirrors “right 25%” placement).
-- **Panel 3:** AX + NOVA at **`size={0.8}`**, centered in stage.
-- **Stars / particles / scanlines** on layers; Space advances via `DialogueBox`.
+**Layout:** Each panel is a flex column (`min-height: 100vh`, `justifyContent: space-between`): upper `flex: 1` stage area (characters/props), lower **200px** `PANEL_DIALOGUE_SLOT` with `DialogueBox dock="panel"`. `CaptionBox` and `SpeechBubble` helpers have been removed; all narration goes through `DialogueBox`.
+
+**Shared decorators (all panels):**
+- `Stars` — static star field (z-index 1).
+- `FloatParticles` — 15 gold dots (`ci2-float-up` CSS, staggered delays).
+- `AmberRiseParticles` — 10 smaller ember dots that float upward and fade (`ci2-amber-rise`), used on the clock panel.
+- `Scanlines` — `repeating-linear-gradient` overlay, `ci2-scanline` shift animation (z-index 5).
+
+**Panel breakdown:**
+
+| Panel | Background | Stage content | DialogueBox character |
+|-------|-----------|--------------|----------------------|
+| 0 | `linear-gradient(165deg, #3d2b1f, #1a0a00, #0d0d24)` | `CitySkyline stripBottom={200}` — SVG 12-building amber skyline with window grids and antennas | NARRATOR |
+| 1 | `radial-gradient(ellipse at center, #2e1a0a, #0d0d24)` | `ChaosBotCharacter animation="roar" size={2.4}` | NARRATOR |
+| 2 | `radial-gradient(circle at center, rgba(120,53,15,0.4), #050510)` | NOVA `left:25%` / `size={0.9}` + `RotatingClock` `left:75%` | NOVA |
+| 3 | `radial-gradient(ellipse at center, #2d1b0a, #070712)` | AX + NOVA centered, `size={0.8}` | NOVA |
+| 4 | `linear-gradient(180deg, #1a0a00, #0d0d24)` | `NeonDistrictSign` at top, AX + platform stub at bottom-left | AX |
+
+**`CitySkyline`:** SVG `viewBox="0 0 700 200"`, `preserveAspectRatio="xMidYMax slice"`. 12 buildings with `#1e1206`/`#160e04`/`#1a1108` fills, `#78350f` stroke, antenna lines, amber `#fde68a` windows (every 5th window unlit). City glow radial gradient behind.
+
+**`RotatingClock`:** Pure SVG (`180×180`). Hands are SVG `<line>` elements from center `(90,90)` with `style={{ transformOrigin: "90px 90px", animation: "ci2-clock-hour/minute ..." }}`. CSS keyframes use plain `rotate(0deg)` → `rotate(360deg)` (no translate). Hour hand spins at 60s; minute hand at 10s. Quarter/full-hour ticks have `strokeWidth={4}`, others `strokeWidth={2}`.
+
+**`NeonDistrictSign`:** Bordered div with `ci2-neon-pulse` flicker animation on the gold "DISTRICT 2" title text.
 
 ### NPC pre-mission — `NPCExploreZone2`
 
 Path: `src/components/games/lesson2/NPCExploreZone2.tsx`
 
-- Canvas **1200px** wide; sepia History Vault art; **60** amber rain streaks; flat ground physics (arrows, Space jump).
-- **3 NPCs** with proximity speech bubbles (lines rotate every **3s**); **3** spinning diamond collectibles (+**15 XP** each); **mission door** at **x=1100** (cyan glow after talking to any NPC); **NOVA** `DialogueBox` on enter; tip if door touched without NPC contact; **90s** pressure message.
-- **`onComplete` → `STAGE_1`**, **`onXP`** wired to shell `addXP`.
+**Canvas scene:**
+- **Sky + background:** `linear-gradient` sky; two layers of parallax amber city silhouettes (opacity 0.35 / 0.45).
+- **Amber rain:** 60 streaks in world space, `rgba(251,191,36,0.15)` stroke, reset at top when off-screen.
+- **Ground glow line:** 6px `linear-gradient(to bottom, rgba(251,191,36,0.5), transparent)` at `groundTop`.
+- **Grid:** Vertical amber grid lines on ground at 48px intervals.
+- **Ember particles:** Up to 20 `Ember` objects (`x, y, vy, vx, life, maxLife, size`) spawned every 4 frames from ground level. Rise with slight horizontal drift; alpha fade in/out over their lifetime. Color transitions from `#fbbf24` to `#f97316` past 50% life. Drawn with `shadowBlur: 4`.
+
+**NPC rendering (`drawNpc`):**
+- **Ground glow:** Radial gradient ellipse beneath each NPC, color tied to `npc.body`.
+- **Shadow blur** via `ctx.shadowColor = n.head; ctx.shadowBlur = 8` during body/head draw.
+- **Body/head:** RoundRect with `n.body` / `n.head` fill (22×30 body, 18×18 head).
+- **Visor strip:** Semi-transparent black bar across upper head.
+- **Eyes:** Two `ctx.arc` circles in `n.eyeColor` (NPC-specific: green / purple / orange-tinted).
+- **Antenna:** Line + tip circle in `n.head` color.
+- **Name plate:** Dark rect + `n.head`-colored monospace text above head.
+
+**NPC data** (`NPCS` array): Each NPC now has an `eyeColor` field alongside `body`, `head`.
+
+**AXCharacter overlay:**
+- AX is **no longer drawn on canvas** (removed the `ctx.fillRect` blue rectangle).
+- An absolutely-positioned `<div ref={axOverlayRef}>` wraps `<AXCharacter animation={axAnim} facing={axFacing} size={1} />`.
+- Positioned via direct DOM: `axOverlayRef.current.style.transform = translate(${sax}px, ${ax.y}px)` inside the rAF loop — **no React re-render per frame**.
+- `axAnim` / `axFacing` state updated via `queueMicrotask` with ref guards (`lastAnimRef`, `lastFacingRef`) only when value changes.
+
+**NPC/NOVA dialogue overlap fix:**
+- `tryDoorEnter` now clears `nearNpcIdRef.current = null` and calls `setActiveNpc(null)` before a **300ms `setTimeout`** that triggers `setShowMissionNova(true)`. Prevents the NPC speech bubble from showing simultaneously with the NOVA `DialogueBox`.
+
+**Physics / collectibles / door:** Unchanged from original — GRAVITY 0.6, JUMP_VY -14, MOVE_SPD 2.8, 3 collectibles (+15 XP each), door at x=1100 with cyan glow + animated arrow.
 
 ### Stages 1 & 2 — `TimelineStage`
 
-- Side-scrolling platformer; **AX** sprite (`AXCharacter` overlay + canvas).
-- **`LEVEL_W` ~2800**; camera follow; platforms with **year** milestones vs **traps**.
-- Land on **correct** platform in **sequence** → progress + NOVA VO lines; wrong order or trap → damage + warning.
-- **Rain:** 60 drops in world space (`rainDropsRef`), updated each frame, drawn **after** sky gradient **before** platforms; stroke **`rgba(251,191,36,0.12)`**, `sx = d.x - camera`.
-- Stage 1 complete: shell **`addXP(200)`** → **`STAGE_CUTSCENE`** (not straight to stage 2).
+Path: `src/components/games/lesson2/TimelineStage.tsx`
+
+**Physics constants (updated):**
+- `GRAVITY = 0.55` (was 0.6)
+- `JUMP_VY = -12` (was -14)
+
+**Platform heights:** All platforms capped at **max 160px** above ground. Previous layout placed some platforms unreachably high.
+
+**New mechanics:**
+
+#### Moving Platforms (3)
+- Interface: `MovingPlat { id, x, baseX, y, w, h, range, speed, dir }`
+- Oscillate horizontally: `x = baseX + Math.sin(fr * 0.02) * range`.
+- AX carries with platform when standing: `ax.x += mp.speed * mp.dir * …` (AX follows movement).
+- Visually distinct: cyan border, darker fill.
+
+#### Crumbling Platforms (2)
+- Extended `TPlat` with: `crumble?, crumbleTimer?, crumbling?, crumbleOrigY?, crumbleRespawnTimer?`
+- State machine: normal → shake (`crumbleTimer > 0` after AX lands) → crumble (fall, `crumbleOrigY` stored) → respawn (after 150 frames, reset to original Y).
+- Visual: crack marks drawn when `crumbleTimer > 0`; orange tint when crumbling.
+
+#### Time Bubbles (4 floating enemies)
+- Interface: `TimeBubble { id, x, baseY, year, frozen, frozenTimer, dead }`
+- Wrong years: `"3000 BC"`, `"1850 AD"`, `"2099 AD"`, `"4001 AD"`.
+- Float via `Math.sin(fr * 0.03) * 30` vertical oscillation.
+- AX collision → bubble frozen (visual pulse), +20 XP, bubble fades then respawns.
+- Drawn as pulsing circles with year text label.
+
+**AX rendering:**
+- No external `scaleX` wrapper; facing handled by `AXCharacter facing` prop.
+- `axAnim` / `axFacing` tracked via refs + `queueMicrotask` state updates.
+- AX positioned: `translate(${sx}px, ${ax.y}px)` (fixed from original `ax.y + AX_H` bug that placed top at ground level).
 
 ### Stage bridge — `StageCutscene2`
 
 Path: `src/components/games/lesson2/StageCutscene2.tsx`
 
-- Two panels (**~4s** each or Space / dialogue advance); NOVA warning then CHAOS_BOT (large **`ChaosBotCharacter`**, idle glitch); **`onComplete` → `STAGE_2`**.
-
-### Boss intro
-
-Two-step `DialogueBox`: NOVA then CHAOS_BOT (“Time Corruptor”).
+Two panels (~4s each or Space/dialogue advance); NOVA warning then CHAOS_BOT (`ChaosBotCharacter`, idle glitch); `onComplete → STAGE_2`.
 
 ### Boss — `BossBattleLesson2`
 
-Separate boss fight module (quiz-shields / timeline locks per original design).
+Path: `src/components/games/lesson2/BossBattleLesson2.tsx`
+
+**Taunt system (new):**
+- `showTaunt(character, text)` `useCallback` — sets `taunt` state, auto-dismisses after 4000ms via `tauntTimerRef`.
+- `TauntBanner`: `AnimatePresence` overlay (Framer Motion slide in/out), red border, monospace text.
+- **3 triggered taunts:**
+  1. **Start** (800ms delay on mount): `"You think HISTORY matters?! I AM THE FUTURE! And the future has no memory!"`
+  2. **Phase 2** (`hp ≤ 6`, `phase === 1`): `"Impossible! You actually remember these dates?! Let me make you FORGET!"`
+  3. **Phase 3** (`hp ≤ 3`, `phase === 2`): `"STOP! If you restore history... everyone will know I was just a buggy prototype! PLEASE!"`
+- Phase transitions also fire `playSound("gateOpen")`.
+
+**NOVA defeat dialogue (updated):** `"The timeline is restored! Every milestone matters — from Turing's dream to today's AI revolution. History is saved, AX!"`
 
 ### Victory — `VictoryScreenLesson2`
 
 XP summary + continue to quiz via parent `onComplete(xpEarned)` from shell.
 
 **HUD:** Health, ammo, wanted stars, mute, exit. District **2 — History Vault**.
-
-### Lesson 2 — code reference (high level)
-
-**`src/components/games/lesson2/gameTypes.ts`** — game state union includes the new steps:
-
-```ts
-export type GameStateLesson2 =
-  | "LOADING"
-  | "CINEMATIC_INTRO"
-  | "NPC_EXPLORE"
-  | "STAGE_1"
-  | "STAGE_CUTSCENE"
-  | "STAGE_2"
-  | "BOSS_INTRO"
-  | "BOSS_BATTLE"
-  | "VICTORY"
-  | "COMPLETE";
-```
-
-**`GameShell2.tsx`** (behavioral wiring):
-
-- After cinematic: `transitionTo("NPC_EXPLORE")` → `<NPCExploreZone2 onComplete={() => transitionTo("STAGE_1")} onXP={addXP} />`.
-- After stage 1: `transitionTo("STAGE_CUTSCENE")` → `<StageCutscene2 onComplete={() => transitionTo("STAGE_2")} />`.
-
-**`src/lib/demo-db.ts`** — token match uses normalization:
-
-```ts
-export function normalizeDemoToken(token: string): string {
-  return token.trim().toLowerCase();
-}
-
-export function getDemoUserByToken(token: string): DemoUser | null {
-  const want = normalizeDemoToken(token);
-  if (!want) return null;
-  return (
-    readUsers().find((u) => normalizeDemoToken(u.demoToken) === want) ?? null
-  );
-}
-```
-
----
-
-## 11a. Shared NOVA character (`NovaCharacter`)
-
-Path: **`src/components/games/shared/NovaCharacter.tsx`** (imported by lesson 2 UI and other shells as needed).
-
-**Visual spec (current):**
-
-- **Head fill:** `linear-gradient(135deg, #1a1a2e, #0f3460)` (dark blue; not pink/red).
-- **Head border:** **`#fbbf24`** (gold); warning expression pulses gold shadow/border, not red fill.
-- **Antenna tip:** **`#fbbf24`** with gold glow.
-- **Eyes:** Cyan **`#22d3ee`**, **`box-shadow: 0 0 6px #22d3ee`** (no dark pupil disks).
-- **Side panels:** Gold border / inset glow; **gold** indicator dots (not cyan).
-- **Mouth LEDs / orbit accents:** Gold-leaning palette to match trim; celebrate mode keeps stronger purple/cyan pulse where intended.
-
-Props: `expression`, optional `size` (scale multiplier).
 
 ---
 
@@ -365,34 +456,27 @@ Props: `expression`, optional `size` (scale multiplier).
 
 **States:** `LOADING` → `CINEMATIC_INTRO` → `STAGE_1` → `BOSS_INTRO` → `BOSS_BATTLE` → `VICTORY` → `COMPLETE`.
 
-**Note:** **Stage 2 of the divide platformer was removed** for demo simplicity; one **`DivideStage`** then boss.
+**Note:** Stage 2 of the divide platformer was removed for demo simplicity; one `DivideStage` then boss.
 
 ### Cinematic — `CinematicIntro3`
 
-Panels introducing Human vs AI / The Divide.
+Panels introducing Human vs AI / The Divide. Imports `AXCharacter` and `NovaCharacter` from `shared/`.
 
 ### Stage — `DivideStage`
 
-- Canvas + **`AXCharacter`** overlay.
-- Two halves of city (warm / cool), **purple divide** line, platforms, **4 challenge zones** (2 human-side, 2 AI-side).
-- **H / A** toggle **Human** vs **AI** mode (HUD pill + NOVA).
-- Enter correct zone in correct mode → **`DecisionGate`** modals (mini puzzles).
-- Wrong mode → **warning text**, no HP drain for wrong zone.
-- **4 zones done** → NOVA dialogue → **go to center** (arrow) → touch center → **`onComplete`** → shell adds **500 XP** → **`BOSS_INTRO`**.
-- Progress: **Zones ●●○○**; bottom **instruction banner**; **Shift+Enter** dev skip to end of divide (hands off to boss path).
-
-### Boss intro
-
-NOVA + Chaos bot dialogue scenes.
+- Canvas + `AXCharacter` overlay (shared).
+- `axFacing` state tracked with `lastFacingRef`; external `scaleX` removed.
+- Two halves of city (warm / cool), purple divide line, platforms, 4 challenge zones.
+- **H / A** toggle Human vs AI mode (HUD pill + NOVA).
+- Enter correct zone in correct mode → `DecisionGate` modals (mini puzzles).
+- Wrong mode → warning text, no HP drain.
+- 4 zones done → NOVA dialogue → go to center → touch center → `onComplete` → shell adds 500 XP → `BOSS_INTRO`.
 
 ### Boss — `BossBattle3`
 
-- **Briefing overlay** (5s countdown): controls, orange vs blue projectile rules, HUD.
-- **Divide Keeper** boss: split orange/teal sprite, HP bar, phased gameplay (split phases, merged phase), projectiles labeled **H** / **A**.
-- AX **44×64**; mode pill on canvas; wrong-hit feedback; **Shift+Enter** dev skip (if still present).
-- Win → `VictoryScreen` (District 3 theming).
+Divide Keeper boss: split orange/teal sprite, HP bar, phased gameplay, projectiles labeled H/A. Victory → `VictoryScreen` (District 3 theming).
 
-**HUD:** Dynamic warm/cool bar; **Mode pill** during stage + boss; **“THE DIVIDE — UNITE THE CITY”**.
+**HUD:** Dynamic warm/cool bar; mode pill during stage + boss; **"THE DIVIDE — UNITE THE CITY"**.
 
 ---
 
@@ -402,59 +486,51 @@ NOVA + Chaos bot dialogue scenes.
 
 **States:** `LOADING` → `CINEMATIC_INTRO` → `STAGE_1` → `BOSS_INTRO` → `BOSS_BATTLE` → `VICTORY` → `COMPLETE`.
 
-**Shared:** Copied from lesson2: `useSoundEngine`, `LoadingScreen`, `AXCharacter`, `NovaCharacter` (`shared/`), `DialogueBox`; lesson-specific `VictoryScreen`.
-
 ### Cinematic — `CinematicIntro4`
 
-Five panels: three AI zones (Narrow / General / Super), enemy silhouettes, NOVA brief, ammo legend (1/2/3), district title.
+Five panels: three AI zones (Narrow / General / Super), enemy silhouettes, NOVA brief, ammo legend, district title. Imports `NovaCharacter` from `shared/`.
 
 ### Stage — `TypeHunterStage`
 
-- Side-scroller; **ammo types:** `narrow | general | super | null`.
-- **Keys 1/2/3** select ammo; **Z** fires. Projectiles differ (size, trail, glow for super).
-- **12 enemies** in four groups (mix of types), tags (e.g. narrow: Spam Filter / Chess Bot / …).
-- Wrong ammo → **bounce** toward player; colored **hint** text; correct → particles + **NOVA** toast.
-- **Two gates:** quiz modals at approximate **x≈600** and **x≈1400** (must answer correctly to continue; wrong costs HP).
-- Win when **all enemies dead** and **both gates** cleared → shell transitions (+**450 XP** on stage complete + combat XP along the way).
-
-### Boss intro — `BossIntro4`
-
-Short NOVA `DialogueBox` before **THE UNDEFINED**.
+- Side-scroller; ammo types: `narrow | general | super | null`.
+- Physics: `GRAVITY = 0.55`, `JUMP_VY = -12`; platforms capped at **max 130px** above ground.
+- `axAnim` tracks `"idle"|"walk"|"jump"|"hit"`; `invTimer` on ax ref (30 frames after bounced projectile hit).
+- `axFacing` state with ref guard; no external `scaleX` on wrapper.
+- Keys 1/2/3 select ammo; Z fires. Wrong ammo → bounce; correct → particles + NOVA toast.
+- Two gates: quiz modals at x≈600 and x≈1400.
+- Win when all enemies dead + both gates cleared.
 
 ### Boss — `BossBattle4`
 
-- **Briefing** + countdown; boss cycles type every **60 frames** in a **180-frame** loop (Narrow → General → Super); segmented body highlights active phase.
-- Player must match **ammo to current phase** to reduce **9 HP**.
-- Attacks: beam (jump over), spread shots, super combo + ground shock.
-- Victory → long **NOVA** dialogue in `DialogueBox` (demo completion message).
+Briefing + countdown; boss cycles type every 60 frames (Narrow → General → Super); match ammo to current phase to reduce 9 HP. Attacks: beam, spread shots, super combo + ground shock.
 
 ### Victory — `VictoryScreen` (lesson4)
 
-Confetti + XP + NOVA line + **Continue to quiz**.
+Confetti + XP + NOVA line + Continue to quiz.
 
-**HUD:** **CLASSIFICATION ARENA**; **ammo readout** (none / NARROW / GENERAL / SUPER); bottom control strip.
+**HUD:** CLASSIFICATION ARENA; ammo readout; bottom control strip.
 
 ---
 
 ## 14. Audio
 
-Each lesson’s `useSoundEngine.ts` loads from **`/public/sounds/`**:
+Each lesson's `useSoundEngine.ts` loads from **`/public/sounds/`**:
 
-- **Background:** e.g. `district1-bg.mp3` (loop).
-- **One-shots:** `correct`, `wrong`, `victory`, `shoot`, `jump`, `enemyHit`, `bossHit`, `playerHit`, `gateOpen`, etc.
+- **Background music:** `district2-bg.mp3`, `district3-bg.mp3`, `district4-bg.mp3` (looped).
+- **One-shots:** `correct.mp3`, `wrong.mp3`, `victory.mp3`, `shoot.mp3`, `jump.mp3`, `enemyHit.mp3`, `bossHit.mp3`, `gateOpen.mp3`, `checkpoint.mp3`, `coin.mp3`.
 
-Missing files fail silently in try/catch.
+Missing files fail silently in try/catch. `useSoundEngine` exposes `playSound(key)`, `playBgMusic()`, `stopBgMusic()`, `toggleMute()`, `isMuted`.
 
 ---
 
-## 15. Key UX & pedagogy themes by “district”
+## 15. Key UX & pedagogy themes by "district"
 
 | Lesson | Theme | Player fantasy |
 |--------|--------|----------------|
 | 1 | What is AI? | Watch + quiz only |
 | 2 | History timeline | Restore erased milestones; defeat Time Corruptor |
 | 3 | Human vs AI | Mode-switch polarity; unite The Divide |
-| 4 | AI taxonomy | Classify Narrow / General / Super; boss “Undefined” cycles types |
+| 4 | AI taxonomy | Classify Narrow / General / Super; boss "Undefined" cycles types |
 
 ---
 
@@ -463,12 +539,23 @@ Missing files fail silently in try/catch.
 **`/demo/complete`** (`src/app/demo/complete/page.tsx`):
 
 - Guard: **`demoCompleted`** must be true else redirect to `/demo`.
-- Confetti, **jsPDF** “badge” certificate download.
+- Confetti, **jsPDF** "badge" certificate download.
 - **Payment UI** (UPI / card / etc.) — presentation-layer flow with local state (`paymentSuccess`), not a live payment processor in-repo.
 
 ---
 
-## 17. Development
+## 17. Admin panel
+
+**Route:** `/admin` (`src/app/admin/page.tsx`)
+**API:** `GET /api/demo/admin` (`src/app/api/demo/admin/route.ts`)
+
+- Displays all registered demo users: name, email, child name, XP, lessons complete, quiz scores, badge status.
+- Protected by admin key (header or env check — see route implementation).
+- Does not require `demoCompleted`; accessible independently from the demo token flow.
+
+---
+
+## 18. Development
 
 ```bash
 npm install
@@ -488,29 +575,39 @@ npm run dev
 
 **Demo token / API:** Always open the app on the **same origin and port** Next prints (e.g. `http://localhost:3003`). Hitting `:3000` while the app runs on `:3003` loads a different process and tokens from `demo-users.json` will not match.
 
-**Games:** Prefer a clean **`.next`** after large refactors.
+**Games:** Prefer a clean **`.next`** after large refactors or after deleting/renaming component files.
 
 **Testing a user:** Use `POST /api/demo/register` or maintain **`presetToken`** in request body; inspect **`data/demo-users.json`**. Use a **`demoToken`** value exactly as stored (normalization handles trim/lowercase).
 
+**ESLint in game loops:** Next.js treats ESLint errors as build failures. Common issues in rAF loops:
+- `react-hooks/exhaustive-deps` — add all functions referenced inside `useEffect` to the dep array; use `useCallback` + stable refs.
+- `@typescript-eslint/no-unused-vars` — delete orphaned refs immediately when refactoring.
+
 ---
 
-## 18. Conventions & extension points
+## 19. Conventions & extension points
 
 - **New lesson:** Add to **`LESSONS`** in `lesson/[id]/page.tsx` + dashboard **`LESSONS`** in `demo/page.tsx`; wire `gameActive && lessonId === n` shell; bump progress logic if program length changes.
 - **New game shell:** Mirror `GameShell3`/`4`; export `onComplete(xp)` and `onExit()`; dynamic import with **`ssr: false`** if using canvas/window keys.
+- **New character:** Add to `src/components/games/shared/`; import via `@/components/games/shared/CharacterName`.
 - **XP:** Lesson results should remain consistent with **additive** `POST /api/demo/progress` behavior.
 - **Unlock:** Tied to **`lessonsComplete`** containing previous id; progress endpoint currently pushes ids on each completion — ensure ordering matches product rules.
+- **AX in canvas games:** Use HTML overlay div + `ref.style.transform` for zero-re-render positioning; never draw AX as a canvas `fillRect`. Track `axAnim`/`axFacing` with refs + `queueMicrotask` guards.
 
 ---
 
-## 19. Glossary
+## 20. Glossary
 
-- **AX:** Player avatar name across games.
-- **NOVA:** Guide character (dialogue).
+- **AX:** Player avatar name across games. Rendered by `shared/AXCharacter.tsx`.
+- **NOVA:** Guide character (dialogue). Rendered by `shared/NovaCharacter.tsx`.
 - **Chaos Bot / Time Corruptor / Divide Keeper / The Undefined:** Antagonists per lesson.
 - **Token:** `demoToken` string; not a JWT.
 - **GAME_BONUS_XP:** Flat +200 for finishing embedded game before quiz (lessons with games).
+- **TauntBanner:** AnimatePresence overlay in BossBattleLesson2 that surfaces boss taunts at phase transitions.
+- **Crumbling platform:** Platform that shakes then falls when AX stands on it, respawning after 150 frames.
+- **Time Bubble:** Floating enemy in TimelineStage showing a wrong year; contact freezes + destroys it.
+- **Moving platform:** Oscillating horizontal platform that carries AX when stood on.
 
 ---
 
-*Last updated: Lesson 2 History Vault flow (NPC explore, stage cutscene, timeline rain), shared NOVA palette, cinematic panel layout + `DialogueBox` docking, demo token normalization, and dev troubleshooting (`.next` chunks / port mismatch). Maintain this file alongside functional changes.*
+*Last updated: Full visual overhaul — shared AXCharacter + NovaCharacter (holographic robot head), CinematicIntro2 rebuild (SVG skyline, SVG rotating clock, amber particles, scanlines, DialogueBox), NPCExploreZone2 rebuild (ember particles, ground glow, improved NPC rendering with glow/eyes/nameplates, AXCharacter HTML overlay, NPC→NOVA delay fix), TimelineStage mechanics (moving platforms, crumbling platforms, Time Bubbles, lowered heights, GRAVITY/JUMP_VY tuning), BossBattleLesson2 taunt system (3-phase TauntBanner), quiz option text brightened (slate-800 + indigo hover), admin panel added.*
