@@ -138,6 +138,7 @@ export default function TypeHunterStage({
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const axWrapRef = useRef<HTMLDivElement>(null);
+  const dimRef = useRef({ W: 800, H: 500 });
   const keysRef = useRef(new Set<string>());
   const rafRef = useRef(0);
   const camRef = useRef(0);
@@ -258,10 +259,12 @@ export default function TypeHunterStage({
 
     const resize = () => {
       const r = canvas.parentElement?.getBoundingClientRect();
-      const W = Math.max(640, r?.width ?? 800);
-      const H = Math.max(380, r?.height ?? 500);
-      canvas.width = W;
-      canvas.height = H;
+      const dpr = window.devicePixelRatio || 1;
+      const W = Math.max(320, r?.width ?? 800);
+      const H = Math.max(200, r?.height ?? 500);
+      dimRef.current = { W, H };
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
       const groundTop = H - GROUND_PAD;
       platRef.current = buildPlatforms(groundTop);
       enemiesRef.current = buildEnemies(groundTop);
@@ -276,10 +279,12 @@ export default function TypeHunterStage({
 
     const loop = () => {
       rafRef.current = requestAnimationFrame(loop);
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       frameRef.current++;
       const fr = frameRef.current;
-      const W = canvas.width;
-      const H = canvas.height;
+      const W = dimRef.current.W;
+      const H = dimRef.current.H;
       const groundTop = H - GROUND_PAD;
       const ax = axRef.current;
       const keys = keysRef.current;

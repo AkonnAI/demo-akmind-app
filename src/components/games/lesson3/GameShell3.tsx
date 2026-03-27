@@ -185,13 +185,19 @@ export default function GameShell3({ onComplete, onExit }: GameShell3Props) {
     if (gameState === "COMPLETE") onComplete(xpEarned);
   }, [gameState, xpEarned, onComplete]);
 
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => { setIsMobile(window.innerWidth < 768); }, []);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  useEffect(() => {
+    setIsTouchDevice(
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && window.innerWidth < 1024)
+    );
+  }, []);
 
   const showHUD = gameState !== "LOADING";
   const healthPct = Math.max(0, Math.min(100, gameData.health));
   const hudWarm = hudMode === "human";
   const touchGameplay = gameState === "STAGE_1" || gameState === "BOSS_BATTLE";
+  const touchPad = isTouchDevice && touchGameplay ? 92 : 0;
 
   return (
     <div
@@ -241,7 +247,7 @@ export default function GameShell3({ onComplete, onExit }: GameShell3Props) {
               <span style={{ fontSize: 12 }}>❤️</span>
               <div
                 style={{
-                  width: isMobile ? 80 : 120,
+                  width: isTouchDevice ? 80 : 120,
                   height: 8,
                   backgroundColor: "rgba(255,255,255,0.1)",
                   borderRadius: 4,
@@ -259,9 +265,9 @@ export default function GameShell3({ onComplete, onExit }: GameShell3Props) {
                   }}
                 />
               </div>
-              {!isMobile && <span style={{ fontFamily: "monospace", fontSize: 10, color: "#94a3b8" }}>{gameData.health}</span>}
+              {!isTouchDevice && <span style={{ fontFamily: "monospace", fontSize: 10, color: "#94a3b8" }}>{gameData.health}</span>}
             </div>
-            {!isMobile && (
+            {!isTouchDevice && (
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <span style={{ fontSize: 11 }}>🔫</span>
                 <span style={{ fontFamily: "monospace", fontSize: 11, color: "#a5b4fc" }}>{gameData.ammo}</span>
@@ -326,8 +332,8 @@ export default function GameShell3({ onComplete, onExit }: GameShell3Props) {
                 fontSize: 11,
                 padding: "2px 6px",
                 cursor: "pointer",
-                minWidth: isMobile ? 32 : undefined,
-                minHeight: isMobile ? 32 : undefined,
+                minWidth: isTouchDevice ? 32 : undefined,
+                minHeight: isTouchDevice ? 32 : undefined,
               }}
             >
               {isMuted ? "🔇" : "🔊"}
@@ -341,11 +347,11 @@ export default function GameShell3({ onComplete, onExit }: GameShell3Props) {
                 borderRadius: 6,
                 color: "#f87171",
                 fontSize: 11,
-                padding: isMobile ? "4px 8px" : "6px 12px",
+                padding: isTouchDevice ? "4px 8px" : "6px 12px",
                 cursor: "pointer",
                 fontWeight: 700,
-                minWidth: isMobile ? 32 : 44,
-                minHeight: isMobile ? 32 : 44,
+                minWidth: isTouchDevice ? 32 : 44,
+                minHeight: isTouchDevice ? 32 : 44,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -357,7 +363,7 @@ export default function GameShell3({ onComplete, onExit }: GameShell3Props) {
         </div>
       )}
 
-      <div style={{ position: "relative", width: "100%", height: "calc(100vh - 48px)", marginTop: "48px", overflow: "hidden" }}>
+      <div style={{ position: "relative", width: "100%", height: `calc(100vh - 52px - ${touchPad}px)`, marginTop: "52px", overflow: "hidden" }}>
         {gameState === "LOADING" && <LoadingScreen onLoadComplete={() => transitionTo("CINEMATIC_INTRO")} />}
         {gameState === "CINEMATIC_INTRO" && <CinematicIntro3 onComplete={() => transitionTo("STAGE_1")} />}
         {gameState === "STAGE_1" && (

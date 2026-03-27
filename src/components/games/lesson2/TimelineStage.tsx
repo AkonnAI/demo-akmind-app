@@ -151,6 +151,8 @@ export default function TimelineStage({
   onXP,
 }: TimelineStageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dimRef = useRef({ W: 1200, H: 600 });
   const axRef = useRef<HTMLDivElement>(null);
   const keysRef = useRef<Set<string>>(new Set());
   const rafRef = useRef(0);
@@ -175,18 +177,6 @@ export default function TimelineStage({
     scaleTimer: 0,
   });
 
-  const MOBILE_CONTROLS_HEIGHT =
-    typeof navigator !== "undefined" &&
-    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-      ? 120
-      : 0;
-  const vpW = typeof window !== "undefined" ? window.innerWidth : 1200;
-  const vpH =
-    typeof window !== "undefined"
-      ? window.innerHeight - 48 - MOBILE_CONTROLS_HEIGHT
-      : 600;
-  const groundTop = vpH - GROUND_Y;
-
   const [uiHealth, setUiHealth] = useState(gameData.health);
   const [novaMessage, setNovaMessage] = useState<string | null>(null);
   const [novaWarn, setNovaWarn] = useState<string | null>(null);
@@ -206,37 +196,6 @@ export default function TimelineStage({
   useEffect(() => {
     healthRef.current = gameData.health;
   }, [gameData.health]);
-
-  useEffect(() => {
-    platformsRef.current = buildStage(stage, groundTop);
-    movingPlatsRef.current = stage === 1 ? buildMovingPlats(groundTop) : [];
-    timeBubblesRef.current = stage === 1 ? buildTimeBubbles(groundTop) : [];
-    progressRef.current = 0;
-    landedRef.current = null;
-    completedRef.current = false;
-    cameraRef.current = 0;
-    frameRef.current = 0;
-    rainDropsRef.current = null;
-    healthRef.current = gameData.health;
-    axRefState.current = {
-      x: 40,
-      y: groundTop - AX_H,
-      vx: 0,
-      vy: 0,
-      onGround: true,
-      facingRight: true,
-      coyoteTimer: 0,
-      invTimer: 0,
-      scaleX: 1,
-      scaleY: 1,
-      scaleTimer: 0,
-    };
-    const t = setTimeout(() => setStageLabel(false), 2200);
-    return () => {
-      clearTimeout(t);
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, [stage, groundTop, gameData.health]);
 
   const floatTextsRef = useRef<FloatTx[]>([]);
   const floatId = useRef(0);
@@ -307,17 +266,54 @@ export default function TimelineStage({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    canvas.width = vpW;
-    canvas.height = vpH;
+    // Reset game state for this stage
+    setStageLabel(true);
+    progressRef.current = 0;
+    landedRef.current = null;
+    completedRef.current = false;
+    cameraRef.current = 0;
+    frameRef.current = 0;
+    rainDropsRef.current = null;
+    axRefState.current = {
+      x: 40, y: 0, vx: 0, vy: 0, onGround: true, facingRight: true,
+      coyoteTimer: 0, invTimer: 0, scaleX: 1, scaleY: 1, scaleTimer: 0,
+    };
+
+    const stageLabel_t = setTimeout(() => setStageLabel(false), 2200);
+
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const W = Math.max(320, container.clientWidth);
+      const H = Math.max(200, container.clientHeight);
+      dimRef.current = { W, H };
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      const gt = H - GROUND_Y;
+      platformsRef.current = buildStage(stage, gt);
+      movingPlatsRef.current = stage === 1 ? buildMovingPlats(gt) : [];
+      timeBubblesRef.current = stage === 1 ? buildTimeBubbles(gt) : [];
+    };
+    resize();
+    // Set initial ax position now that dimensions are known
+    axRefState.current.y = dimRef.current.H - GROUND_Y - AX_H;
+
+    const ro = new ResizeObserver(resize);
+    ro.observe(container);
 
     const loop = () => {
       rafRef.current = requestAnimationFrame(loop);
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       frameRef.current++;
       const fr = frameRef.current;
+      const vpW = dimRef.current.W;
+      const vpH = dimRef.current.H;
+      const groundTop = vpH - GROUND_Y;
       const keys = keysRef.current;
       const ax = axRefState.current;
       const plats = platformsRef.current;
@@ -723,8 +719,13 @@ export default function TimelineStage({
     };
 
     rafRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [vpW, vpH, groundTop, stage, handleLandOn, onComplete, playSound, onUpdateGameData]);
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      ro.disconnect();
+      clearTimeout(stageLabel_t);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, handleLandOn, onComplete, playSound, onUpdateGameData]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => keysRef.current.add(e.key);
@@ -739,10 +740,11 @@ export default function TimelineStage({
 
   return (
     <div
+      ref={containerRef}
       style={{
         position: "relative",
-        width: vpW,
-        height: vpH,
+        width: "100%",
+        height: "100%",
         overflow: "hidden",
         background: "#0d0d24",
         userSelect: "none",
@@ -750,9 +752,7 @@ export default function TimelineStage({
     >
       <canvas
         ref={canvasRef}
-        width={vpW}
-        height={vpH}
-        style={{ position: "absolute", top: 0, left: 0, touchAction: "none" }}
+        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", touchAction: "none" }}
       />
 
       {/* AX character */}

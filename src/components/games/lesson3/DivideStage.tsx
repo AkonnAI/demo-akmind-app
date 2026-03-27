@@ -138,6 +138,7 @@ export default function DivideStage({
 }: DivideStageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const axWrapRef = useRef<HTMLDivElement>(null);
+  const dimRef = useRef({ W: 800, H: 520 });
   const [axAnim, setAxAnim] = useState<"idle" | "walk">("idle");
   const [axFacing, setAxFacing] = useState<"left" | "right">("right");
   const lastMovingRef = useRef(false);
@@ -329,10 +330,12 @@ export default function DivideStage({
 
     const resize = () => {
       const r = canvas.parentElement?.getBoundingClientRect();
-      const W = Math.max(640, Math.floor(r?.width ?? 800));
-      const H = Math.max(420, Math.floor(r?.height ?? 520));
-      canvas.width = W;
-      canvas.height = H;
+      const dpr = window.devicePixelRatio || 1;
+      const W = Math.max(320, Math.floor(r?.width ?? 800));
+      const H = Math.max(200, Math.floor(r?.height ?? 520));
+      dimRef.current = { W, H };
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
       const GROUND_Y = Math.floor(H * (1 - FLOOR_FR));
       const groundTop = H - GROUND_Y;
       axRef.current.x = W * 0.25;
@@ -351,9 +354,11 @@ export default function DivideStage({
 
     const loop = () => {
       rafRef.current = requestAnimationFrame(loop);
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       frame++;
-      const W = canvas.width;
-      const H = canvas.height;
+      const W = dimRef.current.W;
+      const H = dimRef.current.H;
       const vpW = W;
       const vpH = H;
       const GROUND_Y = Math.floor(vpH * (1 - FLOOR_FR));

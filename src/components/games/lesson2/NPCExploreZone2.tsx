@@ -135,6 +135,7 @@ function roundRectPath(
 export default function NPCExploreZone2({ onComplete, onXP }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const dimRef = useRef({ W: 800, H: 520 });
   const axOverlayRef = useRef<HTMLDivElement>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
   const keysRef = useRef(new Set<string>());
@@ -222,10 +223,12 @@ export default function NPCExploreZone2({ onComplete, onXP }: Props) {
 
     const resize = () => {
       const el = containerRef.current;
-      const w = Math.max(640, el?.clientWidth ?? 800);
-      const h = Math.max(400, el?.clientHeight ?? 520);
-      canvas.width = w;
-      canvas.height = h;
+      const dpr = window.devicePixelRatio || 1;
+      const w = Math.max(320, el?.clientWidth ?? 800);
+      const h = Math.max(200, el?.clientHeight ?? 520);
+      dimRef.current = { W: w, H: h };
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
       rainRef.current = initRain(h);
       const gt = h - GROUND_Y;
       axRef.current.y = gt - AX_H;
@@ -243,7 +246,7 @@ export default function NPCExploreZone2({ onComplete, onXP }: Props) {
       fr: number
     ) => {
       const px = n.x - cam;
-      const isMob = canvas.width < 768;
+      const isMob = dimRef.current.W < 768;
       const bodyH = isMob ? 22 : 30;
       const headH = isMob ? 12 : 18;
       const bodyW = isMob ? 16 : 22;
@@ -318,10 +321,12 @@ export default function NPCExploreZone2({ onComplete, onXP }: Props) {
 
     const loop = () => {
       rafRef.current = requestAnimationFrame(loop);
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       frameRef.current++;
       const fr = frameRef.current;
-      const vpW = canvas.width;
-      const vpH = canvas.height;
+      const vpW = dimRef.current.W;
+      const vpH = dimRef.current.H;
       const groundTop = vpH - GROUND_Y;
       const ax = axRef.current;
       const keys = keysRef.current;
