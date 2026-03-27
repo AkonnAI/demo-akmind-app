@@ -177,7 +177,7 @@ export default function GameShell4({ onComplete, onExit }: GameShell4Props) {
             </div>
           </div>
 
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+          <div className="hidden sm:flex" style={{ flex: 1, flexDirection: "column", alignItems: "center", gap: 2 }}>
             <span
               style={{
                 fontFamily: "monospace",
@@ -215,14 +215,19 @@ export default function GameShell4({ onComplete, onExit }: GameShell4Props) {
               type="button"
               onClick={onExit}
               style={{
-                background: "none",
-                border: "1px solid rgba(239,68,68,0.4)",
-                borderRadius: 4,
+                background: "rgba(239,68,68,0.1)",
+                border: "1px solid rgba(239,68,68,0.5)",
+                borderRadius: 6,
                 color: "#f87171",
                 fontSize: 11,
-                padding: "2px 10px",
+                padding: "6px 12px",
                 cursor: "pointer",
                 fontWeight: 700,
+                minWidth: 44,
+                minHeight: 44,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
               ✕

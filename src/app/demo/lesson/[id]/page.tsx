@@ -309,6 +309,38 @@ function LessonPageInner() {
   const [xpAwarded, setXpAwarded] = useState(false);
   const [gameComplete, setGameComplete] = useState(false);
   const [gameActive, setGameActive] = useState(false);
+
+  const launchGame = async () => {
+    const isMobile = window.innerWidth < 768 || "ontouchstart" in window;
+    if (isMobile) {
+      try {
+        const el = document.documentElement;
+        if (el.requestFullscreen) {
+          await el.requestFullscreen();
+        } else if ((el as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen) {
+          await (el as HTMLElement & { webkitRequestFullscreen: () => Promise<void> }).webkitRequestFullscreen();
+        }
+        const so = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+        if (so?.lock) {
+          await so.lock("landscape").catch(() => {});
+        }
+      } catch (e) {
+        console.log("Fullscreen failed:", e);
+      }
+    }
+    setGameActive(true);
+  };
+
+  const exitGame = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      const so2 = screen.orientation as ScreenOrientation & { unlock?: () => void };
+      if (so2?.unlock) so2.unlock();
+    } catch {
+      /* silent */
+    }
+    setGameActive(false);
+  };
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [pickedOption, setPickedOption] = useState<number | null>(null);
   const [resultsXp, setResultsXp] = useState(0);
@@ -679,34 +711,34 @@ function LessonPageInner() {
           <div className="px-0 sm:px-0">
             {gameActive && lessonId === 2 && (
               <GameShell2
-                onComplete={() => {
+                onComplete={async () => {
+                  await exitGame();
                   setGameComplete(true);
-                  setGameActive(false);
                   setPhase("quiz");
                 }}
-                onExit={() => setGameActive(false)}
+                onExit={exitGame}
               />
             )}
 
             {gameActive && lessonId === 3 && (
               <GameShell3
-                onComplete={() => {
+                onComplete={async () => {
+                  await exitGame();
                   setGameComplete(true);
-                  setGameActive(false);
                   setPhase("quiz");
                 }}
-                onExit={() => setGameActive(false)}
+                onExit={exitGame}
               />
             )}
 
             {gameActive && lessonId === 4 && (
               <GameShell4
-                onComplete={() => {
+                onComplete={async () => {
+                  await exitGame();
                   setGameComplete(true);
-                  setGameActive(false);
                   setPhase("quiz");
                 }}
-                onExit={() => setGameActive(false)}
+                onExit={exitGame}
               />
             )}
 
@@ -761,7 +793,7 @@ function LessonPageInner() {
                 <button
                   type="button"
                   className="mt-4 w-full max-w-md rounded-xl bg-cyan-500 px-6 py-4 text-base font-bold text-black transition hover:bg-cyan-400 sm:mt-8 sm:w-auto sm:px-8 sm:text-lg"
-                  onClick={() => setGameActive(true)}
+                  onClick={launchGame}
                 >
                   Launch Game →
                 </button>

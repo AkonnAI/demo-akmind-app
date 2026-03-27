@@ -201,9 +201,9 @@ export default function GameShell2({ onComplete, onExit }: GameShell2Props) {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "8px 16px",
+            padding: "6px 12px",
             zIndex: 300,
-            gap: 12,
+            gap: 8,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -238,9 +238,9 @@ export default function GameShell2({ onComplete, onExit }: GameShell2Props) {
           </div>
 
           <div
+            className="hidden sm:flex"
             style={{
               flex: 1,
-              display: "flex",
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
@@ -297,14 +297,19 @@ export default function GameShell2({ onComplete, onExit }: GameShell2Props) {
               type="button"
               onClick={onExit}
               style={{
-                background: "none",
-                border: "1px solid rgba(239,68,68,0.4)",
-                borderRadius: 4,
+                background: "rgba(239,68,68,0.1)",
+                border: "1px solid rgba(239,68,68,0.5)",
+                borderRadius: 6,
                 color: "#f87171",
                 fontSize: 11,
-                padding: "2px 10px",
+                padding: "6px 12px",
                 cursor: "pointer",
                 fontWeight: 700,
+                minWidth: 44,
+                minHeight: 44,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
               ✕
