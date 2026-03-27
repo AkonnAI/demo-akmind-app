@@ -10,6 +10,7 @@ import VictoryScreen from "./VictoryScreen";
 import DialogueBox from "./DialogueBox";
 import ChaosBotCharacter from "./ChaosBotCharacter";
 import NovaCharacter from "@/components/games/shared/NovaCharacter";
+import GameTouchControls from "@/components/games/shared/GameTouchControls";
 import { useSoundEngine } from "./useSoundEngine";
 import type { GameData, GameStateLesson3, PlayerMode } from "./gameTypes";
 import { INITIAL_GAME_DATA } from "./gameTypes";
@@ -187,6 +188,7 @@ export default function GameShell3({ onComplete, onExit }: GameShell3Props) {
   const showHUD = gameState !== "LOADING";
   const healthPct = Math.max(0, Math.min(100, gameData.health));
   const hudWarm = hudMode === "human";
+  const touchGameplay = gameState === "STAGE_1" || gameState === "BOSS_BATTLE";
 
   return (
     <div
@@ -372,6 +374,8 @@ export default function GameShell3({ onComplete, onExit }: GameShell3Props) {
           <VictoryScreen xpEarned={xpEarned} onCollect={() => transitionTo("COMPLETE")} />
         )}
       </div>
+
+      <GameTouchControls visible={touchGameplay} variant="divide" />
     </div>
   );
 }

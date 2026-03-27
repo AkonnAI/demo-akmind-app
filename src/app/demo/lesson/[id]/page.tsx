@@ -370,10 +370,19 @@ function LessonPageInner() {
     return () => clearTimeout(t);
   }, [phase, token, router, lessonId]);
 
-  const stepLabels = useMemo(() => {
+  const stepMeta = useMemo(() => {
     if (!lesson) return [];
-    if (lesson.hasGame) return ["Video", "Game", "Quiz"] as const;
-    return ["Video", "Quiz"] as const;
+    if (lesson.hasGame) {
+      return [
+        { icon: "📹", label: "Video" },
+        { icon: "🎮", label: "Game" },
+        { icon: "📝", label: "Quiz" },
+      ] as const;
+    }
+    return [
+      { icon: "📹", label: "Video" },
+      { icon: "📝", label: "Quiz" },
+    ] as const;
   }, [lesson]);
 
   const activeStepIndex = useMemo(() => {
@@ -564,9 +573,9 @@ function LessonPageInner() {
     lesson.type === "live" ? "Live session" : "Self-paced + game";
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen overflow-x-hidden bg-slate-50">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex h-16 max-w-5xl items-center gap-3 px-4">
+        <div className="mx-auto flex h-16 max-w-5xl items-center gap-3 px-3 sm:px-4">
           <button
             type="button"
             onClick={goDashboard}
@@ -578,31 +587,42 @@ function LessonPageInner() {
           <h1 className="min-w-0 flex-1 truncate text-center text-sm font-bold text-slate-900 sm:text-base">
             {lesson.title}
           </h1>
-          <div className="shrink-0 rounded-full bg-yellow-100 px-3 py-1 text-sm font-bold text-yellow-700">
+          <div className="shrink-0 rounded-full bg-yellow-100 px-2 py-1 text-xs font-bold text-yellow-700 sm:px-3 sm:text-sm">
             ⚡ {headerXp} XP
           </div>
         </div>
 
-        <div className="border-t border-slate-100 bg-white px-4 py-3">
+        <div className="border-t border-slate-100 bg-white px-3 py-3 sm:px-4">
           <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2 sm:gap-4">
-            {stepLabels.map((label, i) => {
+            {stepMeta.map((step, i) => {
               const done = i < activeStepIndex;
               const current = i === activeStepIndex;
               return (
-                <div
-                  key={label}
-                  className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold sm:text-sm ${
-                    current
-                      ? "bg-indigo-100 text-indigo-800 ring-2 ring-indigo-400"
-                      : done
-                        ? "bg-green-50 text-green-700"
-                        : "bg-slate-100 text-slate-500"
-                  }`}
-                >
-                  {done ? (
-                    <Check className="h-4 w-4 text-green-600" />
-                  ) : null}
-                  {label}
+                <div key={step.label} className="flex items-center gap-2">
+                  <div
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-base sm:h-9 sm:w-9 ${
+                      current
+                        ? "bg-indigo-100 text-indigo-800 ring-2 ring-indigo-400"
+                        : done
+                          ? "bg-green-50 text-green-700"
+                          : "bg-slate-100 text-slate-500"
+                    }`}
+                    title={step.label}
+                  >
+                    {done ? (
+                      <Check className="h-4 w-4 text-green-600" aria-hidden />
+                    ) : (
+                      <span aria-hidden>{step.icon}</span>
+                    )}
+                    <span className="sr-only">{step.label}</span>
+                  </div>
+                  <span
+                    className={`hidden text-xs font-semibold sm:inline sm:text-sm ${
+                      current ? "text-indigo-800" : done ? "text-green-700" : "text-slate-500"
+                    }`}
+                  >
+                    {step.label}
+                  </span>
                 </div>
               );
             })}
@@ -610,10 +630,10 @@ function LessonPageInner() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
+      <main className="mx-auto max-w-4xl px-0 py-4 sm:px-6 sm:py-6">
         {phase === "video" && (
-          <div>
-            <div className="aspect-video overflow-hidden rounded-2xl bg-black">
+          <div className="px-3 sm:px-0">
+            <div className="aspect-video w-full overflow-hidden rounded-none bg-black sm:rounded-2xl">
               <iframe
                 title={lesson.title}
                 src={`${lesson.videoUrl}?rel=0&modestbranding=1`}
@@ -626,11 +646,11 @@ function LessonPageInner() {
               {lesson.title}
             </h2>
             <p className="mt-2 text-slate-500">{lesson.description}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-700">
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <span className="w-fit rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-700">
                 ~{durationMin} min
               </span>
-              <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-800">
+              <span className="w-fit rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-800">
                 {typeLabel}
               </span>
             </div>
@@ -656,7 +676,7 @@ function LessonPageInner() {
         )}
 
         {phase === "game" && lesson.hasGame && (
-          <div>
+          <div className="px-0 sm:px-0">
             {gameActive && lessonId === 2 && (
               <GameShell2
                 onComplete={() => {
@@ -714,7 +734,7 @@ function LessonPageInner() {
             )}
 
             {gameComplete && !gameActive && (
-              <div className="rounded-2xl border border-green-200 bg-green-50 p-8 text-center">
+              <div className="mx-3 rounded-2xl border border-green-200 bg-green-50 p-6 text-center sm:mx-0 sm:p-8">
                 <p className="text-lg font-semibold text-green-800">
                   ✅ Game complete! +{GAME_BONUS_XP} XP earned
                 </p>
@@ -729,17 +749,18 @@ function LessonPageInner() {
             )}
 
             {!gameComplete && !gameActive && (
-              <div className="rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-950 p-12 text-center">
-                <p className="text-6xl">🎮</p>
-                <h2 className="mt-4 text-2xl font-bold text-white">
+              <div className="mx-3 rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-950 p-6 text-center sm:mx-0 sm:p-12">
+                <p className="text-5xl sm:text-6xl">🎮</p>
+                <h2 className="mt-4 text-xl font-bold text-white sm:text-2xl">
                   Story Game: {lesson.title}
                 </h2>
-                <p className="mt-2 text-slate-300">
+                <p className="mt-2 text-sm text-slate-300 sm:text-base">
                   {GAME_MECHANICS[lessonId] ?? "Interactive story adventure."}
                 </p>
+                <p className="mt-4 text-xs text-slate-500 sm:text-sm">Tap to launch game</p>
                 <button
                   type="button"
-                  className="mt-8 rounded-xl bg-cyan-500 px-8 py-4 text-lg font-bold text-black transition hover:bg-cyan-400"
+                  className="mt-4 w-full max-w-md rounded-xl bg-cyan-500 px-6 py-4 text-base font-bold text-black transition hover:bg-cyan-400 sm:mt-8 sm:w-auto sm:px-8 sm:text-lg"
                   onClick={() => setGameActive(true)}
                 >
                   Launch Game →
@@ -750,7 +771,7 @@ function LessonPageInner() {
         )}
 
         {phase === "quiz" && !showQuizResults && (
-          <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="mx-3 max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:mx-auto sm:p-8">
             <h2 className="text-2xl font-bold text-slate-900">
               📝 Knowledge Check
             </h2>
@@ -769,17 +790,17 @@ function LessonPageInner() {
                 const isCorrect = idx === q.correct;
                 const isPicked = pickedOption === idx;
                 let cls =
-                  "rounded-xl border border-slate-200 bg-white p-4 text-left text-slate-800 font-medium transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700";
+                  "min-h-[56px] w-full rounded-xl border border-slate-200 bg-white p-4 text-left text-slate-800 font-medium transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700 active:scale-[0.99]";
                 if (show) {
                   if (isCorrect) {
                     cls =
-                      "rounded-xl border-2 border-green-500 bg-green-50 p-4 text-left text-green-700";
+                      "min-h-[56px] w-full rounded-xl border-2 border-green-500 bg-green-50 p-4 text-left text-green-700";
                   } else if (isPicked) {
                     cls =
-                      "rounded-xl border-2 border-red-500 bg-red-50 p-4 text-left text-red-700";
+                      "min-h-[56px] w-full rounded-xl border-2 border-red-500 bg-red-50 p-4 text-left text-red-700";
                   } else {
                     cls =
-                      "rounded-xl border border-slate-100 bg-slate-50 p-4 text-left text-slate-400";
+                      "min-h-[56px] w-full rounded-xl border border-slate-100 bg-slate-50 p-4 text-left text-slate-400";
                   }
                 }
                 return (
@@ -820,13 +841,13 @@ function LessonPageInner() {
         )}
 
         {phase === "quiz" && showQuizResults && (
-          <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-3 flex max-w-2xl flex-col items-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:mx-auto sm:p-8">
             <h2 className="text-2xl font-bold">Results</h2>
             <p className="mt-2 text-slate-600">
               Score: {quizScoreCorrect}/{totalQs}
             </p>
             <motion.p
-              className="mt-6 text-4xl font-black text-yellow-500 drop-shadow-sm"
+              className="mt-6 text-center text-4xl font-black text-yellow-500 drop-shadow-sm"
               initial={{ scale: 0.5 }}
               animate={{ scale: [0.5, 1.2, 1] }}
               transition={{ duration: 0.6, times: [0, 0.6, 1] }}
@@ -838,7 +859,7 @@ function LessonPageInner() {
             </p>
             <button
               type="button"
-              className="mt-8 rounded-xl bg-indigo-600 px-8 py-3 font-bold text-white disabled:opacity-50"
+              className="mt-8 w-full max-w-xs rounded-xl bg-indigo-600 px-8 py-3 font-bold text-white disabled:opacity-50 sm:w-auto"
               disabled={!xpAwarded}
               onClick={handleResultsContinue}
             >

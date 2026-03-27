@@ -247,35 +247,35 @@ function CompletePageInner() {
   const childName = user.childName || "Explorer";
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <section className="relative overflow-hidden bg-indigo-950 py-16 text-center text-white">
+    <div className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-900">
+      <section className="relative overflow-hidden bg-indigo-950 py-10 text-center text-white sm:py-16">
         <div className="complete-confetti-layer">{confetti}</div>
-        <div className="relative z-10 px-4">
-          <p className="animate-bounce text-6xl">🎉</p>
-          <h1 className="mt-4 text-4xl font-bold">Demo Complete!</h1>
-          <p className="mt-2 text-lg text-indigo-200">
+        <div className="relative z-10 px-3 sm:px-4">
+          <p className="animate-bounce text-5xl sm:text-6xl">🎉</p>
+          <h1 className="mt-4 text-3xl font-bold sm:text-4xl">Demo Complete!</h1>
+          <p className="mt-2 text-base text-indigo-200 sm:text-lg">
             {childName} has finished the AKMIND demo!
           </p>
-          <div className="mx-auto mt-8 inline-flex flex-wrap justify-center gap-4 md:gap-6">
+          <div className="mx-auto mt-6 grid max-w-lg grid-cols-3 gap-2 sm:mt-8 sm:flex sm:flex-wrap sm:justify-center sm:gap-4 md:gap-6">
             {[
-              { big: `⚡ ${xp} XP`, label: "Points Earned" },
+              { big: `⚡ ${xp}`, label: "Points Earned" },
               { big: "4/4", label: "Lessons Done" },
               { big: "🏅", label: "Badge Earned" },
             ].map((s) => (
               <div
                 key={s.label}
-                className="min-w-[8rem] rounded-2xl bg-white/10 p-4 text-center"
+                className="rounded-2xl bg-white/10 p-3 text-center sm:min-w-[8rem] sm:p-4"
               >
-                <p className="text-xl font-bold">{s.big}</p>
-                <p className="mt-1 text-xs text-indigo-200">{s.label}</p>
+                <p className="text-sm font-bold sm:text-xl">{s.big}</p>
+                <p className="mt-1 text-[10px] text-indigo-200 sm:text-xs">{s.label}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="border-b border-slate-200 bg-white py-12 text-center">
-        <div className="mx-auto max-w-sm rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 p-8 text-white shadow-2xl">
+      <section className="border-b border-slate-200 bg-white py-8 text-center sm:py-12">
+        <div className="mx-auto max-w-xs rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 p-6 text-white shadow-2xl sm:max-w-sm sm:p-8">
           <p className="font-mono text-lg tracking-widest">⚡ AKMIND</p>
           <p className="my-4 text-8xl">🏅</p>
           <p className="text-3xl font-black tracking-wider">AI EXPLORER</p>
@@ -293,20 +293,20 @@ function CompletePageInner() {
         <button
           type="button"
           disabled={badgeDownloading}
-          className="mt-6 rounded-xl border-2 border-indigo-200 bg-white px-8 py-3 font-bold text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
+          className="mt-6 w-full max-w-xs rounded-xl border-2 border-indigo-200 bg-white px-6 py-3 font-bold text-indigo-700 hover:bg-indigo-50 disabled:opacity-60 sm:w-auto sm:px-8"
           onClick={downloadBadge}
         >
           {badgeDownloading ? "Preparing PDF…" : "Download Badge PDF"}
         </button>
       </section>
 
-      <section className="border-b border-slate-200 bg-white py-12 text-center">
-        <h2 className="text-3xl font-bold">What&apos;s Next?</h2>
-        <p className="mx-auto mt-2 max-w-lg text-slate-500">
+      <section className="border-b border-slate-200 bg-white py-8 text-center sm:py-12">
+        <h2 className="text-2xl font-bold sm:text-3xl">What&apos;s Next?</h2>
+        <p className="mx-auto mt-2 max-w-lg px-3 text-sm text-slate-500 sm:text-base">
           You&apos;ve experienced 4 lessons. The full AI Explorers program has
           60 lessons across 6 modules.
         </p>
-        <div className="mx-auto mt-8 max-w-md rounded-2xl border-2 border-indigo-200 p-6 text-left">
+        <div className="mx-auto mt-6 max-w-md rounded-2xl border-2 border-indigo-200 p-4 text-left sm:mt-8 sm:p-6">
           <p className="text-xl font-bold">🚀 AI Explorers — Full Program</p>
           <p className="mt-1 text-sm text-slate-500">
             60 Lessons · 6 Modules · 1 Capstone Project
@@ -338,7 +338,7 @@ function CompletePageInner() {
           </div>
           <button
             type="button"
-            className="mt-4 w-full rounded-xl bg-indigo-600 py-4 text-lg font-bold text-white hover:bg-indigo-700"
+            className="mt-4 w-full rounded-xl bg-indigo-600 py-4 text-base font-bold text-white hover:bg-indigo-700 sm:text-lg"
             onClick={openPayment}
           >
             Reserve My Spot →
@@ -362,11 +362,11 @@ function CompletePageInner() {
       </section>
 
       {showPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-8 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-4">
+          <div className="relative flex max-h-[100dvh] w-full flex-col overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:max-h-[90vh] sm:max-w-md sm:rounded-2xl sm:p-8">
             <button
               type="button"
-              className="absolute right-4 top-4 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              className="absolute right-3 top-3 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 sm:right-4 sm:top-4"
               aria-label="Close"
               onClick={closePayment}
             >
@@ -375,7 +375,7 @@ function CompletePageInner() {
 
             {!paymentSuccess ? (
               <>
-                <h3 className="pr-8 text-xl font-bold">
+                <h3 className="pr-10 text-lg font-bold sm:pr-8 sm:text-xl">
                   Complete Your Enrollment
                 </h3>
                 <p className="text-sm text-indigo-600">AI Explorers Program</p>

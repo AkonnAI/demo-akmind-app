@@ -12,6 +12,7 @@ import VictoryScreenLesson2 from "./VictoryScreenLesson2";
 import DialogueBox from "./DialogueBox";
 import ChaosBotCharacter from "./ChaosBotCharacter";
 import NovaCharacter from "@/components/games/shared/NovaCharacter";
+import GameTouchControls from "@/components/games/shared/GameTouchControls";
 import { useSoundEngine } from "./useSoundEngine";
 import type { GameData, GameStateLesson2 } from "./gameTypes";
 import { INITIAL_GAME_DATA } from "./gameTypes";
@@ -157,6 +158,11 @@ export default function GameShell2({ onComplete, onExit }: GameShell2Props) {
 
   const showHUD = gameState !== "LOADING";
   const healthPct = Math.max(0, Math.min(100, gameData.health));
+  const touchGameplay =
+    gameState === "NPC_EXPLORE" ||
+    gameState === "STAGE_1" ||
+    gameState === "STAGE_2" ||
+    gameState === "BOSS_BATTLE";
 
   return (
     <div
@@ -355,6 +361,12 @@ export default function GameShell2({ onComplete, onExit }: GameShell2Props) {
           <VictoryScreenLesson2 xpEarned={xpEarned} onCollect={() => transitionTo("COMPLETE")} />
         )}
       </div>
+
+      <GameTouchControls
+        visible={touchGameplay}
+        variant="default"
+        showBossQuizRow={gameState === "BOSS_BATTLE"}
+      />
     </div>
   );
 }

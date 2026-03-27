@@ -9,6 +9,7 @@ import BossBattle4 from "./BossBattle4";
 import VictoryScreen from "./VictoryScreen";
 import DialogueBox from "./DialogueBox";
 import NovaCharacter from "@/components/games/shared/NovaCharacter";
+import GameTouchControls from "@/components/games/shared/GameTouchControls";
 import { useSoundEngine } from "./useSoundEngine";
 import type { GameData, GameStateLesson4, AmmoType } from "./gameTypes";
 import { INITIAL_GAME_DATA } from "./gameTypes";
@@ -105,6 +106,7 @@ export default function GameShell4({ onComplete, onExit }: GameShell4Props) {
   const showHUD = gameState !== "LOADING";
   const healthPct = Math.max(0, Math.min(100, gameData.health));
   const showAmmoHud = gameState === "STAGE_1" || gameState === "BOSS_BATTLE";
+  const touchGameplay = gameState === "STAGE_1" || gameState === "BOSS_BATTLE";
 
   return (
     <div
@@ -263,6 +265,7 @@ export default function GameShell4({ onComplete, onExit }: GameShell4Props) {
 
       {(gameState === "STAGE_1" || gameState === "BOSS_BATTLE") && (
         <div
+          className="hidden md:block"
           style={{
             position: "fixed",
             bottom: 8,
@@ -283,6 +286,8 @@ export default function GameShell4({ onComplete, onExit }: GameShell4Props) {
           ← → Move · Space Jump · 1=Narrow · 2=General · 3=Super · Z=Shoot
         </div>
       )}
+
+      <GameTouchControls visible={touchGameplay} variant="typehunter" />
     </div>
   );
 }
