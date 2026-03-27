@@ -156,6 +156,9 @@ export default function GameShell2({ onComplete, onExit }: GameShell2Props) {
     if (gameState === "COMPLETE") onComplete(xpEarned);
   }, [gameState, xpEarned, onComplete]);
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => { setIsMobile(window.innerWidth < 768); }, []);
+
   const showHUD = gameState !== "LOADING";
   const healthPct = Math.max(0, Math.min(100, gameData.health));
   const touchGameplay =
@@ -211,7 +214,7 @@ export default function GameShell2({ onComplete, onExit }: GameShell2Props) {
               <span style={{ fontSize: 12 }}>❤️</span>
               <div
                 style={{
-                  width: 120,
+                  width: isMobile ? 80 : 120,
                   height: 8,
                   backgroundColor: "rgba(255,255,255,0.1)",
                   borderRadius: 4,
@@ -229,12 +232,14 @@ export default function GameShell2({ onComplete, onExit }: GameShell2Props) {
                   }}
                 />
               </div>
-              <span style={{ fontFamily: "monospace", fontSize: 10, color: "#94a3b8" }}>{gameData.health}</span>
+              {!isMobile && <span style={{ fontFamily: "monospace", fontSize: 10, color: "#94a3b8" }}>{gameData.health}</span>}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ fontSize: 11 }}>🔫</span>
-              <span style={{ fontFamily: "monospace", fontSize: 11, color: "#fcd34d" }}>{gameData.ammo}</span>
-            </div>
+            {!isMobile && (
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ fontSize: 11 }}>🔫</span>
+                <span style={{ fontFamily: "monospace", fontSize: 11, color: "#fcd34d" }}>{gameData.ammo}</span>
+              </div>
+            )}
           </div>
 
           <div
@@ -287,8 +292,10 @@ export default function GameShell2({ onComplete, onExit }: GameShell2Props) {
                 borderRadius: 4,
                 color: "#94a3b8",
                 fontSize: 11,
-                padding: "2px 8px",
+                padding: "2px 6px",
                 cursor: "pointer",
+                minWidth: isMobile ? 32 : undefined,
+                minHeight: isMobile ? 32 : undefined,
               }}
             >
               {isMuted ? "🔇" : "🔊"}
@@ -302,11 +309,11 @@ export default function GameShell2({ onComplete, onExit }: GameShell2Props) {
                 borderRadius: 6,
                 color: "#f87171",
                 fontSize: 11,
-                padding: "6px 12px",
+                padding: isMobile ? "4px 8px" : "6px 12px",
                 cursor: "pointer",
                 fontWeight: 700,
-                minWidth: 44,
-                minHeight: 44,
+                minWidth: isMobile ? 32 : 44,
+                minHeight: isMobile ? 32 : 44,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -318,7 +325,7 @@ export default function GameShell2({ onComplete, onExit }: GameShell2Props) {
         </div>
       )}
 
-      <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+      <div style={{ position: "relative", width: "100%", height: "calc(100vh - 48px)", marginTop: "48px", overflow: "hidden" }}>
         {gameState === "LOADING" && <LoadingScreen onLoadComplete={() => transitionTo("CINEMATIC_INTRO")} />}
         {gameState === "CINEMATIC_INTRO" && (
           <CinematicIntro2 onComplete={() => transitionTo("NPC_EXPLORE")} />

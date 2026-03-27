@@ -243,10 +243,11 @@ export default function NPCExploreZone2({ onComplete, onXP }: Props) {
       fr: number
     ) => {
       const px = n.x - cam;
-      const bodyH = 30;
-      const headH = 18;
-      const bodyW = 22;
-      const headW = 18;
+      const isMob = canvas.width < 768;
+      const bodyH = isMob ? 22 : 30;
+      const headH = isMob ? 12 : 18;
+      const bodyW = isMob ? 16 : 22;
+      const headW = isMob ? 14 : 18;
       const bodyY = groundTop - bodyH;
       const headY = bodyY - headH;
 
@@ -450,7 +451,10 @@ export default function NPCExploreZone2({ onComplete, onXP }: Props) {
 
       // Door
       const doorLeft = DOOR_X - cam;
-      const doorTop = groundTop - 120;
+      const isMobD = vpW < 768;
+      const doorW = isMobD ? 40 : 60;
+      const doorH = isMobD ? 80 : 120;
+      const doorTop = groundTop - doorH;
       const urgent = pressureFiredRef.current;
       const pulse = urgent
         ? 10 + Math.sin(fr * 0.12) * 12
@@ -460,14 +464,14 @@ export default function NPCExploreZone2({ onComplete, onXP }: Props) {
       ctx.shadowBlur = talkedRef.current ? pulse : 4;
       ctx.strokeStyle = "#22d3ee";
       ctx.lineWidth = 3;
-      ctx.strokeRect(doorLeft, doorTop, 60, 120);
+      ctx.strokeRect(doorLeft, doorTop, doorW, doorH);
       ctx.shadowBlur = 0;
       if (talkedRef.current) {
         ctx.fillStyle = "#22d3ee";
-        ctx.font = "bold 11px monospace";
-        ctx.fillText("MISSION START →", doorLeft - 22, doorTop - 10);
-        const axd = doorLeft + 70 + Math.sin(fr * (urgent ? 0.14 : 0.08)) * 8;
-        ctx.fillText("→", axd, doorTop + 55);
+        ctx.font = `bold ${isMobD ? 9 : 11}px monospace`;
+        ctx.fillText("MISSION START →", doorLeft - 22, doorTop - 8);
+        const axd = doorLeft + doorW + 10 + Math.sin(fr * (urgent ? 0.14 : 0.08)) * 8;
+        ctx.fillText("→", axd, doorTop + doorH / 2);
       }
       ctx.restore();
 
@@ -610,7 +614,7 @@ export default function NPCExploreZone2({ onComplete, onXP }: Props) {
           willChange: "transform",
         }}
       >
-        <AXCharacter animation={axAnim} facing={axFacing} size={1} />
+        <AXCharacter animation={axAnim} facing={axFacing} size={typeof window !== "undefined" && window.innerWidth < 768 ? 0.7 : 1} />
       </div>
 
       {npc ? (

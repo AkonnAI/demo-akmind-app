@@ -21,38 +21,6 @@ interface GameTouchControlsProps {
   showBossQuizRow?: boolean;
 }
 
-/* ── Corner bracket decoration ── */
-function CornerBrackets({ color = "rgba(99,102,241,0.4)" }: { color?: string }) {
-  const s: React.CSSProperties = { position: "absolute", width: 14, height: 14 };
-  const line: React.CSSProperties = { position: "absolute", backgroundColor: color };
-  const h: React.CSSProperties = { ...line, height: 2, width: 12 };
-  const v: React.CSSProperties = { ...line, width: 2, height: 12 };
-  return (
-    <>
-      {/* top-left */}
-      <div style={{ ...s, top: -4, left: -4 }}>
-        <div style={{ ...h, top: 0, left: 0 }} />
-        <div style={{ ...v, top: 0, left: 0 }} />
-      </div>
-      {/* top-right */}
-      <div style={{ ...s, top: -4, right: -4 }}>
-        <div style={{ ...h, top: 0, right: 0 }} />
-        <div style={{ ...v, top: 0, right: 0 }} />
-      </div>
-      {/* bottom-left */}
-      <div style={{ ...s, bottom: -4, left: -4 }}>
-        <div style={{ ...h, bottom: 0, left: 0 }} />
-        <div style={{ ...v, bottom: 0, left: 0 }} />
-      </div>
-      {/* bottom-right */}
-      <div style={{ ...s, bottom: -4, right: -4 }}>
-        <div style={{ ...h, bottom: 0, right: 0 }} />
-        <div style={{ ...v, bottom: 0, right: 0 }} />
-      </div>
-    </>
-  );
-}
-
 const SCANLINES: React.CSSProperties = {
   backgroundImage:
     "repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(255,255,255,0.02) 3px,rgba(255,255,255,0.02) 4px)",
@@ -80,12 +48,12 @@ interface CircleBtnProps {
 }
 
 function CircleBtn({
-  size = 68, bgIdle, bgActive, border, shadow, shadowActive,
+  size = 56, bgIdle, bgActive, border, shadow, shadowActive,
   active, label, sublabel, sublabelColor = "#94a3b8", icon,
   onDown, onUp,
 }: CircleBtnProps) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, pointerEvents: "auto" }}>
       <button
         type="button"
         aria-label={label}
@@ -107,6 +75,7 @@ function CircleBtn({
           touchAction: "none",
           userSelect: "none",
           overflow: "hidden",
+          flexShrink: 0,
         }}
         onTouchStart={(e) => { e.preventDefault(); onDown(); }}
         onTouchEnd={(e) => { e.preventDefault(); onUp(); }}
@@ -122,10 +91,11 @@ function CircleBtn({
         <span style={{
           fontFamily: "monospace",
           fontSize: 9,
-          letterSpacing: 2,
+          letterSpacing: 1,
           color: sublabelColor,
           fontWeight: 700,
           textTransform: "uppercase",
+          marginTop: 0,
         }}>
           {sublabel}
         </span>
@@ -149,7 +119,7 @@ interface PillBtnProps {
   onUp: () => void;
 }
 
-function PillBtn({ w = 56, h = 40, bg, border, active, label, labelColor, dot, icon, onDown, onUp }: PillBtnProps) {
+function PillBtn({ w = 48, h = 36, bg, border, active, label, labelColor, dot, icon, onDown, onUp }: PillBtnProps) {
   return (
     <button
       type="button"
@@ -157,11 +127,11 @@ function PillBtn({ w = 56, h = 40, bg, border, active, label, labelColor, dot, i
       style={{
         width: w,
         height: h,
-        borderRadius: 12,
+        borderRadius: 10,
         background: bg,
         border: `2px solid ${border}`,
-        boxShadow: active ? `0 0 14px ${border}` : `0 0 6px ${border}55`,
-        transform: active ? "scale(1.12)" : "scale(1)",
+        boxShadow: active ? `0 0 12px ${border}` : `0 0 4px ${border}55`,
+        transform: active ? "scale(1.1)" : "scale(1)",
         transition: "transform 0.08s, box-shadow 0.08s",
         display: "flex",
         flexDirection: "column",
@@ -172,6 +142,7 @@ function PillBtn({ w = 56, h = 40, bg, border, active, label, labelColor, dot, i
         WebkitTapHighlightColor: "transparent",
         touchAction: "none",
         userSelect: "none",
+        flexShrink: 0,
       }}
       onTouchStart={(e) => { e.preventDefault(); onDown(); }}
       onTouchEnd={(e) => { e.preventDefault(); onUp(); }}
@@ -181,12 +152,12 @@ function PillBtn({ w = 56, h = 40, bg, border, active, label, labelColor, dot, i
       onMouseLeave={() => onUp()}
     >
       {icon ?? (
-        <span style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 18, color: labelColor, lineHeight: 1 }}>
+        <span style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 15, color: labelColor, lineHeight: 1 }}>
           {label}
         </span>
       )}
       {dot && (
-        <div style={{ width: 6, height: 6, borderRadius: "50%", background: dot }} />
+        <div style={{ width: 5, height: 5, borderRadius: "50%", background: dot }} />
       )}
     </button>
   );
@@ -204,7 +175,7 @@ export default function GameTouchControls({
   const [pressed, setPressed] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    // Only show on real phones/tablets — not desktop browsers with touch screens
+    // Only show on real phones/tablets — not desktop browsers
     const isTouchDevice =
       /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
       (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
@@ -223,15 +194,16 @@ export default function GameTouchControls({
   /* ── Left D-pad ── */
   const leftBtn = (
     <CircleBtn
+      size={56}
       active={is("left")}
       bgIdle="radial-gradient(circle at 35% 35%, rgba(99,102,241,0.4), rgba(49,46,129,0.8))"
       bgActive="radial-gradient(circle at 35% 35%, rgba(99,102,241,0.8), rgba(49,46,129,1))"
       border="rgba(99,102,241,0.6)"
-      shadow="0 0 15px rgba(99,102,241,0.3), inset 0 0 10px rgba(99,102,241,0.1)"
-      shadowActive="0 0 25px rgba(99,102,241,0.6), inset 0 0 15px rgba(165,180,252,0.2)"
+      shadow="0 0 12px rgba(99,102,241,0.3)"
+      shadowActive="0 0 22px rgba(99,102,241,0.6)"
       label="Left"
       icon={
-        <svg viewBox="0 0 24 24" width="32" height="32">
+        <svg viewBox="0 0 24 24" width="26" height="26">
           <path d="M15 18l-6-6 6-6" stroke="#a5b4fc" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       }
@@ -242,15 +214,16 @@ export default function GameTouchControls({
 
   const rightBtn = (
     <CircleBtn
+      size={56}
       active={is("right")}
       bgIdle="radial-gradient(circle at 35% 35%, rgba(99,102,241,0.4), rgba(49,46,129,0.8))"
       bgActive="radial-gradient(circle at 35% 35%, rgba(99,102,241,0.8), rgba(49,46,129,1))"
       border="rgba(99,102,241,0.6)"
-      shadow="0 0 15px rgba(99,102,241,0.3), inset 0 0 10px rgba(99,102,241,0.1)"
-      shadowActive="0 0 25px rgba(99,102,241,0.6), inset 0 0 15px rgba(165,180,252,0.2)"
+      shadow="0 0 12px rgba(99,102,241,0.3)"
+      shadowActive="0 0 22px rgba(99,102,241,0.6)"
       label="Right"
       icon={
-        <svg viewBox="0 0 24 24" width="32" height="32">
+        <svg viewBox="0 0 24 24" width="26" height="26">
           <path d="M9 18l6-6-6-6" stroke="#a5b4fc" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       }
@@ -262,17 +235,18 @@ export default function GameTouchControls({
   /* ── Right action buttons ── */
   const jumpBtn = (
     <CircleBtn
+      size={60}
       active={is("jump")}
       bgIdle="radial-gradient(circle at 35% 35%, rgba(34,211,238,0.4), rgba(8,145,178,0.8))"
       bgActive="radial-gradient(circle at 35% 35%, rgba(34,211,238,0.8), rgba(8,145,178,1))"
       border="rgba(34,211,238,0.6)"
-      shadow="0 0 15px rgba(34,211,238,0.3), inset 0 0 10px rgba(34,211,238,0.1)"
-      shadowActive="0 0 28px rgba(34,211,238,0.7), inset 0 0 15px rgba(103,232,249,0.2)"
+      shadow="0 0 12px rgba(34,211,238,0.3)"
+      shadowActive="0 0 24px rgba(34,211,238,0.7)"
       label="Jump"
       sublabel="JUMP"
       sublabelColor="#67e8f9"
       icon={
-        <svg viewBox="0 0 24 24" width="32" height="32">
+        <svg viewBox="0 0 24 24" width="26" height="26">
           <path d="M12 19V5M5 12l7-7 7 7" stroke="#67e8f9" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       }
@@ -283,17 +257,18 @@ export default function GameTouchControls({
 
   const fireBtn = (
     <CircleBtn
+      size={60}
       active={is("shoot")}
       bgIdle="radial-gradient(circle at 35% 35%, rgba(251,191,36,0.4), rgba(180,83,9,0.8))"
       bgActive="radial-gradient(circle at 35% 35%, rgba(251,191,36,0.8), rgba(180,83,9,1))"
       border="rgba(251,191,36,0.6)"
-      shadow="0 0 15px rgba(251,191,36,0.3), inset 0 0 10px rgba(251,191,36,0.1)"
-      shadowActive="0 0 28px rgba(251,191,36,0.7), inset 0 0 15px rgba(253,230,138,0.2)"
+      shadow="0 0 12px rgba(251,191,36,0.3)"
+      shadowActive="0 0 24px rgba(251,191,36,0.7)"
       label="Shoot"
       sublabel="FIRE"
       sublabelColor="#fde68a"
       icon={
-        <svg viewBox="0 0 24 24" width="32" height="32">
+        <svg viewBox="0 0 24 24" width="26" height="26">
           <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="#fde68a" strokeWidth="2" fill="rgba(251,191,36,0.3)" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       }
@@ -302,56 +277,57 @@ export default function GameTouchControls({
     />
   );
 
-  /* ── Divide H/A variant row ── */
+  /* ── Divide H/A variant pills (above left d-pad) ── */
   const divideRow = variant === "divide" && (
-    <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
+    <div
+      style={{
+        position: "absolute",
+        left: 12,
+        bottom: 96,
+        display: "flex",
+        gap: 8,
+        pointerEvents: "auto",
+      }}
+    >
       <PillBtn
+        w={48} h={36}
         bg="rgba(249,115,22,0.3)"
         border="rgba(249,115,22,0.6)"
         active={is("h")}
         label="H"
         labelColor="#fb923c"
         dot="#fb923c"
-        icon={
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-            <svg viewBox="0 0 24 24" width="20" height="20">
-              <circle cx="12" cy="5" r="3" fill="#fb923c" />
-              <path d="M6 20v-4a6 6 0 0112 0v4" stroke="#fb923c" strokeWidth="2" fill="none" />
-            </svg>
-            <span style={{ fontSize: 8, color: "#fb923c", fontFamily: "monospace", fontWeight: 700 }}>H</span>
-          </div>
-        }
         onDown={() => press("h", true, "h", "KeyH")}
         onUp={() => press("h", false, "h", "KeyH")}
       />
       <PillBtn
+        w={48} h={36}
         bg="rgba(34,211,238,0.3)"
         border="rgba(34,211,238,0.6)"
         active={is("ai")}
         label="A"
         labelColor="#22d3ee"
         dot="#22d3ee"
-        icon={
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-            <svg viewBox="0 0 24 24" width="20" height="20">
-              <rect x="7" y="8" width="10" height="9" rx="2" stroke="#22d3ee" strokeWidth="2" fill="none" />
-              <path d="M9 11h.01M15 11h.01M9 14h6" stroke="#22d3ee" strokeWidth="2" strokeLinecap="round" />
-              <path d="M12 8V5M10 5h4" stroke="#22d3ee" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            <span style={{ fontSize: 8, color: "#22d3ee", fontFamily: "monospace", fontWeight: 700 }}>A</span>
-          </div>
-        }
         onDown={() => press("ai", true, "a", "KeyA")}
         onUp={() => press("ai", false, "a", "KeyA")}
       />
     </div>
   );
 
-  /* ── TypeHunter ammo variant row ── */
+  /* ── TypeHunter ammo variant pills (above right buttons) ── */
   const hunterRow = variant === "typehunter" && (
-    <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+    <div
+      style={{
+        position: "absolute",
+        right: 12,
+        bottom: 100,
+        display: "flex",
+        gap: 6,
+        pointerEvents: "auto",
+      }}
+    >
       <PillBtn
-        w={52} h={44}
+        w={44} h={34}
         bg="rgba(124,58,237,0.3)"
         border="rgba(124,58,237,0.6)"
         active={is("n1")}
@@ -362,7 +338,7 @@ export default function GameTouchControls({
         onUp={() => press("n1", false, "1", "Digit1")}
       />
       <PillBtn
-        w={52} h={44}
+        w={44} h={34}
         bg="rgba(217,119,6,0.3)"
         border="rgba(217,119,6,0.6)"
         active={is("n2")}
@@ -373,7 +349,7 @@ export default function GameTouchControls({
         onUp={() => press("n2", false, "2", "Digit2")}
       />
       <PillBtn
-        w={52} h={44}
+        w={44} h={34}
         bg="rgba(220,38,38,0.3)"
         border="rgba(220,38,38,0.6)"
         active={is("n3")}
@@ -388,7 +364,16 @@ export default function GameTouchControls({
 
   /* ── Boss quiz row (lesson 2) ── */
   const bossQuizRow = showBossQuizRow && (
-    <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+    <div
+      style={{
+        position: "absolute",
+        right: 12,
+        bottom: 104,
+        display: "flex",
+        gap: 6,
+        pointerEvents: "auto",
+      }}
+    >
       {[
         { id: "q1", k: "1", c: "Digit1", color: "#22d3ee" },
         { id: "q2", k: "2", c: "Digit2", color: "#a78bfa" },
@@ -396,8 +381,8 @@ export default function GameTouchControls({
       ].map(({ id, k, c, color }) => (
         <PillBtn
           key={id}
-          w={52} h={40}
-          bg={`rgba(0,0,0,0.5)`}
+          w={44} h={34}
+          bg="rgba(0,0,0,0.5)"
           border={color}
           active={is(id)}
           label={k}
@@ -420,54 +405,46 @@ export default function GameTouchControls({
         bottom: 0,
         pointerEvents: "none",
         zIndex: 260,
+        overflow: "hidden",
       }}
       className="md:hidden"
     >
+      {divideRow}
+      {hunterRow}
+      {bossQuizRow}
+
       {/* ── LEFT side: D-pad ── */}
       <div
         style={{
           position: "absolute",
-          left: 16,
-          bottom: 16,
+          left: 12,
+          bottom: 8,
           pointerEvents: "auto",
           display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-start",
-          gap: 0,
+          flexDirection: "row",
+          gap: 8,
+          alignItems: "flex-end",
         }}
       >
-        {divideRow}
-        <div style={{ position: "relative", display: "inline-block", padding: 6 }}>
-          <CornerBrackets color="rgba(99,102,241,0.4)" />
-          <div style={{ display: "flex", gap: 10 }}>
-            {leftBtn}
-            {rightBtn}
-          </div>
-        </div>
+        {leftBtn}
+        {rightBtn}
       </div>
 
       {/* ── RIGHT side: Jump + Fire ── */}
       <div
         style={{
           position: "absolute",
-          right: 16,
-          bottom: 16,
+          right: 12,
+          bottom: 8,
           pointerEvents: "auto",
           display: "flex",
-          flexDirection: "column",
+          flexDirection: "row",
+          gap: 8,
           alignItems: "flex-end",
-          gap: 0,
         }}
       >
-        {hunterRow}
-        {bossQuizRow}
-        <div style={{ position: "relative", display: "inline-block", padding: 6 }}>
-          <CornerBrackets color="rgba(34,211,238,0.4)" />
-          <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-            {jumpBtn}
-            {fireBtn}
-          </div>
-        </div>
+        {jumpBtn}
+        {fireBtn}
       </div>
     </div>
   );

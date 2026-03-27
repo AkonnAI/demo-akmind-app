@@ -46,7 +46,7 @@ const CINEMATIC_CSS = `
 const PANEL_FRAME: CSSProperties = {
   position: "relative",
   width: "100%",
-  minHeight: "100vh",
+  height: "100%",
   display: "flex",
   flexDirection: "column",
   justifyContent: "space-between",
@@ -61,11 +61,11 @@ const PANEL_STAGE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
+  overflow: "hidden",
 };
 
 const PANEL_DIALOGUE_SLOT: CSSProperties = {
   flexShrink: 0,
-  height: 200,
   position: "relative",
   width: "100%",
 };
@@ -348,6 +348,7 @@ function Stars({ count = 50 }: { count?: number }) {
 
 export default function CinematicIntro2({ onComplete }: CinematicIntro2Props) {
   const [panelIdx, setPanelIdx] = useState(0);
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 
   const advance = () => {
     if (panelIdx < 4) setPanelIdx((p) => p + 1);
@@ -398,7 +399,7 @@ export default function CinematicIntro2({ onComplete }: CinematicIntro2Props) {
       </div>
       <div style={{ ...PANEL_STAGE, zIndex: 6 }}>
         <div style={{ transform: "translateY(-6%)" }}>
-          <ChaosBotCharacter animation="roar" size={2.4} />
+          <ChaosBotCharacter animation="roar" size={isMobile ? 1.0 : 2.4} />
         </div>
       </div>
       <div style={PANEL_DIALOGUE_SLOT}>
@@ -443,7 +444,7 @@ export default function CinematicIntro2({ onComplete }: CinematicIntro2Props) {
             transform: "translateX(-50%)",
           }}
         >
-          <NovaCharacter expression="warning" size={0.9} />
+          <NovaCharacter expression="warning" size={isMobile ? 0.6 : 0.9} />
         </div>
         <div
           style={{
@@ -482,8 +483,8 @@ export default function CinematicIntro2({ onComplete }: CinematicIntro2Props) {
         <Scanlines />
       </div>
       <div style={{ ...PANEL_STAGE, gap: 40, zIndex: 6 }}>
-        <AXCharacter animation="idle" size={0.8} />
-        <NovaCharacter expression="explaining" size={0.8} />
+        <AXCharacter animation="idle" size={isMobile ? 0.6 : 0.8} />
+        <NovaCharacter expression="explaining" size={isMobile ? 0.6 : 0.8} />
       </div>
       <div style={PANEL_DIALOGUE_SLOT}>
         <DialogueBox
@@ -525,7 +526,7 @@ export default function CinematicIntro2({ onComplete }: CinematicIntro2Props) {
             gap: 8,
           }}
         >
-          <AXCharacter animation="idle" size={1.4} />
+          <AXCharacter animation="idle" size={isMobile ? 0.6 : 1.4} />
           <div
             style={{
               width: 220,

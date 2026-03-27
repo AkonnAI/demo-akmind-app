@@ -11,13 +11,14 @@ export default function LandscapeWrapper({
 
   useEffect(() => {
     const checkDevice = () => {
-      const mobile =
-        /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-        (window.innerWidth < 768 && "ontouchstart" in window);
-      setIsMobile(mobile);
+      // Only flag as mobile for real devices — not desktop browser emulation
+      const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      setIsMobile(isMobileDevice);
 
-      if (mobile) {
+      if (isMobileDevice) {
         setIsPortrait(window.innerHeight > window.innerWidth);
+      } else {
+        setIsPortrait(false); // Never show rotate prompt on desktop
       }
     };
 

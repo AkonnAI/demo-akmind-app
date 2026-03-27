@@ -700,7 +700,7 @@ function LessonPageInner() {
         )}
 
         {phase === "game" && lesson.hasGame && (
-          <div className="px-0 sm:px-0">
+          <div style={{ position: "fixed", inset: 0, zIndex: 50, overflow: "hidden", maxWidth: "100vw", maxHeight: "100vh" }}>
             {gameActive && lessonId === 2 && (
               <LandscapeWrapper>
                 <GameShell2
