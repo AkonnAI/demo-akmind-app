@@ -265,6 +265,15 @@ function readCookieToken(): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+function getToken(tokenFromUrl: string | null): string | null {
+  if (tokenFromUrl) return tokenFromUrl;
+  if (typeof sessionStorage !== "undefined") {
+    const sessionToken = sessionStorage.getItem("demo_token");
+    if (sessionToken) return sessionToken;
+  }
+  return readCookieToken();
+}
+
 function lessonUnlocked(
   lessonId: number,
   lessonsComplete: number[]
@@ -360,7 +369,7 @@ function LessonPageInner() {
   }, []);
 
   useEffect(() => {
-    const t = tokenFromUrl ?? readCookieToken();
+    const t = getToken(tokenFromUrl);
     setToken(t);
     if (t) void loadUser(t);
     else {

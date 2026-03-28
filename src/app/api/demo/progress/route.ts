@@ -1,27 +1,30 @@
 import { fail, ok } from "@/lib/api-response";
 import { getDemoUserByToken, updateDemoUser } from "@/lib/demo-db";
+import { checkRateLimit, getIP } from "@/lib/rate-limit";
+import { progressSchema } from "@/lib/validators";
 import { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest) {
-  let body: {
-    token?: string;
-    lessonId?: number;
-    quizScore?: number;
-    xp?: number;
-  };
+  const ip = getIP(req);
+  const { allowed } = checkRateLimit(ip, 60, 60 * 1000);
+  if (!allowed) {
+    return fail("Too many requests", 429);
+  }
+
+  let body: unknown;
   try {
     body = await req.json();
   } catch {
     return fail("Invalid JSON body");
   }
 
-  const { token, lessonId, quizScore, xp } = body;
-  if (!token) return fail("token is required");
-  if (lessonId === undefined || lessonId === null) {
-    return fail("lessonId is required");
+  const parsed = progressSchema.safeParse(body);
+  if (!parsed.success) {
+    return fail("Invalid input", 422);
   }
+  const { token, lessonId, quizScore, xp } = parsed.data;
 
-  const user = getDemoUserByToken(token);
+  const user = await getDemoUserByToken(token);
   if (!user) {
     return fail("Invalid", 401);
   }
@@ -40,7 +43,7 @@ export async function POST(req: NextRequest) {
   const completed = lessons.length >= 4;
   const badge = completed;
 
-  updateDemoUser(user.id, {
+  await updateDemoUser(user.id, {
     lessonsComplete: lessons,
     quizScores: scores,
     xp: newXP,

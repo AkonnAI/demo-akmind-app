@@ -3,13 +3,22 @@ import nodemailer from "nodemailer";
 // From address uses GMAIL_USER. For production, set GMAIL_USER to hello@akmind.com
 // (or your verified domain sender) and use a proper SMTP provider instead of Gmail if needed.
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-});
+let _transporter: nodemailer.Transporter | null = null;
+
+function getTransporter(): nodemailer.Transporter {
+  if (_transporter) return _transporter;
+  _transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
+  });
+  return _transporter;
+}
 
 export async function sendEmail({
   to,
@@ -21,7 +30,7 @@ export async function sendEmail({
   html: string;
 }) {
   try {
-    await transporter.sendMail({
+    await getTransporter().sendMail({
       from: `"AKMIND" <${process.env.GMAIL_USER}>`,
       to,
       subject,

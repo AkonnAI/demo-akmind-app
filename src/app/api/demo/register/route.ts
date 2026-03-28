@@ -1,41 +1,59 @@
 import { fail, ok } from "@/lib/api-response";
 import { createDemoUser, generateDemoToken, hasUsedDemo } from "@/lib/demo-db";
 import { sendAdminNotification, sendDemoLink } from "@/lib/email";
+import { getIP, checkRateLimit } from "@/lib/rate-limit";
+import { sanitizeString } from "@/lib/sanitize";
+import { registerSchema } from "@/lib/validators";
 import { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest) {
-  let body: {
-    parentName?: string;
-    email?: string;
-    phone?: string;
-    childName?: string;
-    presetToken?: string;
-  };
+  console.log("=== REGISTER DIAGNOSTIC ===", {
+    USE_DYNAMODB: process.env.USE_DYNAMODB,
+    TABLE_NAME_1: process.env.DEMO_USERS_TABLE,
+    TABLE_NAME_2: process.env.DYNAMODB_DEMO_TABLE,
+    TABLE_NAME_3: process.env.DYNAMODB_USERS_TABLE,
+    AWS_REGION: process.env.AWS_REGION,
+    NODE_ENV: process.env.NODE_ENV,
+    timestamp: new Date().toISOString(),
+  });
+
+  const ip = getIP(req);
+  const { allowed } = checkRateLimit(ip, 3, 60 * 60 * 1000);
+  if (!allowed) {
+    return fail("Too many requests", 429);
+  }
+
+  let body: unknown;
   try {
     body = await req.json();
   } catch {
     return fail("Invalid JSON body");
   }
 
-  const { parentName, email, phone, childName, presetToken } = body;
-  if (!parentName?.trim()) return fail("parentName is required");
-  if (!email?.trim()) return fail("email is required");
-  if (!phone?.trim()) return fail("phone is required");
-  if (!childName?.trim()) return fail("childName is required");
+  const parsed = registerSchema.safeParse(body);
+  if (!parsed.success) {
+    return fail("Invalid input", 422);
+  }
 
-  if (hasUsedDemo(email)) {
+  const { parentName, email, phone, childName, presetToken } = parsed.data;
+  const parentNameSafe = sanitizeString(parentName);
+  const emailSafe = sanitizeString(email).toLowerCase();
+  const phoneSafe = sanitizeString(phone);
+  const childNameSafe = sanitizeString(childName);
+
+  if (await hasUsedDemo(emailSafe)) {
     return fail("Demo already used", 409);
   }
 
   const token =
     typeof presetToken === "string" && presetToken.trim().length > 0
-      ? presetToken.trim()
+      ? sanitizeString(presetToken.trim())
       : generateDemoToken();
-  createDemoUser({
-    email: email.trim(),
-    name: parentName.trim(),
-    childName: childName.trim(),
-    phone: phone.trim(),
+  await createDemoUser({
+    email: emailSafe,
+    name: parentNameSafe,
+    childName: childNameSafe,
+    phone: phoneSafe,
     demoToken: token,
     demoStarted: false,
     demoCompleted: false,
@@ -45,12 +63,12 @@ export async function POST(req: NextRequest) {
     badgeEarned: false,
   });
 
-  void sendDemoLink(email.trim(), parentName.trim(), childName.trim(), token);
+  void sendDemoLink(emailSafe, parentNameSafe, childNameSafe, token);
   void sendAdminNotification(
-    parentName.trim(),
-    email.trim(),
-    phone.trim(),
-    childName.trim(),
+    parentNameSafe,
+    emailSafe,
+    phoneSafe,
+    childNameSafe,
     token
   );
 

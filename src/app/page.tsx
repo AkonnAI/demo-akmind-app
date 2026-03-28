@@ -94,7 +94,12 @@ function HomeContent() {
       }
       setUser(await res.json());
       setToken(t);
-      router.push(`/demo?token=${encodeURIComponent(t)}`);
+      const returnTo = searchParams.get("returnTo");
+      router.push(
+        returnTo
+          ? `${returnTo}?token=${encodeURIComponent(t)}`
+          : `/demo?token=${encodeURIComponent(t)}`
+      );
     } catch {
       setError("Invalid or expired token");
     } finally {
@@ -189,9 +194,14 @@ function HomeContent() {
                 <button
                   type="button"
                   className="mt-6 w-full rounded-xl bg-indigo-600 py-4 text-lg font-bold text-white transition hover:bg-indigo-700"
-                  onClick={() =>
-                    router.push(`/demo?token=${encodeURIComponent(token)}`)
-                  }
+                  onClick={() => {
+                    const returnTo = searchParams.get("returnTo");
+                    router.push(
+                      returnTo
+                        ? `${returnTo}?token=${encodeURIComponent(token)}`
+                        : `/demo?token=${encodeURIComponent(token)}`
+                    );
+                  }}
                 >
                   Start Demo →
                 </button>

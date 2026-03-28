@@ -1,6 +1,13 @@
-import crypto from "crypto";
-import fs from "fs";
-import path from "path";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  PutCommand,
+  QueryCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
 
 export interface DemoUser {
   id: string;
@@ -19,6 +26,20 @@ export interface DemoUser {
 }
 
 export type CreateDemoUserInput = Omit<DemoUser, "id" | "createdAt">;
+const TABLE =
+  process.env.DEMO_USERS_TABLE ||
+  process.env.DYNAMODB_DEMO_TABLE ||
+  "akmind-demo-users";
+const IS_DYNAMO = process.env.USE_DYNAMODB === "true";
+
+const getDb = () => {
+  const client = new DynamoDBClient({
+    region: process.env.AWS_REGION || "ap-south-1",
+  });
+  return DynamoDBDocumentClient.from(client, {
+    marshallOptions: { removeUndefinedValues: true },
+  });
+};
 
 function getDataDir(): string {
   const base = process.env.AKMIND_LOCAL_DB_PATH ?? "./data";
@@ -58,7 +79,7 @@ function writeUsers(users: DemoUser[]): void {
 }
 
 export function generateDemoToken(): string {
-  return crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+  return crypto.randomUUID().replaceAll("-", "").slice(0, 16);
 }
 
 /** Normalize tokens from input, URL, or cookies (trim + lowercase hex). */
@@ -66,55 +87,105 @@ export function normalizeDemoToken(token: string): string {
   return token.trim().toLowerCase();
 }
 
-export function createDemoUser(data: CreateDemoUserInput): DemoUser {
-  const users = readUsers();
+export async function createDemoUser(data: CreateDemoUserInput): Promise<DemoUser> {
   const user: DemoUser = {
     ...data,
-    demoToken: normalizeDemoToken(data.demoToken),
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
+    demoToken: data.demoToken.toLowerCase().trim(),
   };
-  users.push(user);
-  writeUsers(users);
+
+  if (!IS_DYNAMO) {
+    const users = readUsers();
+    users.push(user);
+    writeUsers(users);
+    return user;
+  }
+
+  await getDb().send(
+    new PutCommand({
+      TableName: TABLE,
+      Item: user,
+    })
+  );
   return user;
 }
 
-export function getDemoUserByEmail(email: string): DemoUser | null {
-  const normalized = email.trim().toLowerCase();
-  return readUsers().find((u) => u.email.trim().toLowerCase() === normalized) ?? null;
+export async function getDemoUserByEmail(email: string): Promise<DemoUser | null> {
+  if (!IS_DYNAMO) {
+    return (
+      readUsers().find((u) => u.email === email.toLowerCase()) ?? null
+    );
+  }
+  const res = await getDb().send(
+    new QueryCommand({
+      TableName: TABLE,
+      IndexName: "email-index",
+      KeyConditionExpression: "email = :e",
+      ExpressionAttributeValues: { ":e": email.toLowerCase() },
+      Limit: 1,
+    })
+  );
+  return (res.Items?.[0] as DemoUser) || null;
 }
 
-export function getDemoUserByToken(token: string): DemoUser | null {
-  const want = normalizeDemoToken(token);
-  if (!want) return null;
-  return (
-    readUsers().find((u) => normalizeDemoToken(u.demoToken) === want) ?? null
+export async function getDemoUserByToken(token: string): Promise<DemoUser | null> {
+  if (!IS_DYNAMO) {
+    return (
+      readUsers().find((u) => u.demoToken === token.toLowerCase().trim()) ?? null
+    );
+  }
+  const res = await getDb().send(
+    new QueryCommand({
+      TableName: TABLE,
+      IndexName: "token-index",
+      KeyConditionExpression: "demoToken = :t",
+      ExpressionAttributeValues: { ":t": token.toLowerCase().trim() },
+      Limit: 1,
+    })
+  );
+  return (res.Items?.[0] as DemoUser) || null;
+}
+
+export async function updateDemoUser(
+  id: string,
+  updates: Partial<Omit<DemoUser, "id" | "createdAt">>
+): Promise<void> {
+  if (!IS_DYNAMO) {
+    const users = readUsers();
+    const idx = users.findIndex((u) => u.id === id);
+    if (idx !== -1) {
+      users[idx] = { ...users[idx], ...updates };
+      writeUsers(users);
+    }
+    return;
+  }
+
+  const entries = Object.entries(updates).filter(([, v]) => v !== undefined);
+  if (entries.length === 0) return;
+  const expr = "SET " + entries.map((_, i) => `#f${i} = :v${i}`).join(", ");
+  const names = Object.fromEntries(entries.map(([k], i) => [`#f${i}`, k]));
+  const values = Object.fromEntries(entries.map(([, v], i) => [`:v${i}`, v]));
+
+  await getDb().send(
+    new UpdateCommand({
+      TableName: TABLE,
+      Key: { id },
+      UpdateExpression: expr,
+      ExpressionAttributeNames: names,
+      ExpressionAttributeValues: values,
+    })
   );
 }
 
-export function updateDemoUser(
-  id: string,
-  updates: Partial<Omit<DemoUser, "id" | "createdAt">>
-): DemoUser {
-  const users = readUsers();
-  const idx = users.findIndex((u) => u.id === id);
-  if (idx === -1) {
-    throw new Error(`Demo user not found: ${id}`);
-  }
-  const updated: DemoUser = { ...users[idx], ...updates };
-  users[idx] = updated;
-  writeUsers(users);
-  return updated;
-}
-
-export function hasUsedDemo(email: string): boolean {
-  return getDemoUserByEmail(email) !== null;
+export async function hasUsedDemo(email: string): Promise<boolean> {
+  return (await getDemoUserByEmail(email)) !== null;
 }
 
 const ADMIN_DEV_TOKEN = "admin-akmind-dev-2026";
 
-export function getOrCreateAdminUser(): DemoUser {
-  const existing = getDemoUserByToken(ADMIN_DEV_TOKEN);
+export async function getOrCreateAdminUser(): Promise<DemoUser> {
+  const existing = await getDemoUserByToken(ADMIN_DEV_TOKEN);
   if (existing) return existing;
 
   return createDemoUser({

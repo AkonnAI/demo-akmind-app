@@ -119,12 +119,24 @@ function DemoDashboardInner() {
   }, []);
 
   useEffect(() => {
-    const t = tokenFromUrl ?? readCookieToken();
+    const sessionToken =
+      typeof sessionStorage !== "undefined"
+        ? sessionStorage.getItem("demo_token")
+        : null;
+    const t = tokenFromUrl ?? readCookieToken() ?? sessionToken;
     setToken(t);
     if (!t) {
       setLoading(false);
       setUser(null);
       return;
+    }
+    if (typeof sessionStorage !== "undefined") {
+      sessionStorage.setItem("demo_token", t);
+    }
+    if (!tokenFromUrl && typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("token", t);
+      window.history.replaceState({}, "", url.toString());
     }
     void load(t);
   }, [tokenFromUrl, load]);
@@ -431,9 +443,21 @@ function DemoDashboardInner() {
         )}
 
         {!loading && (!user || !token) && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-            <p className="font-semibold text-slate-800">Unable to load your demo session.</p>
-            <p className="mt-2 text-sm text-slate-500">Return home and open your demo link again.</p>
+          <div className="flex items-center justify-center py-16">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-8 text-center shadow-md">
+              <div className="text-5xl">🔑</div>
+              <h2 className="mt-4 text-xl font-bold text-slate-900">Session Expired</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                Your demo session has expired. Please use your original demo link from your email to continue.
+              </p>
+              <a
+                href={process.env.NEXT_PUBLIC_LANDING_URL ?? "https://www.akmind.com"}
+                className="mt-6 block rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white no-underline"
+              >
+                Back to AKMIND →
+              </a>
+              <p className="mt-3 text-xs text-slate-400">Need help? Email hello@akmind.com</p>
+            </div>
           </div>
         )}
       </main>

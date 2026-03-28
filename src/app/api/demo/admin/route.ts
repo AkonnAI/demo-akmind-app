@@ -5,7 +5,7 @@ import {
 } from "@/lib/demo-db";
 
 export async function GET() {
-  const admin = getOrCreateAdminUser();
+  const admin = await getOrCreateAdminUser();
   return ok({
     token: admin.demoToken,
     accessUrl: `/?token=${encodeURIComponent(admin.demoToken)}`,
@@ -13,8 +13,8 @@ export async function GET() {
 }
 
 export async function DELETE() {
-  const admin = getOrCreateAdminUser();
-  updateDemoUser(admin.id, {
+  const admin = await getOrCreateAdminUser();
+  await updateDemoUser(admin.id, {
     demoStarted: false,
     demoCompleted: false,
     lessonsComplete: [],

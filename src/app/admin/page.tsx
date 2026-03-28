@@ -1,10 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function AdminPage() {
+  const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "changeme";
+  const [authed, setAuthed] = useState(false);
+  const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
   const [message, setMessage] = useState("");
+  const [authError, setAuthError] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("admin_authed") === "1") {
+      setAuthed(true);
+    }
+  }, []);
+
+  const doLogin = () => {
+    if (password === ADMIN_PASSWORD) {
+      setAuthed(true);
+      setAuthError("");
+      sessionStorage.setItem("admin_authed", "1");
+      return;
+    }
+    setAuthError("Invalid admin password");
+  };
 
   const getToken = async () => {
     const res = await fetch("/api/demo/admin");
@@ -19,6 +39,69 @@ export default function AdminPage() {
   };
 
   const q = token ? encodeURIComponent(token) : "";
+
+  if (!authed) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#050510",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "monospace",
+        }}
+      >
+        <div
+          style={{
+            background: "#0f0f23",
+            border: "1px solid #6366f1",
+            borderRadius: "16px",
+            padding: "40px",
+            maxWidth: "420px",
+            width: "100%",
+          }}
+        >
+          <h1 style={{ color: "#22d3ee", fontSize: "24px", marginBottom: "16px" }}>AKMIND Admin Login</h1>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Admin password"
+            style={{
+              width: "100%",
+              borderRadius: "10px",
+              border: "1px solid #334155",
+              background: "#020617",
+              color: "white",
+              padding: "10px 12px",
+              marginBottom: "12px",
+            }}
+          />
+          <button
+            type="button"
+            onClick={doLogin}
+            style={{
+              background: "#6366f1",
+              color: "white",
+              border: "none",
+              borderRadius: "10px",
+              padding: "12px 24px",
+              cursor: "pointer",
+              fontSize: "14px",
+              fontWeight: "bold",
+              width: "100%",
+            }}
+          >
+            Login
+          </button>
+          {authError ? (
+            <p style={{ color: "#f87171", marginTop: "10px", fontSize: "12px" }}>{authError}</p>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
