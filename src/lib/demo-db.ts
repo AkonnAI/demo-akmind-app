@@ -6,6 +6,7 @@ import {
   DynamoDBDocumentClient,
   PutCommand,
   QueryCommand,
+  ScanCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 
@@ -30,7 +31,12 @@ const TABLE =
   process.env.DEMO_USERS_TABLE ||
   process.env.DYNAMODB_DEMO_TABLE ||
   "akmind-demo-users";
-const IS_DYNAMO = process.env.USE_DYNAMODB === "true";
+const HAS_TABLE_CONFIG = Boolean(
+  process.env.DEMO_USERS_TABLE || process.env.DYNAMODB_DEMO_TABLE
+);
+const IS_DYNAMO =
+  process.env.USE_DYNAMODB === "true" ||
+  (process.env.USE_DYNAMODB !== "false" && HAS_TABLE_CONFIG);
 
 const getDb = () => {
   const client = new DynamoDBClient({
@@ -112,39 +118,68 @@ export async function createDemoUser(data: CreateDemoUserInput): Promise<DemoUse
 }
 
 export async function getDemoUserByEmail(email: string): Promise<DemoUser | null> {
+  const normalizedEmail = email.toLowerCase().trim();
   if (!IS_DYNAMO) {
     return (
-      readUsers().find((u) => u.email === email.toLowerCase()) ?? null
+      readUsers().find((u) => u.email === normalizedEmail) ?? null
     );
   }
-  const res = await getDb().send(
-    new QueryCommand({
-      TableName: TABLE,
-      IndexName: "email-index",
-      KeyConditionExpression: "email = :e",
-      ExpressionAttributeValues: { ":e": email.toLowerCase() },
-      Limit: 1,
-    })
-  );
-  return (res.Items?.[0] as DemoUser) || null;
+  try {
+    const res = await getDb().send(
+      new QueryCommand({
+        TableName: TABLE,
+        IndexName: "email-index",
+        KeyConditionExpression: "email = :e",
+        ExpressionAttributeValues: { ":e": normalizedEmail },
+        Limit: 1,
+      })
+    );
+    return (res.Items?.[0] as DemoUser) || null;
+  } catch (error) {
+    console.warn("email-index query failed, falling back to table scan", error);
+    const scan = await getDb().send(
+      new ScanCommand({
+        TableName: TABLE,
+        FilterExpression: "email = :e",
+        ExpressionAttributeValues: { ":e": normalizedEmail },
+        Limit: 1,
+      })
+    );
+    return (scan.Items?.[0] as DemoUser) || null;
+  }
 }
 
 export async function getDemoUserByToken(token: string): Promise<DemoUser | null> {
+  const normalizedToken = normalizeDemoToken(token);
+  if (!normalizedToken) return null;
   if (!IS_DYNAMO) {
     return (
-      readUsers().find((u) => u.demoToken === token.toLowerCase().trim()) ?? null
+      readUsers().find((u) => u.demoToken === normalizedToken) ?? null
     );
   }
-  const res = await getDb().send(
-    new QueryCommand({
-      TableName: TABLE,
-      IndexName: "token-index",
-      KeyConditionExpression: "demoToken = :t",
-      ExpressionAttributeValues: { ":t": token.toLowerCase().trim() },
-      Limit: 1,
-    })
-  );
-  return (res.Items?.[0] as DemoUser) || null;
+  try {
+    const res = await getDb().send(
+      new QueryCommand({
+        TableName: TABLE,
+        IndexName: "token-index",
+        KeyConditionExpression: "demoToken = :t",
+        ExpressionAttributeValues: { ":t": normalizedToken },
+        Limit: 1,
+      })
+    );
+    return (res.Items?.[0] as DemoUser) || null;
+  } catch (error) {
+    console.warn("token-index query failed, falling back to table scan", error);
+    const scan = await getDb().send(
+      new ScanCommand({
+        TableName: TABLE,
+        FilterExpression: "demoToken = :t",
+        ExpressionAttributeValues: { ":t": normalizedToken },
+        Limit: 1,
+      })
+    );
+    return (scan.Items?.[0] as DemoUser) || null;
+  }
 }
 
 export async function updateDemoUser(
