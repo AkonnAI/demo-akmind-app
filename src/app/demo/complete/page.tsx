@@ -2,25 +2,17 @@
 
 import type { DemoUser } from "@/types/demo";
 import { jsPDF } from "jspdf";
+import { Trophy, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
-const CONFETTI_COLORS = [
-  "#6366f1",
-  "#f59e0b",
-  "#10b981",
-  "#ef4444",
-  "#a855f7",
-];
-
-const LANDING_URL =
-  process.env.NEXT_PUBLIC_LANDING_URL ?? "https://www.akmind.com";
-
-const CONFETTI_PIECES = Array.from({ length: 40 }, (_, i) => ({
-  left: `${(i * 2.47 + ((i * 13) % 7)) % 100}%`,
+const CONFETTI_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#a855f7"];
+const LANDING_URL = process.env.NEXT_PUBLIC_LANDING_URL ?? "https://www.akmind.com";
+const CONFETTI_PIECES = Array.from({ length: 20 }, (_, i) => ({
+  left: `${(i * 4.7 + ((i * 11) % 9)) % 100}%`,
   duration: 2.6 + (i % 6) * 0.35,
-  delay: (i % 12) * 0.08,
+  delay: (i % 10) * 0.08,
   color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
   dx: `${((i % 9) - 4) * 18}px`,
   spin: `${540 + (i % 6) * 120}deg`,
@@ -40,46 +32,45 @@ function CompletePageInner() {
   const tokenFromUrl = searchParams.get("token");
 
   const [user, setUser] = useState<DemoUser | null>(null);
-  const [bootStatus, setBootStatus] = useState<
-    "loading" | "ready" | "noop"
-  >("loading");
+  const [bootStatus, setBootStatus] = useState<"loading" | "ready" | "noop">(
+    "loading"
+  );
   const [showPayment, setShowPayment] = useState(false);
   const [badgeDownloading, setBadgeDownloading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(
-    null
-  );
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [fullName, setFullName] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
 
-  const loadUser = useCallback(async (t: string) => {
-    setBootStatus("loading");
-    try {
-      const res = await fetch(`/api/demo/user?token=${encodeURIComponent(t)}`);
-      if (!res.ok) {
+  const loadUser = useCallback(
+    async (t: string) => {
+      setBootStatus("loading");
+      try {
+        const res = await fetch(`/api/demo/user?token=${encodeURIComponent(t)}`);
+        if (!res.ok) {
+          setUser(null);
+          setBootStatus("ready");
+          return;
+        }
+        const data = (await res.json()) as DemoUser;
+        if (!data.demoCompleted) {
+          setBootStatus("noop");
+          router.replace(`/demo${t ? `?token=${encodeURIComponent(t)}` : ""}`);
+          return;
+        }
+        setUser(data);
+        setFullName(data.name || "");
+        setEmailInput(data.email || "");
+        setPhoneInput(data.phone || "");
+        setBootStatus("ready");
+      } catch {
         setUser(null);
         setBootStatus("ready");
-        return;
       }
-      const data = (await res.json()) as DemoUser;
-      if (!data.demoCompleted) {
-        setBootStatus("noop");
-        router.replace(
-          `/demo${t ? `?token=${encodeURIComponent(t)}` : ""}`
-        );
-        return;
-      }
-      setUser(data);
-      setFullName(data.name || "");
-      setEmailInput(data.email || "");
-      setPhoneInput(data.phone || "");
-      setBootStatus("ready");
-    } catch {
-      setUser(null);
-      setBootStatus("ready");
-    }
-  }, [router]);
+    },
+    [router]
+  );
 
   useEffect(() => {
     const t = tokenFromUrl ?? readCookieToken();
@@ -96,49 +87,34 @@ function CompletePageInner() {
     if (!user) return;
     setBadgeDownloading(true);
     try {
-      const doc = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: "a4",
-      });
-
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       doc.setFillColor(79, 70, 229);
       doc.rect(0, 0, 297, 210, "F");
-
       doc.setFillColor(255, 255, 255);
       doc.roundedRect(20, 20, 257, 170, 8, 8, "F");
-
       doc.setDrawColor(79, 70, 229);
       doc.setLineWidth(2);
       doc.roundedRect(20, 20, 257, 170, 8, 8, "S");
-
       doc.setFontSize(28);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(79, 70, 229);
       doc.text("AKMIND", 148, 50, { align: "center" });
-
       doc.setFontSize(11);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
       doc.text("Dream. Discover. Shine.", 148, 60, { align: "center" });
-
       doc.setFontSize(22);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 41, 59);
-      doc.text("AI EXPLORER DEMO CERTIFICATE", 148, 85, {
-        align: "center",
-      });
-
+      doc.text("AI EXPLORER DEMO CERTIFICATE", 148, 85, { align: "center" });
       doc.setFontSize(13);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(71, 85, 105);
       doc.text("This certifies that", 148, 105, { align: "center" });
-
       doc.setFontSize(24);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(79, 70, 229);
       doc.text(user.childName || "Student", 148, 120, { align: "center" });
-
       doc.setFontSize(12);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(71, 85, 105);
@@ -154,22 +130,17 @@ function CompletePageInner() {
         142,
         { align: "center" }
       );
-
       const dateStr = new Date().toLocaleDateString("en-IN", {
         day: "numeric",
         month: "long",
         year: "numeric",
       });
-
       doc.setFontSize(11);
       doc.setTextColor(100, 116, 139);
       doc.text(`Date: ${dateStr}`, 60, 165);
       doc.text(`XP Earned: ${user.xp ?? 0}`, 148, 165, { align: "center" });
       doc.text("akmind.com", 237, 165, { align: "right" });
-
-      doc.save(
-        `AKMIND-Demo-Certificate-${user.childName || "Student"}.pdf`
-      );
+      doc.save(`AKMIND-Demo-Certificate-${user.childName || "Student"}.pdf`);
     } finally {
       setBadgeDownloading(false);
     }
@@ -220,23 +191,20 @@ function CompletePageInner() {
 
   if (bootStatus === "loading" || bootStatus === "noop") {
     return (
-      <div className="min-h-screen animate-pulse bg-slate-50">
-        <div className="h-48 bg-indigo-950/20" />
-        <div className="mx-auto mt-8 h-64 max-w-sm rounded-2xl bg-slate-200" />
+      <div className="min-h-screen animate-pulse">
+        <div className="h-48 bg-indigo-900/20" />
+        <div className="mx-auto mt-8 h-64 max-w-sm rounded-2xl bg-indigo-400/20" />
       </div>
     );
   }
 
   if (!user || !user.demoCompleted) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-8 text-center">
-        <p className="font-semibold text-slate-800">
+      <div className="flex min-h-screen flex-col items-center justify-center p-8 text-center">
+        <p className="font-semibold text-slate-300">
           We couldn&apos;t load your completion record.
         </p>
-        <Link
-          href="/demo"
-          className="mt-4 text-indigo-600 underline"
-        >
+        <Link href="/demo" className="mt-4 text-cyan-400 underline">
           Back to demo
         </Link>
       </div>
@@ -247,126 +215,141 @@ function CompletePageInner() {
   const childName = user.childName || "Explorer";
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-900">
-      <section className="relative overflow-hidden bg-indigo-950 py-10 text-center text-white sm:py-16">
+    <div className="min-h-screen overflow-x-hidden text-slate-100">
+      <section className="relative px-4 py-8 sm:py-12">
         <div className="complete-confetti-layer">{confetti}</div>
-        <div className="relative z-10 px-3 sm:px-4">
-          <p className="animate-bounce text-5xl sm:text-6xl">🎉</p>
-          <h1 className="mt-4 text-3xl font-bold sm:text-4xl">Demo Complete!</h1>
-          <p className="mt-2 text-base text-indigo-200 sm:text-lg">
+        <div
+          className="relative z-10 mx-auto max-w-[820px] rounded-3xl border p-8 sm:p-12"
+          style={{
+            background: "rgba(15,20,50,0.8)",
+            borderColor: "rgba(99,102,241,0.25)",
+            backdropFilter: "blur(24px)",
+          }}
+        >
+          <div className="mx-auto grid h-[72px] w-[72px] place-items-center rounded-full">
+            <Trophy
+              className="h-[72px] w-[72px] text-amber-400"
+              style={{ filter: "drop-shadow(0 0 32px rgba(245,158,11,0.4))" }}
+            />
+          </div>
+
+          <h1
+            className="mt-4 text-center text-4xl font-extrabold sm:text-5xl"
+            style={{
+              background: "linear-gradient(135deg, #FFFFFF, #67E8F9)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            Demo Complete!
+          </h1>
+          <p className="mt-3 text-center text-slate-400">
             {childName} has finished the AKMIND demo!
           </p>
-          <div className="mx-auto mt-6 grid max-w-lg grid-cols-3 gap-2 sm:mt-8 sm:flex sm:flex-wrap sm:justify-center sm:gap-4 md:gap-6">
+
+          <div className="mx-auto mt-8 grid max-w-2xl grid-cols-3 gap-3">
             {[
-              { big: `⚡ ${xp}`, label: "Points Earned" },
-              { big: "4/4", label: "Lessons Done" },
-              { big: "🏅", label: "Badge Earned" },
+              { big: `${xp}`, label: "Points", icon: <Zap className="h-4 w-4 text-cyan-300" /> },
+              { big: "4/4", label: "Lessons", icon: <span>📚</span> },
+              { big: certDate, label: "Date", icon: <span>📅</span> },
             ].map((s) => (
               <div
                 key={s.label}
-                className="rounded-2xl bg-white/10 p-3 text-center sm:min-w-[8rem] sm:p-4"
+                className="group rounded-2xl border p-4 text-center transition-all duration-300 hover:-translate-y-0.5"
+                style={{
+                  background: "rgba(15,20,50,0.7)",
+                  borderColor: "rgba(99,102,241,0.12)",
+                  backdropFilter: "blur(16px)",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+                }}
               >
-                <p className="text-sm font-bold sm:text-xl">{s.big}</p>
-                <p className="mt-1 text-[10px] text-indigo-200 sm:text-xs">{s.label}</p>
+                <div className="mb-2 flex justify-center">
+                  <span className="grid h-10 w-10 place-items-center rounded-[10px] bg-indigo-500/15">
+                    {s.icon}
+                  </span>
+                </div>
+                <p className="text-base font-bold text-white sm:text-xl">{s.big}</p>
+                <p className="mt-1 text-[10px] uppercase tracking-[0.08em] text-slate-500">
+                  {s.label}
+                </p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
 
-      <section className="border-b border-slate-200 bg-white py-8 text-center sm:py-12">
-        <div className="mx-auto max-w-xs rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 p-6 text-white shadow-2xl sm:max-w-sm sm:p-8">
-          <p className="font-mono text-lg tracking-widest">⚡ AKMIND</p>
-          <p className="my-4 text-8xl">🏅</p>
-          <p className="text-3xl font-black tracking-wider">AI EXPLORER</p>
-          <p className="mt-1 text-sm tracking-widest text-indigo-200">
-            DEMO CERTIFICATE
-          </p>
-          <div className="my-4 border-t border-white/20" />
-          <p className="text-xl font-bold">{childName}</p>
-          <p className="mt-1 text-sm text-indigo-200">
-            has completed the AKMIND AI Explorers Demo
-          </p>
-          <p className="mt-2 text-xs text-indigo-300">{certDate}</p>
-          <p className="mt-4 text-xs text-indigo-300">akmind.com</p>
-        </div>
-        <button
-          type="button"
-          disabled={badgeDownloading}
-          className="mt-6 w-full max-w-xs rounded-xl border-2 border-indigo-200 bg-white px-6 py-3 font-bold text-indigo-700 hover:bg-indigo-50 disabled:opacity-60 sm:w-auto sm:px-8"
-          onClick={downloadBadge}
-        >
-          {badgeDownloading ? "Preparing PDF…" : "Download Badge PDF"}
-        </button>
-      </section>
-
-      <section className="border-b border-slate-200 bg-white py-8 text-center sm:py-12">
-        <h2 className="text-2xl font-bold sm:text-3xl">What&apos;s Next?</h2>
-        <p className="mx-auto mt-2 max-w-lg px-3 text-sm text-slate-500 sm:text-base">
-          You&apos;ve experienced 4 lessons. The full AI Explorers program has
-          60 lessons across 6 modules.
-        </p>
-        <div className="mx-auto mt-6 max-w-md rounded-2xl border-2 border-indigo-200 p-4 text-left sm:mt-8 sm:p-6">
-          <p className="text-xl font-bold">🚀 AI Explorers — Full Program</p>
-          <p className="mt-1 text-sm text-slate-500">
-            60 Lessons · 6 Modules · 1 Capstone Project
-          </p>
-          <ul className="mt-4 space-y-2 text-sm text-slate-700">
-            {[
-              "✅ 60 micro-lessons (11 min each)",
-              "✅ 6 story games — one per module",
-              "✅ Live sessions with expert mentors",
-              "✅ XP, badges and leaderboard",
-              "✅ Capstone AI project",
-              "✅ Completion certificate",
-            ].map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-          <p className="mt-4 inline-block rounded-lg bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700">
-            🗓 Available from August 2026
-          </p>
-          <div className="mt-6 text-center">
-            <p className="text-sm text-slate-400">Early Bird Price</p>
-            <p className="text-4xl font-black text-indigo-600">
-              ₹29,999/-
-              <span className="text-lg font-normal text-slate-400">
-                {" "}
-                /program
-              </span>
+          <div className="mt-10 text-center">
+            <button
+              type="button"
+              className="rounded-[14px] px-10 py-4 text-base font-black text-slate-900 transition duration-200 hover:-translate-y-0.5"
+              style={{
+                background: "linear-gradient(135deg, #F59E0B, #F97316)",
+                boxShadow: "0 8px 32px rgba(245,158,11,0.4)",
+              }}
+              onClick={openPayment}
+            >
+              Upgrade to Full Program
+            </button>
+            <p className="mt-3 text-[13px] text-slate-500">
+              60 lessons · 3 programs · Live classes
             </p>
           </div>
-          <button
-            type="button"
-            className="mt-4 w-full rounded-xl bg-indigo-600 py-4 text-base font-bold text-white hover:bg-indigo-700 sm:text-lg"
-            onClick={openPayment}
-          >
-            Reserve My Spot →
-          </button>
-        </div>
-      </section>
 
-      <section className="bg-slate-50 py-8 text-center">
-        <p className="text-sm text-slate-400">Not ready yet? No problem.</p>
-        <p className="mt-1 text-xs text-slate-300">
-          Keep your badge and come back anytime.
-        </p>
-        <Link
-          href={LANDING_URL}
-          className="mt-3 inline-block text-sm text-indigo-400 underline"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          ← Back to akmind.com
-        </Link>
+          <div className="mt-8 flex flex-col items-center gap-3">
+            <div
+              className="w-full max-w-sm rounded-2xl border p-6 text-center"
+              style={{
+                background: "rgba(15,20,50,0.65)",
+                borderColor: "rgba(99,102,241,0.15)",
+              }}
+            >
+              <p className="font-mono text-sm tracking-[0.25em] text-indigo-200">
+                AKMIND
+              </p>
+              <p className="my-2 text-6xl">🏅</p>
+              <p className="text-2xl font-black text-white">AI EXPLORER</p>
+              <p className="mt-1 text-xs tracking-[0.25em] text-indigo-300">
+                DEMO CERTIFICATE
+              </p>
+              <p className="mt-3 text-lg font-bold text-slate-200">{childName}</p>
+            </div>
+            <button
+              type="button"
+              disabled={badgeDownloading}
+              className="rounded-xl border border-indigo-400/30 bg-indigo-500/15 px-6 py-3 font-bold text-indigo-200 hover:bg-indigo-500/25 disabled:opacity-60"
+              onClick={downloadBadge}
+            >
+              {badgeDownloading ? "Preparing PDF…" : "Download Badge PDF"}
+            </button>
+          </div>
+
+          <p className="mt-8 text-center text-xs text-slate-600">
+            Keep your badge and come back anytime.
+          </p>
+          <div className="mt-3 text-center">
+            <Link
+              href={LANDING_URL}
+              className="text-sm text-cyan-400 underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ← Back to akmind.com
+            </Link>
+          </div>
+        </div>
       </section>
 
       {showPayment && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-4">
-          <div className="relative flex max-h-[100dvh] w-full flex-col overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:max-h-[90vh] sm:max-w-md sm:rounded-2xl sm:p-8">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4">
+          <div
+            className="relative flex max-h-[100dvh] w-full flex-col overflow-y-auto rounded-t-2xl border p-5 sm:max-h-[90vh] sm:max-w-md sm:rounded-2xl sm:p-8"
+            style={{
+              background: "rgba(8,10,22,0.96)",
+              borderColor: "rgba(99,102,241,0.2)",
+              backdropFilter: "blur(24px)",
+            }}
+          >
             <button
               type="button"
-              className="absolute right-3 top-3 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 sm:right-4 sm:top-4"
+              className="absolute right-3 top-3 rounded-lg p-2 text-slate-500 hover:bg-white/5 hover:text-slate-200"
               aria-label="Close"
               onClick={closePayment}
             >
@@ -375,96 +358,74 @@ function CompletePageInner() {
 
             {!paymentSuccess ? (
               <>
-                <h3 className="pr-10 text-lg font-bold sm:pr-8 sm:text-xl">
+                <h3 className="pr-10 text-lg font-bold text-white sm:text-xl">
                   Complete Your Enrollment
                 </h3>
-                <p className="text-sm text-indigo-600">AI Explorers Program</p>
+                <p className="text-sm text-indigo-300">AI Explorers Program</p>
 
-                <div className="mt-4 rounded-xl bg-slate-50 p-4">
+                <div className="mt-4 rounded-xl border border-indigo-400/20 bg-indigo-500/10 p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <span className="font-medium">
+                    <span className="font-medium text-slate-100">
                       AI Explorers — Full Program
                     </span>
-                    <span className="text-xl font-bold">₹29,999/-</span>
+                    <span className="text-xl font-bold text-amber-300">₹29,999/-</span>
                   </div>
-                  <p className="mt-1 text-xs text-amber-600">
-                    Available from August 2026
-                  </p>
+                  <p className="mt-1 text-xs text-amber-400">Available from August 2026</p>
                 </div>
 
-                <p className="mt-6 text-sm font-medium text-slate-700">
+                <p className="mt-6 text-sm font-medium text-slate-300">
                   Select Payment Method
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   {(
                     [
-                      {
-                        id: "upi" as const,
-                        title: "📱 UPI",
-                        sub: "Google Pay, PhonePe, Paytm",
-                      },
-                      {
-                        id: "card" as const,
-                        title: "💳 Credit / Debit Card",
-                        sub: "Visa, Mastercard, RuPay",
-                      },
-                      {
-                        id: "netbank" as const,
-                        title: "🏦 Net Banking",
-                        sub: "All major banks",
-                      },
-                      {
-                        id: "emi" as const,
-                        title: "📅 EMI",
-                        sub: "3 / 6 / 12 months",
-                      },
+                      { id: "upi" as const, title: "📱 UPI", sub: "Google Pay, PhonePe, Paytm" },
+                      { id: "card" as const, title: "💳 Credit / Debit Card", sub: "Visa, Mastercard, RuPay" },
+                      { id: "netbank" as const, title: "🏦 Net Banking", sub: "All major banks" },
+                      { id: "emi" as const, title: "📅 EMI", sub: "3 / 6 / 12 months" },
                     ] as const
                   ).map((m) => (
                     <button
                       key={m.id}
                       type="button"
                       onClick={() => setPaymentMethod(m.id)}
-                      className={`rounded-xl border p-3 text-center text-sm transition hover:border-indigo-400 ${
+                      className={`rounded-xl border p-3 text-center text-sm transition ${
                         paymentMethod === m.id
-                          ? "border-indigo-600 bg-indigo-50"
-                          : "border-slate-200"
+                          ? "border-indigo-400 bg-indigo-500/15"
+                          : "border-indigo-300/20 hover:border-indigo-300/40"
                       }`}
                     >
-                      <span className="block font-semibold text-slate-900">
-                        {m.title}
-                      </span>
-                      <span className="mt-1 block text-xs text-slate-500">
-                        {m.sub}
-                      </span>
+                      <span className="block font-semibold text-slate-100">{m.title}</span>
+                      <span className="mt-1 block text-xs text-slate-500">{m.sub}</span>
                     </button>
                   ))}
                 </div>
 
-                <label className="mt-4 block text-left text-xs font-medium text-slate-600">
+                <label className="mt-4 block text-left text-xs font-medium text-slate-400">
                   Full Name
                   <input
                     type="text"
-                    className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm"
+                    className="mt-1 w-full rounded-xl border border-indigo-300/20 bg-white/5 p-3 text-sm text-slate-100"
                     placeholder="Full Name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                   />
                 </label>
-                <label className="mt-3 block text-left text-xs font-medium text-slate-600">
+                <label className="mt-3 block text-left text-xs font-medium text-slate-400">
                   Email
                   <input
                     type="email"
-                    className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm"
+                    className="mt-1 w-full rounded-xl border border-indigo-300/20 bg-white/5 p-3 text-sm text-slate-100"
                     placeholder="you@example.com"
                     value={emailInput}
                     onChange={(e) => setEmailInput(e.target.value)}
                   />
                 </label>
-                <label className="mt-3 block text-left text-xs font-medium text-slate-600">
+                <label className="mt-3 block text-left text-xs font-medium text-slate-400">
                   Phone
                   <input
                     type="tel"
-                    className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm"
+                    className="mt-1 w-full rounded-xl border border-indigo-300/20 bg-white/5 p-3 text-sm text-slate-100"
                     placeholder="Phone number"
                     value={phoneInput}
                     onChange={(e) => setPhoneInput(e.target.value)}
@@ -473,30 +434,30 @@ function CompletePageInner() {
 
                 <button
                   type="button"
-                  className="mt-6 w-full rounded-xl bg-indigo-600 py-4 font-bold text-white hover:bg-indigo-700"
+                  className="mt-6 w-full rounded-xl py-4 font-black text-slate-900"
+                  style={{
+                    background: "linear-gradient(135deg, #F59E0B, #F97316)",
+                    boxShadow: "0 8px 30px rgba(245,158,11,0.35)",
+                  }}
                   onClick={handlePayClick}
                 >
                   Pay ₹29,999/- →
                 </button>
-                <p className="mt-3 text-center text-xs text-slate-400">
-                  🔒 Secure payment · Full refund if course doesn&apos;t launch
-                  · No charges until August 2026
+                <p className="mt-3 text-center text-xs text-slate-600">
+                  Secure payment · Full refund if course doesn&apos;t launch · No charges until August 2026
                 </p>
               </>
             ) : (
               <div className="pt-2 text-center">
                 <p className="text-5xl">✅</p>
-                <h3 className="mt-4 text-2xl font-bold">Payment Received!</h3>
-                <p className="mt-2 text-slate-500">
+                <h3 className="mt-4 text-2xl font-bold text-white">Payment Received!</h3>
+                <p className="mt-2 text-slate-400">
                   Thank you {user.name}! Your spot is reserved for AI Explorers
                   starting August 2026.
                 </p>
-                <p className="mt-1 text-center text-sm text-slate-400">
-                  We will email you enrollment details before the course begins.
-                </p>
                 <button
                   type="button"
-                  className="mt-6 w-full rounded-xl border border-slate-200 py-3 font-semibold text-slate-800 hover:bg-slate-50"
+                  className="mt-6 w-full rounded-xl border border-indigo-300/25 py-3 font-semibold text-slate-200 hover:bg-white/5"
                   onClick={closePayment}
                 >
                   Close
@@ -514,8 +475,8 @@ export default function DemoCompletePage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-slate-50">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-indigo-300/20 border-t-indigo-400" />
         </div>
       }
     >

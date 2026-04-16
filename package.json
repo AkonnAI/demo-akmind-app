@@ -12,6 +12,7 @@
     "@aws-sdk/client-dynamodb": "^3.1019.0",
     "@aws-sdk/lib-dynamodb": "^3.1019.0",
     "framer-motion": "^12.38.0",
+    "groq-sdk": "^1.1.2",
     "isomorphic-dompurify": "^3.7.1",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.7.0",

@@ -2,43 +2,173 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --bg-space: #080c1e;
+  --bg-deep: #0a0f24;
+  --bg-navy: #0d1230;
+  --bg-glass: rgba(15, 20, 50, 0.6);
+  --bg-card: rgba(15, 20, 50, 0.7);
+  --border-glass: rgba(139, 148, 255, 0.18);
+  --border-glow: rgba(6, 182, 212, 0.35);
+  --text-bright: #ffffff;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --cyan: #06b6d4;
+  --indigo: #6366f1;
+  --amber: #f59e0b;
+  --green: #10b981;
+  --glow-cyan: 0 0 20px rgba(6, 182, 212, 0.3);
+  --glow-indigo: 0 0 20px rgba(99, 102, 241, 0.3);
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-space);
+  background-image:
+    radial-gradient(
+      ellipse at 15% 15%,
+      rgba(99, 102, 241, 0.12) 0%,
+      transparent 45%
+    ),
+    radial-gradient(
+      ellipse at 85% 85%,
+      rgba(6, 182, 212, 0.1) 0%,
+      transparent 45%
+    ),
+    radial-gradient(
+      ellipse at 85% 15%,
+      rgba(139, 92, 246, 0.06) 0%,
+      transparent 35%
+    );
+  background-attachment: fixed;
+  color: var(--text-primary);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  min-height: 100vh;
 }
 
-@keyframes star-twinkle {
+@keyframes float {
   0%,
   100% {
-    opacity: 0.25;
-    transform: scale(1);
+    transform: translateY(0px);
   }
   50% {
-    opacity: 1;
-    transform: scale(1.35);
+    transform: translateY(-8px);
   }
 }
 
-.star-field-dot {
-  position: absolute;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 0 4px rgba(199, 210, 254, 0.9);
-  animation: star-twinkle ease-in-out infinite;
-  pointer-events: none;
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+@keyframes border-cycle {
+  0% {
+    border-color: rgba(99, 102, 241, 0.2);
+  }
+  50% {
+    border-color: rgba(6, 182, 212, 0.4);
+  }
+  100% {
+    border-color: rgba(99, 102, 241, 0.2);
+  }
+}
+
+@keyframes scan-line {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.6;
+  }
+  90% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(400px);
+    opacity: 0;
+  }
+}
+
+@keyframes particle-rise {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.6;
+  }
+  90% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateY(-100px) scale(0.3);
+    opacity: 0;
+  }
+}
+
+@keyframes ring-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes count-up {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes nova-typing {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
 }
 
 @keyframes confetti-fall {
@@ -70,4 +200,17 @@ body {
   animation-name: confetti-fall;
   animation-timing-function: linear;
   animation-fill-mode: both;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #6366f1, #06b6d4);
+  border-radius: 2px;
 }

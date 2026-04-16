@@ -1,12 +1,14 @@
 "use client";
 
+import NOVAChat from "@/components/NOVAChat";
 import type { DemoUser } from "@/types/demo";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, PlayCircle } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Suspense,
+  type CSSProperties,
   useCallback,
   useEffect,
   useMemo,
@@ -243,17 +245,14 @@ const GameShell2 = dynamic(
   () => import("@/components/games/lesson2/GameShell2"),
   { ssr: false }
 );
-
 const GameShell3 = dynamic(
   () => import("@/components/games/lesson3/GameShell3"),
   { ssr: false }
 );
-
 const GameShell4 = dynamic(
   () => import("@/components/games/lesson4/GameShell4"),
   { ssr: false }
 );
-
 const LandscapeWrapper = dynamic(
   () => import("@/components/games/shared/LandscapeWrapper"),
   { ssr: false }
@@ -274,17 +273,16 @@ function getToken(tokenFromUrl: string | null): string | null {
   return readCookieToken();
 }
 
-function lessonUnlocked(
-  lessonId: number,
-  lessonsComplete: number[]
-): boolean {
+function lessonUnlocked(lessonId: number, lessonsComplete: number[]): boolean {
   if (lessonId === 1) return true;
   return lessonsComplete.includes(lessonId - 1);
 }
 
 function isAdminTester(user: DemoUser | null): boolean {
   if (!user) return false;
-  return user.email?.toLowerCase() === "admin@akmind.com" || user.name === "Admin";
+  return (
+    user.email?.toLowerCase() === "admin@akmind.com" || user.name === "Admin"
+  );
 }
 
 function quizXpFromAccuracy(
@@ -327,10 +325,15 @@ function LessonPageInner() {
   const [xpAwarded, setXpAwarded] = useState(false);
   const [gameComplete, setGameComplete] = useState(false);
   const [gameActive, setGameActive] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [pickedOption, setPickedOption] = useState<number | null>(null);
+  const [resultsXp, setResultsXp] = useState(0);
+  const [showQuizResults, setShowQuizResults] = useState(false);
+  const progressPosted = useRef(false);
+  const resultsInitialized = useRef(false);
 
   const launchGame = () => {
     setGameActive(true);
-    // Best-effort fullscreen (LandscapeWrapper handles the rotation prompt)
     try {
       document.documentElement.requestFullscreen?.().catch(() => {});
     } catch {
@@ -346,12 +349,6 @@ function LessonPageInner() {
     }
     setGameActive(false);
   };
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [pickedOption, setPickedOption] = useState<number | null>(null);
-  const [resultsXp, setResultsXp] = useState(0);
-  const [showQuizResults, setShowQuizResults] = useState(false);
-  const progressPosted = useRef(false);
-  const resultsInitialized = useRef(false);
 
   const loadUser = useCallback(async (t: string) => {
     setUserLoading(true);
@@ -429,19 +426,15 @@ function LessonPageInner() {
   const headerXp = user?.xp ?? 0;
 
   const goDashboard = () => {
-    if (token) {
-      router.push(`/demo?token=${encodeURIComponent(token)}`);
-    } else {
-      router.push("/demo");
-    }
+    if (token) router.push(`/demo?token=${encodeURIComponent(token)}`);
+    else router.push("/demo");
   };
 
   const postLessonProgress = useCallback(
     async (correctCount: number, total: number, totalXp: number) => {
       if (!token || !lesson || progressPosted.current) return;
       progressPosted.current = true;
-      const pct =
-        total > 0 ? Math.round((correctCount / total) * 100) : 0;
+      const pct = total > 0 ? Math.round((correctCount / total) * 100) : 0;
       try {
         const res = await fetch("/api/demo/progress", {
           method: "POST",
@@ -491,8 +484,7 @@ function LessonPageInner() {
     setQuizScoreCorrect(correct);
 
     const quizXp = quizXpFromAccuracy(lesson.xpReward, correct, total);
-    const gameXp =
-      lesson.hasGame && gameComplete ? GAME_BONUS_XP : 0;
+    const gameXp = lesson.hasGame && gameComplete ? GAME_BONUS_XP : 0;
     const totalXp = quizXp + gameXp;
     setResultsXp(totalXp);
 
@@ -543,11 +535,11 @@ function LessonPageInner() {
 
   if (!Number.isFinite(lessonId) || !lesson) {
     return (
-      <div className="min-h-screen bg-slate-50 p-8 text-center text-slate-700">
+      <div className="min-h-screen p-8 text-center text-slate-300">
         <p className="font-semibold">Lesson not found.</p>
         <button
           type="button"
-          className="mt-4 text-indigo-600 underline"
+          className="mt-4 text-cyan-400 underline"
           onClick={goDashboard}
         >
           Back to dashboard
@@ -558,11 +550,11 @@ function LessonPageInner() {
 
   if (loadError || !token) {
     return (
-      <div className="min-h-screen bg-slate-50 p-8 text-center">
-        <p className="font-semibold text-slate-800">Unable to load lesson.</p>
+      <div className="min-h-screen p-8 text-center">
+        <p className="font-semibold text-slate-300">Unable to load lesson.</p>
         <button
           type="button"
-          className="mt-4 text-indigo-600 underline"
+          className="mt-4 text-cyan-400 underline"
           onClick={() => router.push("/")}
         >
           Go home
@@ -573,32 +565,30 @@ function LessonPageInner() {
 
   if (userLoading) {
     return (
-      <div className="min-h-screen animate-pulse bg-slate-50">
-        <div className="h-16 border-b bg-white" />
-        <div className="mx-auto mt-8 h-48 max-w-4xl rounded-2xl bg-slate-200" />
+      <div className="min-h-screen animate-pulse">
+        <div className="h-16 border-b border-indigo-300/20 bg-black/20" />
+        <div className="mx-auto mt-8 h-48 max-w-4xl rounded-2xl bg-indigo-300/20" />
       </div>
     );
   }
 
   const adminMode = isAdminTester(user);
   if (user && !lessonUnlocked(lessonId, user.lessonsComplete)) {
-    if (adminMode) {
-      // Allow test admin to open any lesson/game directly
-    } else {
-    return (
-      <div className="min-h-screen bg-slate-50 p-8 text-center">
-        <p className="font-semibold text-slate-800">
-          Complete the previous lesson first.
-        </p>
-        <button
-          type="button"
-          className="mt-4 rounded-xl bg-indigo-600 px-6 py-2 font-semibold text-white"
-          onClick={goDashboard}
-        >
-          Back to dashboard
-        </button>
-      </div>
-    );
+    if (!adminMode) {
+      return (
+        <div className="min-h-screen p-8 text-center">
+          <p className="font-semibold text-slate-300">
+            Complete the previous lesson first.
+          </p>
+          <button
+            type="button"
+            className="mt-4 rounded-xl bg-indigo-600 px-6 py-2 font-semibold text-white"
+            onClick={goDashboard}
+          >
+            Back to dashboard
+          </button>
+        </div>
+      );
     }
   }
 
@@ -609,26 +599,40 @@ function LessonPageInner() {
     lesson.type === "live" ? "Live session" : "Self-paced + game";
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-slate-50">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">
+    <div className="min-h-screen overflow-x-hidden">
+      <header
+        className="sticky top-0 z-20 border-b"
+        style={{
+          background: "rgba(6,8,20,0.9)",
+          borderColor: "rgba(99,102,241,0.15)",
+          backdropFilter: "blur(20px)",
+        }}
+      >
         <div className="mx-auto flex h-16 max-w-5xl items-center gap-3 px-3 sm:px-4">
           <button
             type="button"
             onClick={goDashboard}
-            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+            className="rounded-lg p-2 text-slate-400 hover:bg-white/5"
             aria-label="Back to dashboard"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <h1 className="min-w-0 flex-1 truncate text-center text-sm font-bold text-slate-900 sm:text-base">
+          <h1 className="min-w-0 flex-1 truncate text-center text-sm font-bold text-white sm:text-base">
             {lesson.title}
           </h1>
-          <div className="shrink-0 rounded-full bg-yellow-100 px-2 py-1 text-xs font-bold text-yellow-700 sm:px-3 sm:text-sm">
+          <div
+            className="shrink-0 rounded-full border px-2 py-1 text-xs font-bold sm:px-3 sm:text-sm"
+            style={{
+              background: "rgba(245,158,11,0.15)",
+              borderColor: "rgba(245,158,11,0.3)",
+              color: "#FCD34D",
+            }}
+          >
             ⚡ {headerXp} XP
           </div>
         </div>
 
-        <div className="border-t border-slate-100 bg-white px-3 py-3 sm:px-4">
+        <div className="border-t border-indigo-300/10 px-3 py-3 sm:px-4">
           <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2 sm:gap-4">
             {stepMeta.map((step, i) => {
               const done = i < activeStepIndex;
@@ -638,23 +642,42 @@ function LessonPageInner() {
                   <div
                     className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-base sm:h-9 sm:w-9 ${
                       current
-                        ? "bg-indigo-100 text-indigo-800 ring-2 ring-indigo-400"
+                        ? "text-indigo-300"
                         : done
-                          ? "bg-green-50 text-green-700"
-                          : "bg-slate-100 text-slate-500"
+                          ? "text-emerald-300"
+                          : "text-slate-600"
                     }`}
+                    style={
+                      current
+                        ? {
+                            background: "rgba(99,102,241,0.2)",
+                            border: "2px solid #6366F1",
+                          }
+                        : done
+                          ? {
+                              background: "rgba(16,185,129,0.2)",
+                              border: "2px solid #10B981",
+                            }
+                          : {
+                              background: "rgba(255,255,255,0.04)",
+                              border: "1px solid rgba(99,102,241,0.15)",
+                            }
+                    }
                     title={step.label}
                   >
                     {done ? (
-                      <Check className="h-4 w-4 text-green-600" aria-hidden />
+                      <CheckCircle2 className="h-4 w-4 text-green-400" />
                     ) : (
-                      <span aria-hidden>{step.icon}</span>
+                      <span>{step.icon}</span>
                     )}
-                    <span className="sr-only">{step.label}</span>
                   </div>
                   <span
                     className={`hidden text-xs font-semibold sm:inline sm:text-sm ${
-                      current ? "text-indigo-800" : done ? "text-green-700" : "text-slate-500"
+                      current
+                        ? "text-indigo-300"
+                        : done
+                          ? "text-emerald-300"
+                          : "text-slate-600"
                     }`}
                   >
                     {step.label}
@@ -666,53 +689,83 @@ function LessonPageInner() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-0 py-4 sm:px-6 sm:py-6">
+      <main className="mx-auto max-w-4xl px-3 py-4 sm:px-6 sm:py-7">
         {phase === "video" && (
-          <div className="px-3 sm:px-0">
-            <div className="relative aspect-video w-full overflow-hidden rounded-none bg-slate-900 sm:rounded-2xl">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(99,102,241,0.35),transparent_45%),radial-gradient(circle_at_80%_70%,rgba(168,85,247,0.3),transparent_40%)]" />
+          <div
+            className="overflow-hidden rounded-[20px] border shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
+            style={{
+              background: "rgba(15,20,50,0.7)",
+              borderColor: "rgba(99,102,241,0.15)",
+              backdropFilter: "blur(20px)",
+            }}
+          >
+            <div
+              className="relative aspect-video w-full"
+              style={{
+                background:
+                  "linear-gradient(135deg, rgba(30,20,80,0.9), rgba(15,30,70,0.9))",
+              }}
+            >
+              <div
+                className="absolute inset-x-0 top-0 h-[2px]"
+                style={{
+                  background:
+                    "linear-gradient(90deg, transparent, #06B6D4, transparent)",
+                  animation: "scan-line 5s ease-in-out infinite",
+                }}
+              />
               <div className="relative z-[1] flex h-full flex-col items-center justify-center px-6 text-center">
-                <motion.div
-                  animate={{ opacity: [0.4, 1, 0.4] }}
-                  transition={{ repeat: Infinity, duration: 1.8 }}
-                  className="text-4xl"
-                >
-                  🎬
-                </motion.div>
+                <PlayCircle className="h-16 w-16 text-white/60" />
                 <p className="mt-4 text-lg font-bold text-white">Video Uploading Soon</p>
                 <p className="mt-2 max-w-md text-sm text-slate-300">
-                  We are preparing the lesson video for this module. You can continue to the game and quiz right away.
+                  We are preparing the lesson video for this module. You can
+                  continue to the game and quiz right away.
+                </p>
+                <p className="mt-3 text-sm font-semibold text-cyan-400">
+                  Continue to {lesson.hasGame ? "Game" : "Quiz"} →
                 </p>
               </div>
             </div>
-            <h2 className="mt-4 text-xl font-bold text-slate-900">
-              {lesson.title}
-            </h2>
-            <p className="mt-2 text-slate-500">{lesson.description}</p>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <span className="w-fit rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-700">
-                ~{durationMin} min
-              </span>
-              <span className="w-fit rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-800">
-                {typeLabel}
-              </span>
+
+            <div className="p-6 sm:p-7">
+              <h2 className="text-[22px] font-bold tracking-tight text-white">{lesson.title}</h2>
+              <p className="mt-2 text-sm text-slate-400">{lesson.description}</p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <span className="w-fit rounded-full bg-white/5 px-3 py-1 text-xs text-slate-400">
+                  ~{durationMin} min
+                </span>
+                <span className="w-fit rounded-full bg-indigo-500/15 px-3 py-1 text-xs text-indigo-300">
+                  {typeLabel}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="mt-6 rounded-xl px-7 py-3 font-semibold text-white transition-all duration-200 hover:-translate-y-0.5"
+                style={{
+                  background: "linear-gradient(135deg, #6366F1, #4F46E5)",
+                  boxShadow: "var(--glow-indigo)",
+                }}
+                onClick={() =>
+                  lesson.hasGame ? setPhase("game") : setPhase("quiz")
+                }
+              >
+                {lesson.hasGame ? "Continue to Game →" : "Continue to Quiz →"}
+              </button>
             </div>
-            <button
-              type="button"
-              className="mt-6 rounded-xl bg-indigo-600 px-8 py-3 font-bold text-white transition hover:bg-indigo-700"
-              onClick={() =>
-                lesson.hasGame ? setPhase("game") : setPhase("quiz")
-              }
-            >
-              {lesson.hasGame
-                ? "Continue to Game →"
-                : "Continue to Quiz →"}
-            </button>
           </div>
         )}
 
         {phase === "game" && lesson.hasGame && (
-          <div style={{ position: "fixed", inset: 0, zIndex: 50, overflow: "hidden", maxWidth: "100vw", maxHeight: "100vh" }}>
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 50,
+              overflow: "hidden",
+              maxWidth: "100vw",
+              maxHeight: "100vh",
+            }}
+          >
             {gameActive && lessonId === 2 && (
               <LandscapeWrapper>
                 <GameShell2
@@ -725,7 +778,6 @@ function LessonPageInner() {
                 />
               </LandscapeWrapper>
             )}
-
             {gameActive && lessonId === 3 && (
               <LandscapeWrapper>
                 <GameShell3
@@ -738,7 +790,6 @@ function LessonPageInner() {
                 />
               </LandscapeWrapper>
             )}
-
             {gameActive && lessonId === 4 && (
               <LandscapeWrapper>
                 <GameShell4
@@ -769,20 +820,25 @@ function LessonPageInner() {
                 >
                   Complete Game
                 </button>
-                <p className="mt-4 max-w-sm text-xs text-slate-400">
-                  ⚡ Complete the game to unlock the quiz and earn bonus XP
-                </p>
               </div>
             )}
 
             {gameComplete && !gameActive && (
-              <div className="mx-3 rounded-2xl border border-green-200 bg-green-50 p-6 text-center sm:mx-0 sm:p-8">
-                <p className="text-lg font-semibold text-green-800">
-                  ✅ Game complete! +{GAME_BONUS_XP} XP earned
+              <div
+                className="mx-3 rounded-2xl border p-6 text-center sm:mx-0 sm:p-8"
+                style={{
+                  background: "rgba(16,185,129,0.08)",
+                  borderColor: "rgba(16,185,129,0.2)",
+                }}
+              >
+                <CheckCircle2 className="mx-auto h-10 w-10 text-green-400" />
+                <p className="mt-3 text-lg font-semibold text-green-300">
+                  Game complete! <span className="text-amber-300">+200 XP earned</span>
                 </p>
                 <button
                   type="button"
-                  className="mt-6 rounded-xl bg-indigo-600 px-8 py-3 font-bold text-white"
+                  className="mt-6 rounded-xl px-8 py-3 font-bold text-white"
+                  style={{ background: "linear-gradient(135deg, #6366F1, #4F46E5)" }}
                   onClick={() => setPhase("quiz")}
                 >
                   Continue to Quiz →
@@ -791,18 +847,29 @@ function LessonPageInner() {
             )}
 
             {!gameComplete && !gameActive && (
-              <div className="mx-3 rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-950 p-6 text-center sm:mx-0 sm:p-12">
-                <p className="text-5xl sm:text-6xl">🎮</p>
-                <h2 className="mt-4 text-xl font-bold text-white sm:text-2xl">
+              <div
+                className="mx-3 rounded-[20px] border px-8 py-12 text-center sm:mx-0"
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(15,10,40,0.95), rgba(10,20,50,0.95))",
+                  borderColor: "rgba(99,102,241,0.2)",
+                }}
+              >
+                <p className="text-6xl text-indigo-300/70">🎮</p>
+                <h2 className="mt-4 text-[24px] font-bold tracking-tight text-white">
                   Story Game: {lesson.title}
                 </h2>
                 <p className="mt-2 text-sm text-slate-300 sm:text-base">
                   {GAME_MECHANICS[lessonId] ?? "Interactive story adventure."}
                 </p>
-                <p className="mt-4 text-xs text-slate-500 sm:text-sm">Tap to launch game</p>
+                <p className="mt-4 text-xs text-slate-500">Tap to launch game</p>
                 <button
                   type="button"
-                  className="mt-4 w-full max-w-md rounded-xl bg-cyan-500 px-6 py-4 text-base font-bold text-black transition hover:bg-cyan-400 sm:mt-8 sm:w-auto sm:px-8 sm:text-lg"
+                  className="mt-6 w-full max-w-md rounded-xl px-8 py-4 text-lg font-bold text-white transition-all duration-200 hover:-translate-y-0.5 sm:w-auto"
+                  style={{
+                    background: "linear-gradient(135deg, #6366F1, #4F46E5)",
+                    boxShadow: "var(--glow-indigo)",
+                  }}
                   onClick={launchGame}
                 >
                   Launch Game →
@@ -813,36 +880,73 @@ function LessonPageInner() {
         )}
 
         {phase === "quiz" && !showQuizResults && (
-          <div className="mx-3 max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:mx-auto sm:p-8">
-            <h2 className="text-2xl font-bold text-slate-900">
-              📝 Knowledge Check
-            </h2>
-            <p className="text-sm font-medium text-indigo-600">
-              {lesson.title}
-            </p>
+          <div
+            className="mx-auto max-w-2xl rounded-[20px] border p-6 sm:p-7"
+            style={{
+              background: "rgba(15,20,50,0.7)",
+              borderColor: "rgba(99,102,241,0.15)",
+              backdropFilter: "blur(16px)",
+            }}
+          >
+            <h2 className="text-[28px] font-bold tracking-tight text-white">Knowledge Check</h2>
+            <p className="text-sm text-cyan-400">{lesson.title}</p>
+
+            <div className="mt-4 flex items-center gap-1.5">
+              {lesson.quiz.map((_, idx) => (
+                <span
+                  key={`dot-${idx}`}
+                  className="h-2 w-2 rounded-full"
+                  style={{
+                    background:
+                      idx < currentQuestion
+                        ? "#10B981"
+                        : idx === currentQuestion
+                          ? "#6366F1"
+                          : "rgba(99,102,241,0.2)",
+                  }}
+                />
+              ))}
+            </div>
+
             <p className="mt-4 text-sm text-slate-500">
               Question {currentQuestion + 1} of {totalQs}
             </p>
-            <p className="mb-6 mt-2 text-lg font-semibold text-slate-900">
+            <p className="mb-6 mt-2 text-lg font-semibold text-slate-200">
               {q.q}
             </p>
+
             <div className="flex flex-col gap-3">
               {q.options.map((opt, idx) => {
                 const show = pickedOption !== null;
                 const isCorrect = idx === q.correct;
                 const isPicked = pickedOption === idx;
-                let cls =
-                  "min-h-[56px] w-full rounded-xl border border-slate-200 bg-white p-4 text-left text-slate-800 font-medium transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700 active:scale-[0.99]";
+                const cls =
+                  "min-h-[56px] w-full rounded-xl border p-4 text-left text-sm transition duration-200 hover:-translate-y-0.5";
+                let style: CSSProperties = {
+                  background: "rgba(255,255,255,0.04)",
+                  borderColor: "rgba(99,102,241,0.15)",
+                  color: "#CBD5E1",
+                };
                 if (show) {
                   if (isCorrect) {
-                    cls =
-                      "min-h-[56px] w-full rounded-xl border-2 border-green-500 bg-green-50 p-4 text-left text-green-700";
+                    style = {
+                      background: "rgba(16,185,129,0.1)",
+                      borderColor: "rgba(16,185,129,0.4)",
+                      color: "#6EE7B7",
+                      boxShadow: "0 0 12px rgba(16,185,129,0.2)",
+                    };
                   } else if (isPicked) {
-                    cls =
-                      "min-h-[56px] w-full rounded-xl border-2 border-red-500 bg-red-50 p-4 text-left text-red-700";
+                    style = {
+                      background: "rgba(239,68,68,0.08)",
+                      borderColor: "rgba(239,68,68,0.3)",
+                      color: "#FCA5A5",
+                    };
                   } else {
-                    cls =
-                      "min-h-[56px] w-full rounded-xl border border-slate-100 bg-slate-50 p-4 text-left text-slate-400";
+                    style = {
+                      background: "rgba(255,255,255,0.02)",
+                      borderColor: "rgba(99,102,241,0.1)",
+                      color: "#64748B",
+                    };
                   }
                 }
                 return (
@@ -851,16 +955,17 @@ function LessonPageInner() {
                     type="button"
                     disabled={pickedOption !== null}
                     className={cls}
+                    style={style}
                     onClick={() => selectOption(idx)}
                   >
                     {opt}
                     {show && isCorrect ? (
-                      <span className="mt-2 block text-sm font-bold">
+                      <span className="mt-2 block text-sm font-bold text-green-400">
                         ✓ Correct!
                       </span>
                     ) : null}
                     {show && isPicked && !isCorrect ? (
-                      <span className="mt-2 block text-sm font-bold text-green-700">
+                      <span className="mt-2 block text-sm font-bold text-green-400">
                         Correct: {q.options[q.correct]}
                       </span>
                     ) : null}
@@ -868,40 +973,66 @@ function LessonPageInner() {
                 );
               })}
             </div>
+
             {pickedOption !== null && (
               <button
                 type="button"
-                className="mt-6 rounded-xl bg-indigo-600 px-6 py-3 font-bold text-white"
+                className="mt-6 rounded-xl px-6 py-3 font-bold text-white transition-all duration-200 hover:-translate-y-0.5"
+                style={{
+                  background: "linear-gradient(135deg, #6366F1, #4F46E5)",
+                  boxShadow: "var(--glow-indigo)",
+                }}
                 onClick={advanceQuestion}
               >
-                {currentQuestion >= totalQs - 1
-                  ? "See results →"
-                  : "Next Question →"}
+                {currentQuestion >= totalQs - 1 ? "See results →" : "Next Question →"}
               </button>
             )}
           </div>
         )}
 
         {phase === "quiz" && showQuizResults && (
-          <div className="mx-3 flex max-w-2xl flex-col items-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:mx-auto sm:p-8">
-            <h2 className="text-2xl font-bold">Results</h2>
-            <p className="mt-2 text-slate-600">
+          <div
+            className="mx-auto flex max-w-2xl flex-col items-center rounded-[20px] border p-8 text-center"
+            style={{
+              background: "rgba(15,20,50,0.8)",
+              borderColor: "rgba(99,102,241,0.2)",
+              backdropFilter: "blur(20px)",
+            }}
+          >
+            <h2
+              className="text-[34px] font-bold tracking-tight"
+              style={{
+                background: "linear-gradient(135deg, #FFFFFF, #67E8F9)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              Results
+            </h2>
+            <p className="mt-2 text-slate-400">
               Score: {quizScoreCorrect}/{totalQs}
             </p>
             <motion.p
-              className="mt-6 text-center text-4xl font-black text-yellow-500 drop-shadow-sm"
+              className="mt-6 text-center text-[52px] font-black leading-none"
               initial={{ scale: 0.5 }}
               animate={{ scale: [0.5, 1.2, 1] }}
               transition={{ duration: 0.6, times: [0, 0.6, 1] }}
+              style={{
+                background: "linear-gradient(135deg, #F59E0B, #F97316)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                animation: "count-up 0.6s ease",
+              }}
             >
               +{resultsXp} XP
             </motion.p>
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-2 text-sm text-green-400">
               {xpAwarded ? "Progress saved!" : "Saving progress…"}
             </p>
             <button
               type="button"
-              className="mt-8 w-full max-w-xs rounded-xl bg-indigo-600 px-8 py-3 font-bold text-white disabled:opacity-50 sm:w-auto"
+              className="mt-8 w-full max-w-xs rounded-xl px-8 py-3 font-bold text-white transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50 sm:w-auto"
+              style={{ background: "linear-gradient(135deg, #6366F1, #4F46E5)" }}
               disabled={!xpAwarded}
               onClick={handleResultsContinue}
             >
@@ -916,15 +1047,24 @@ function LessonPageInner() {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", stiffness: 220, damping: 14 }}
-              className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500 text-white shadow-lg"
+              className="grid h-[72px] w-[72px] place-items-center rounded-full text-white"
+              style={{
+                background: "linear-gradient(135deg, #10B981, #059669)",
+                boxShadow: "0 0 32px rgba(16,185,129,0.4)",
+              }}
             >
               <Check className="h-10 w-10" strokeWidth={3} />
             </motion.div>
             <motion.h2
-              className="mt-6 text-3xl font-bold text-slate-900"
+              className="mt-6 text-3xl font-bold"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15 }}
+              style={{
+                background: "linear-gradient(135deg, #FFFFFF, #67E8F9)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
             >
               Lesson Complete!
             </motion.h2>
@@ -932,17 +1072,26 @@ function LessonPageInner() {
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.25 }}
-              className="mt-4 rounded-full bg-yellow-100 px-4 py-2 text-lg font-bold text-yellow-800"
+              className="mt-4 rounded-full bg-amber-500/15 px-4 py-2 text-lg font-bold text-amber-300"
             >
               +{resultsXp} XP earned
             </motion.div>
             <p className="mt-6 text-sm text-slate-500">
-              Returning to{" "}
-              {lessonId >= 4 ? "completion" : "dashboard"} in 3 seconds…
+              Returning to {lessonId >= 4 ? "completion" : "dashboard"} in 3
+              seconds…
             </p>
           </div>
         )}
       </main>
+
+      {!userLoading && user && token ? (
+        <NOVAChat
+          userName={user?.name || ""}
+          xp={user?.xp || 0}
+          lessonsComplete={user?.lessonsComplete?.length || 0}
+          currentLesson={lesson?.title || ""}
+        />
+      ) : null}
     </div>
   );
 }
@@ -951,9 +1100,9 @@ export default function DemoLessonPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen animate-pulse bg-slate-50">
-          <div className="h-16 border-b bg-white" />
-          <div className="mx-auto mt-8 h-48 max-w-4xl rounded-2xl bg-slate-200" />
+        <div className="min-h-screen animate-pulse">
+          <div className="h-16 border-b border-indigo-300/20 bg-black/20" />
+          <div className="mx-auto mt-8 h-48 max-w-4xl rounded-2xl bg-indigo-300/20" />
         </div>
       }
     >
