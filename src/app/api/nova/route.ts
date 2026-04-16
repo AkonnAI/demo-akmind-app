@@ -1,7 +1,11 @@
 import Groq from "groq-sdk";
 import { NextRequest } from "next/server";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+function getGroqClient(): Groq | null {
+  const apiKey = process.env.GROQ_API_KEY?.trim();
+  if (!apiKey) return null;
+  return new Groq({ apiKey });
+}
 
 const DEMO_SYSTEM_PROMPT = `You are NOVA — an AI learning companion
 for Akmind, an AI education platform for school students in India.
@@ -78,6 +82,18 @@ Lessons completed: ${lessonsComplete || 0} out of 4
         })),
       { role: "user" as const, content: message },
     ];
+
+    const groq = getGroqClient();
+    if (!groq) {
+      return Response.json(
+        {
+          response:
+            "NOVA is getting ready. Please try again in a moment.",
+          error: true,
+        },
+        { status: 200 }
+      );
+    }
 
     const completion = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
