@@ -282,6 +282,11 @@ function lessonUnlocked(
   return lessonsComplete.includes(lessonId - 1);
 }
 
+function isAdminTester(user: DemoUser | null): boolean {
+  if (!user) return false;
+  return user.email?.toLowerCase() === "admin@akmind.com" || user.name === "Admin";
+}
+
 function quizXpFromAccuracy(
   xpReward: number,
   correct: number,
@@ -317,7 +322,6 @@ function LessonPageInner() {
   const [phase, setPhase] = useState<"video" | "game" | "quiz" | "complete">(
     "video"
   );
-  const [videoWatched, setVideoWatched] = useState(false);
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [quizScoreCorrect, setQuizScoreCorrect] = useState(0);
   const [xpAwarded, setXpAwarded] = useState(false);
@@ -384,12 +388,6 @@ function LessonPageInner() {
       setPhase("video");
     }
   }, [lesson?.hasGame, phase]);
-
-  useEffect(() => {
-    setVideoWatched(false);
-    const t = setTimeout(() => setVideoWatched(true), 10_000);
-    return () => clearTimeout(t);
-  }, [lessonId]);
 
   useEffect(() => {
     if (phase !== "complete" || !token) return;
@@ -582,7 +580,11 @@ function LessonPageInner() {
     );
   }
 
+  const adminMode = isAdminTester(user);
   if (user && !lessonUnlocked(lessonId, user.lessonsComplete)) {
+    if (adminMode) {
+      // Allow test admin to open any lesson/game directly
+    } else {
     return (
       <div className="min-h-screen bg-slate-50 p-8 text-center">
         <p className="font-semibold text-slate-800">
@@ -597,6 +599,7 @@ function LessonPageInner() {
         </button>
       </div>
     );
+    }
   }
 
   const totalQs = lesson.quiz.length;
@@ -666,14 +669,21 @@ function LessonPageInner() {
       <main className="mx-auto max-w-4xl px-0 py-4 sm:px-6 sm:py-6">
         {phase === "video" && (
           <div className="px-3 sm:px-0">
-            <div className="aspect-video w-full overflow-hidden rounded-none bg-black sm:rounded-2xl">
-              <iframe
-                title={lesson.title}
-                src={`${lesson.videoUrl}?rel=0&modestbranding=1`}
-                className="h-full w-full border-0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
+            <div className="relative aspect-video w-full overflow-hidden rounded-none bg-slate-900 sm:rounded-2xl">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(99,102,241,0.35),transparent_45%),radial-gradient(circle_at_80%_70%,rgba(168,85,247,0.3),transparent_40%)]" />
+              <div className="relative z-[1] flex h-full flex-col items-center justify-center px-6 text-center">
+                <motion.div
+                  animate={{ opacity: [0.4, 1, 0.4] }}
+                  transition={{ repeat: Infinity, duration: 1.8 }}
+                  className="text-4xl"
+                >
+                  🎬
+                </motion.div>
+                <p className="mt-4 text-lg font-bold text-white">Video Uploading Soon</p>
+                <p className="mt-2 max-w-md text-sm text-slate-300">
+                  We are preparing the lesson video for this module. You can continue to the game and quiz right away.
+                </p>
+              </div>
             </div>
             <h2 className="mt-4 text-xl font-bold text-slate-900">
               {lesson.title}
@@ -687,24 +697,17 @@ function LessonPageInner() {
                 {typeLabel}
               </span>
             </div>
-            {videoWatched && (
-              <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-800">
-                ✅ Video watched!
-              </div>
-            )}
-            {videoWatched && (
-              <button
-                type="button"
-                className="mt-6 rounded-xl bg-indigo-600 px-8 py-3 font-bold text-white transition hover:bg-indigo-700"
-                onClick={() =>
-                  lesson.hasGame ? setPhase("game") : setPhase("quiz")
-                }
-              >
-                {lesson.hasGame
-                  ? "Continue to Game →"
-                  : "Continue to Quiz →"}
-              </button>
-            )}
+            <button
+              type="button"
+              className="mt-6 rounded-xl bg-indigo-600 px-8 py-3 font-bold text-white transition hover:bg-indigo-700"
+              onClick={() =>
+                lesson.hasGame ? setPhase("game") : setPhase("quiz")
+              }
+            >
+              {lesson.hasGame
+                ? "Continue to Game →"
+                : "Continue to Quiz →"}
+            </button>
           </div>
         )}
 

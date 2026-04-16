@@ -189,9 +189,15 @@ export default function TimelineStage({
   const completedRef = useRef(false);
   const rainDropsRef = useRef<RainDrop[] | null>(null);
   const shootBubbleCdRef = useRef(0);
-  const onXPRef = useRef(onXP);
-  onXPRef.current = onXP;
   const { playSound } = useSoundEngine();
+  const onXPRef = useRef(onXP);
+  const onCompleteRef = useRef(onComplete);
+  const onUpdateGameDataRef = useRef(onUpdateGameData);
+  const playSoundRef = useRef(playSound);
+  onXPRef.current = onXP;
+  onCompleteRef.current = onComplete;
+  onUpdateGameDataRef.current = onUpdateGameData;
+  playSoundRef.current = playSound;
 
   useEffect(() => {
     healthRef.current = gameData.health;
@@ -213,56 +219,53 @@ export default function TimelineStage({
     });
   };
 
-  const handleLandOn = useCallback(
-    (p: TPlat, ax: typeof axRefState.current) => {
-      if (p.dead) return;
-      if (p.kind === "trap") {
-        const hp = Math.max(0, healthRef.current - 10);
-        healthRef.current = hp;
-        onUpdateGameData({ health: hp });
-        setUiHealth(hp);
-        p.dead = true;
-        flashRef.current = 14;
-        setNovaMessage(null);
-        setNovaWarn("That's not an AI milestone!");
-        playSound("wrong");
-        ax.invTimer = 50;
-        return;
+  const handleLandOn = useCallback((p: TPlat, ax: typeof axRefState.current) => {
+    if (p.dead) return;
+    if (p.kind === "trap") {
+      const hp = Math.max(0, healthRef.current - 10);
+      healthRef.current = hp;
+      onUpdateGameDataRef.current({ health: hp });
+      setUiHealth(hp);
+      p.dead = true;
+      flashRef.current = 14;
+      setNovaMessage(null);
+      setNovaWarn("That's not an AI milestone!");
+      playSoundRef.current("wrong");
+      ax.invTimer = 50;
+      return;
+    }
+    const need = progressRef.current;
+    if (p.seq !== need) {
+      const hp = Math.max(0, healthRef.current - 10);
+      healthRef.current = hp;
+      onUpdateGameDataRef.current({ health: hp });
+      setUiHealth(hp);
+      flashRef.current = 12;
+      setNovaWarn("Land on the milestones in chronological order!");
+      playSoundRef.current("wrong");
+      ax.invTimer = 40;
+      return;
+    }
+    progressRef.current += 1;
+    p.glow = 55;
+    onXPRef.current(40);
+    spawnFloat(p.x + p.w / 2, p.y - 24, "+correct!", "#fbbf24");
+    const line = NOVA_BY_YEAR[p.year] ?? "Nice — history holds.";
+    setNovaMessage(line);
+    setNovaWarn(null);
+    playSoundRef.current("correct");
+    if (progressRef.current === 4) {
+      try {
+        playSoundRef.current("checkpoint");
+      } catch {
+        /* silent */
       }
-      const need = progressRef.current;
-      if (p.seq !== need) {
-        const hp = Math.max(0, healthRef.current - 10);
-        healthRef.current = hp;
-        onUpdateGameData({ health: hp });
-        setUiHealth(hp);
-        flashRef.current = 12;
-        setNovaWarn("Land on the milestones in chronological order!");
-        playSound("wrong");
-        ax.invTimer = 40;
-        return;
-      }
-      progressRef.current += 1;
-      p.glow = 55;
-      onXP(40);
-      spawnFloat(p.x + p.w / 2, p.y - 24, "+correct!", "#fbbf24");
-      const line = NOVA_BY_YEAR[p.year] ?? "Nice — history holds.";
-      setNovaMessage(line);
-      setNovaWarn(null);
-      playSound("correct");
-      if (progressRef.current === 4) {
-        try {
-          playSound("checkpoint");
-        } catch {
-          /* silent */
-        }
-      }
-      if (progressRef.current >= 4 && !completedRef.current) {
-        completedRef.current = true;
-        setTimeout(onComplete, 600);
-      }
-    },
-    [onComplete, onUpdateGameData, onXP, playSound]
-  );
+    }
+    if (progressRef.current >= 4 && !completedRef.current) {
+      completedRef.current = true;
+      setTimeout(() => onCompleteRef.current(), 600);
+    }
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -483,14 +486,14 @@ export default function TimelineStage({
           if (dist < AX_W / 2 + 20) {
             const hp = Math.max(0, healthRef.current - 8);
             healthRef.current = hp;
-            onUpdateGameData({ health: hp });
+            onUpdateGameDataRef.current({ health: hp });
             setUiHealth(hp);
             ax.invTimer = 40;
             flashRef.current = 10;
             ax.vx = ax.x < b.x ? -4 : 4;
             ax.vy = -5;
             try {
-              playSound("enemyHit");
+              playSoundRef.current("enemyHit");
             } catch {
               /* silent */
             }
@@ -512,7 +515,7 @@ export default function TimelineStage({
       if (stage === 1 && zPress && shootBubbleCdRef.current <= 0) {
         shootBubbleCdRef.current = 22;
         try {
-          playSound("shoot");
+          playSoundRef.current("shoot");
         } catch {
           /* silent */
         }
@@ -526,7 +529,7 @@ export default function TimelineStage({
             b.frozen = true;
             b.frozenTimer = 160;
             try {
-              playSound("xpCollect");
+              playSoundRef.current("xpCollect");
             } catch {
               /* silent */
             }
@@ -686,7 +689,7 @@ export default function TimelineStage({
         ax.onGround = false;
         ax.coyoteTimer = 0;
         landedRef.current = null;
-        try { playSound("jump"); } catch { /* silent */ }
+        try { playSoundRef.current("jump"); } catch { /* silent */ }
       }
 
       if (ax.invTimer > 0) ax.invTimer--;
@@ -724,8 +727,7 @@ export default function TimelineStage({
       ro.disconnect();
       clearTimeout(stageLabel_t);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage, handleLandOn, onComplete, playSound, onUpdateGameData]);
+  }, [stage, handleLandOn]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => keysRef.current.add(e.key);

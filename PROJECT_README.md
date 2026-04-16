@@ -4,6 +4,47 @@ This document is the **single source of truth** for **demo-akmind-app**: what it
 
 ---
 
+## 0. Latest Updates (Mar 2026)
+
+Recent production-facing changes implemented in this repository:
+
+- **Mobile-first dashboard and lesson UX refresh**
+  - Dashboard hero redesign, improved lesson cards, progress rail, daily tip card, and bottom nav on mobile.
+  - Lesson page interactions optimized for touch: larger quiz targets, stacked mobile layouts, and responsive stage/flow cards.
+  - Complete page mobile layout tightened (badge card sizing, stacked CTAs, full-screen style payment modal on mobile).
+
+- **Game mobile controls**
+  - Added shared touch overlay controls in `src/components/games/shared/GameTouchControls.tsx`.
+  - Wired controls into `GameShell2`, `GameShell3`, and `GameShell4`.
+  - Added mode/ammo touch rows for lessons 3/4 and boss quiz shortcuts where required.
+
+- **Lesson content flow change**
+  - Removed YouTube embed dependency from lesson screens in active flow.
+  - Added animated **"Video Uploading Soon"** placeholder panel.
+  - Removed 10-second watch gate; users can continue immediately to game/quiz.
+
+- **Admin QA/testing access improvements**
+  - Admin tester identity (email `admin@akmind.com` or name `Admin`) can bypass lesson lock progression and open any game/lesson for testing.
+  - Admin login screen is password-gated and uses session storage persistence.
+
+- **Security and API hardening**
+  - Added rate limiting utilities and route enforcement on demo endpoints.
+  - Added Zod validation + sanitization for registration/progress input paths.
+  - Added timing-safe token comparison + delayed invalid token response behavior.
+  - Added CORS and payload-size checks in middleware for API routes.
+  - Added hardened security headers in `next.config.ts`.
+
+- **Storage/concurrency upgrade path**
+  - `src/lib/demo-db.ts` supports DynamoDB mode (`USE_DYNAMODB=true`) and local JSON fallback.
+  - Added DynamoDB diagnostics and environment/table fallback support for production troubleshooting.
+  - Booking-side integration was updated in `akmind-master` so parent registration can create demo users directly in shared DynamoDB.
+
+- **Gameplay stability fixes (History Vault / lesson 2)**
+  - Fixed stale-loop closure behavior in `TimelineStage` by moving loop-time callbacks to refs (`onUpdateGameDataRef`, `onCompleteRef`, `playSoundRef`, `onXPRef`).
+  - This stabilizes platform landing outcomes, health updates, and timeline completion behavior under long-running animation loops.
+
+---
+
 ## 1. What this project is
 
 **demo-akmind-app** is a **Next.js 15** web application for the **AKMIND** brand. It delivers a **guided demo "class"** for kids (parent registers → receives a magic link → child progresses through **4 lessons** with **video**, optional **story games**, **quizzes**, **XP**, and a **completion** experience including badge PDF and upsell UI).

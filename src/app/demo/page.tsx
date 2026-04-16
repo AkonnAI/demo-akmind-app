@@ -92,6 +92,11 @@ function streakFromStart(lessonsComplete: number[]): number {
   return s;
 }
 
+function isAdminTester(user: DemoUser | null): boolean {
+  if (!user) return false;
+  return user.email?.toLowerCase() === "admin@akmind.com" || user.name === "Admin";
+}
+
 function DemoDashboardInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -160,11 +165,16 @@ function DemoDashboardInner() {
   const streak = user ? streakFromStart(user.lessonsComplete) : 0;
   const demoComplete =
     !!user && (user.demoCompleted || user.lessonsComplete.length >= 4);
+  const adminMode = isAdminTester(user);
   const tipIndex = new Date().getDate() % DAILY_TIPS.length;
   const tip = DAILY_TIPS[tipIndex] ?? DAILY_TIPS[0];
 
   const nextLessonId = user
-    ? LESSONS.find((l) => !user.lessonsComplete.includes(l.id) && isUnlocked(l.id, user.lessonsComplete))?.id
+    ? LESSONS.find(
+        (l) =>
+          !user.lessonsComplete.includes(l.id) &&
+          (adminMode || isUnlocked(l.id, user.lessonsComplete))
+      )?.id
     : undefined;
 
   return (
@@ -283,7 +293,7 @@ function DemoDashboardInner() {
               <div className="flex flex-col gap-4">
                 {LESSONS.map((lesson) => {
                   const done = user.lessonsComplete.includes(lesson.id);
-                  const unlocked = isUnlocked(lesson.id, user.lessonsComplete);
+                  const unlocked = adminMode || isUnlocked(lesson.id, user.lessonsComplete);
                   const active = unlocked && !done && lesson.id === nextLessonId;
                   const quizScore = user.quizScores[String(lesson.id)];
 
