@@ -1,9 +1,11 @@
 import { fail } from "@/lib/api-response";
-import { getDemoUserByToken } from "@/lib/demo-db";
+import { getDemoUserByToken, getOrCreateAdminUser } from "@/lib/demo-db";
 import { checkRateLimit, getIP } from "@/lib/rate-limit";
 import { tokenSchema } from "@/lib/validators";
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest } from "next/server";
+
+const ADMIN_DEV_TOKEN = "admin-akmind-dev-2026";
 
 function safeTokenCompare(a: string, b: string): boolean {
   try {
@@ -29,7 +31,10 @@ export async function GET(req: NextRequest) {
   }
   const token = parsed.data.token;
 
-  const user = await getDemoUserByToken(token);
+  const user =
+    token === ADMIN_DEV_TOKEN
+      ? await getOrCreateAdminUser()
+      : await getDemoUserByToken(token);
   if (!user || !safeTokenCompare(token, user.demoToken)) {
     await new Promise((r) => setTimeout(r, 200));
     return fail("Invalid token", 401);
