@@ -1087,8 +1087,14 @@ function LessonPageInner() {
       {!userLoading && user && token ? (
         <NOVAChat
           userName={user?.name || ""}
+          childName={user?.childName}
+          userKey={user?.email || user?.name || undefined}
           xp={user?.xp || 0}
-          lessonsComplete={user?.lessonsComplete?.length || 0}
+          lessonsComplete={user?.lessonsComplete ?? []}
+          quizScores={user?.quizScores}
+          badgeEarned={user?.badgeEarned}
+          currentModule={1}
+          lessonOrder={lessonId}
           currentLesson={lesson?.title || ""}
         />
       ) : null}

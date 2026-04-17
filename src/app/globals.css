@@ -214,3 +214,10 @@ body {
   background: linear-gradient(180deg, #6366f1, #06b6d4);
   border-radius: 2px;
 }
+
+@media (max-width: 768px) {
+  .nova-float-button {
+    bottom: 80px !important;
+    right: 16px !important;
+  }
+}

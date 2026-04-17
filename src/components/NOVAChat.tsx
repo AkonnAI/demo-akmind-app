@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Send, BrainCircuit } from "lucide-react";
 import NOVACharacter from "./NOVACharacter";
+import { useNOVAVoice } from "@/hooks/useNOVAVoice";
+import NOVAVoiceButton from "@/components/NOVAVoiceButton";
 
 interface Message {
   id: string;
@@ -12,9 +14,18 @@ interface Message {
 
 interface NOVAChatProps {
   userName?: string;
+  childName?: string;
   currentLesson?: string;
   xp?: number;
-  lessonsComplete?: number;
+  /** Lesson IDs completed in the demo (e.g. [1, 2]) or a count for legacy callers */
+  lessonsComplete?: number | number[];
+  /** Stable key for chat memory (e.g. email) */
+  userKey?: string;
+  currentModule?: number;
+  /** Current demo lesson number 1–4, for curriculum hints */
+  lessonOrder?: number;
+  quizScores?: Record<string, number> | null;
+  badgeEarned?: boolean;
 }
 
 const DEMO_STARTERS = [
@@ -26,16 +37,25 @@ const DEMO_STARTERS = [
 
 export default function NOVAChat({
   userName,
+  childName: childNameProp,
   currentLesson,
   xp = 0,
   lessonsComplete = 0,
-}: NOVAChatProps) {
+  userKey,
+  currentModule = 1,
+  lessonOrder = 1,
+  quizScores,
+  badgeEarned = false,
+}: Readonly<NOVAChatProps>) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const greetName =
+    (childNameProp ?? userName)?.trim().split(/\s+/)[0] ?? "";
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       role: "nova",
-      content: `Hi${userName ? " " + userName.split(" ")[0] : ""}! I am NOVA. I am here to help you learn about AI and guide you through your demo lessons. What would you like to know?`,
+      content: `Hi${greetName ? " " + greetName : ""}! I am NOVA. I am here to help you learn about AI and guide you through your demo lessons. What would you like to know?`,
     },
   ]);
   const [input, setInput] = useState("");
@@ -46,6 +66,18 @@ export default function NOVAChat({
   >("happy");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const sendMessageRef = useRef<(text: string) => Promise<void>>(async () => {});
+
+  const {
+    voiceState,
+    error: voiceError,
+    speak,
+    toggleListening,
+  } = useNOVAVoice({
+    onTranscript: (text) => {
+      void sendMessageRef.current(text);
+    },
+  });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -54,6 +86,14 @@ export default function NOVAChat({
   useEffect(() => {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 100);
   }, [isOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const syncMobile = () => setIsMobile(window.innerWidth < 768);
+    syncMobile();
+    window.addEventListener("resize", syncMobile);
+    return () => window.removeEventListener("resize", syncMobile);
+  }, []);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -74,13 +114,20 @@ export default function NOVAChat({
         const res = await fetch("/api/nova", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          cache: "no-store",
           body: JSON.stringify({
             message: text.trim(),
-            conversationHistory: messages.slice(-8),
+            conversationHistory: messages.slice(-12),
             userName,
+            childName: childNameProp ?? userName,
             currentLesson,
             xp,
             lessonsComplete,
+            userId: userKey,
+            currentModule,
+            lessonOrder,
+            quizScores: quizScores ?? undefined,
+            badgeEarned,
           }),
         });
 
@@ -94,6 +141,7 @@ export default function NOVAChat({
             content: data.response,
           },
         ]);
+        void speak(data.response);
 
         const lower = data.response.toLowerCase();
         if (
@@ -123,8 +171,31 @@ export default function NOVAChat({
         setLoading(false);
       }
     },
-    [loading, messages, userName, currentLesson, xp, lessonsComplete]
+    [
+      loading,
+      messages,
+      userName,
+      childNameProp,
+      currentLesson,
+      xp,
+      lessonsComplete,
+      userKey,
+      currentModule,
+      lessonOrder,
+      quizScores,
+      badgeEarned,
+      speak,
+    ]
   );
+
+  useEffect(() => {
+    sendMessageRef.current = sendMessage;
+  }, [sendMessage]);
+
+  let currentEmotion: "happy" | "thinking" | "excited" | "concerned" = emotion;
+  if (voiceState === "listening") currentEmotion = "excited";
+  else if (voiceState === "thinking") currentEmotion = "thinking";
+  else if (voiceState === "speaking") currentEmotion = "happy";
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -136,10 +207,11 @@ export default function NOVAChat({
   if (!isOpen) {
     return (
       <div
+        className="nova-float-button"
         style={{
           position: "fixed",
-          bottom: "24px",
-          right: "24px",
+          bottom: isMobile ? "80px" : "24px",
+          right: isMobile ? "16px" : "24px",
           zIndex: 50,
           display: "flex",
           flexDirection: "column",
@@ -210,14 +282,16 @@ export default function NOVAChat({
     <div
       style={{
         position: "fixed",
-        bottom: "24px",
-        right: "24px",
-        zIndex: 50,
-        width: "360px",
-        height: "520px",
+        bottom: isMobile ? "0" : "24px",
+        right: isMobile ? "0" : "24px",
+        left: isMobile ? "0" : "auto",
+        top: isMobile ? "0" : "auto",
+        zIndex: 60,
+        width: isMobile ? "100%" : "360px",
+        height: isMobile ? "100%" : "520px",
         background: "rgba(8,10,22,0.95)",
         backdropFilter: "blur(24px)",
-        borderRadius: "20px",
+        borderRadius: isMobile ? "0" : "20px",
         boxShadow: "0 32px 80px rgba(0,0,0,0.5), var(--glow-indigo)",
         border: "1px solid rgba(99,102,241,0.2)",
         display: "flex",
@@ -238,7 +312,7 @@ export default function NOVAChat({
           flexShrink: 0,
         }}
       >
-        <NOVACharacter size="sm" emotion={emotion} animate />
+        <NOVACharacter size="sm" emotion={currentEmotion} animate />
         <div style={{ flex: 1 }}>
           <div style={{ color: "white", fontWeight: 700, fontSize: "14px" }}>NOVA</div>
           <div
@@ -259,6 +333,27 @@ export default function NOVAChat({
               }}
             />
             AI Learning Guide
+            {voiceState !== "idle" ? (
+              <span
+                style={{
+                  fontSize: 10,
+                  color:
+                    voiceState === "listening"
+                      ? "#EF4444"
+                      : voiceState === "thinking"
+                        ? "#F59E0B"
+                        : "#10B981",
+                  fontFamily: "monospace",
+                  letterSpacing: "0.08em",
+                }}
+              >
+                {voiceState === "listening"
+                  ? "LISTENING"
+                  : voiceState === "thinking"
+                    ? "THINKING"
+                    : "SPEAKING"}
+              </span>
+            ) : null}
           </div>
         </div>
         <button
@@ -372,9 +467,9 @@ export default function NOVAChat({
                 gap: "4px",
               }}
             >
-              {[0, 0.2, 0.4].map((delay, i) => (
+              {[0, 0.2, 0.4].map((delay) => (
                 <div
-                  key={i}
+                  key={`typing-${delay}`}
                   style={{
                     width: "6px",
                     height: "6px",
@@ -433,60 +528,92 @@ export default function NOVAChat({
       <div
         style={{
           borderTop: "1px solid rgba(99,102,241,0.15)",
-          padding: "12px",
+          padding: "12px 12px 10px",
           display: "flex",
+          flexDirection: "column",
           gap: "8px",
-          alignItems: "center",
           background: "rgba(8,10,22,0.92)",
           flexShrink: 0,
         }}
       >
-        <input
-          className="nova-input"
-          ref={inputRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onFocus={() => setInputFocused(true)}
-          onBlur={() => setInputFocused(false)}
-          placeholder="Ask NOVA anything..."
-          disabled={loading}
+        <div
           style={{
-            flex: 1,
-            height: "40px",
-            borderRadius: "10px",
-            border: inputFocused
-              ? "1px solid #06B6D4"
-              : "1px solid rgba(99,102,241,0.2)",
-            boxShadow: inputFocused ? "var(--glow-cyan)" : "none",
-            padding: "0 12px",
-            fontSize: "13px",
-            outline: "none",
-            color: "#F0F4FF",
-            background: "rgba(255,255,255,0.04)",
-          }}
-        />
-        <button
-          onClick={() => void sendMessage(input)}
-          disabled={!input.trim() || loading}
-          style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "10px",
-            background:
-              input.trim() && !loading
-                ? "linear-gradient(135deg, #6366F1, #06B6D4)"
-                : "#E2E8F0",
-            border: "none",
-            cursor: input.trim() && !loading ? "pointer" : "not-allowed",
+            width: "100%",
             display: "flex",
+            gap: "8px",
             alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
           }}
         >
-          <Send size={16} color={input.trim() && !loading ? "white" : "#94A3B8"} />
-        </button>
+          <NOVAVoiceButton
+            voiceState={voiceState}
+            onToggle={toggleListening}
+            error={voiceError}
+            size="sm"
+          />
+          <input
+            className="nova-input"
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
+            placeholder="Ask NOVA anything..."
+            disabled={loading}
+            style={{
+              flex: 1,
+              height: "40px",
+              borderRadius: "10px",
+              border: inputFocused
+                ? "1px solid #06B6D4"
+                : "1px solid rgba(99,102,241,0.2)",
+              boxShadow: inputFocused ? "var(--glow-cyan)" : "none",
+              padding: "0 12px",
+              fontSize: "13px",
+              outline: "none",
+              color: "#F0F4FF",
+              background: "rgba(255,255,255,0.04)",
+            }}
+          />
+          <button
+            onClick={() => void sendMessage(input)}
+            disabled={!input.trim() || loading}
+            style={{
+              width: "40px",
+              height: "40px",
+              borderRadius: "10px",
+              background:
+                input.trim() && !loading
+                  ? "linear-gradient(135deg, #6366F1, #06B6D4)"
+                  : "#E2E8F0",
+              border: "none",
+              cursor: input.trim() && !loading ? "pointer" : "not-allowed",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <Send size={16} color={input.trim() && !loading ? "white" : "#94A3B8"} />
+          </button>
+        </div>
+        {voiceError && voiceState === "idle" ? (
+          <div
+            style={{
+              fontSize: 10,
+              color: "#EF4444",
+              maxWidth: 220,
+              textAlign: "center",
+              lineHeight: 1.4,
+              padding: "4px 8px",
+              background: "rgba(239,68,68,0.08)",
+              borderRadius: 6,
+              border: "1px solid rgba(239,68,68,0.2)",
+            }}
+          >
+            {voiceError}
+          </div>
+        ) : null}
       </div>
 
       <style>{`

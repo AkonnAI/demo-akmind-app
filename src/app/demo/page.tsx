@@ -173,7 +173,6 @@ function DemoDashboardInner() {
   const lessonsDone = user?.lessonsComplete.length ?? 0;
   const xp = user?.xp ?? 0;
   const userName = user?.name || "";
-  const lessonsComplete = user?.lessonsComplete?.length || 0;
   const progressPct = Math.min(100, (lessonsDone / 4) * 100);
   const level = Math.max(1, Math.floor(xp / 1000) + 1);
   const xpBarPct = Math.min(100, (xp / 1000) * 100);
@@ -262,7 +261,7 @@ function DemoDashboardInner() {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-[820px] px-4 py-6 sm:px-6 sm:py-8">
+      <main className="relative z-10 mx-auto max-w-[820px] px-4 py-6 pb-20 sm:px-6 sm:py-8 md:pb-8">
         {loading && (
           <div className="space-y-6 animate-pulse">
             <div className="h-8 w-2/3 rounded-lg bg-indigo-300/20" />
@@ -280,7 +279,7 @@ function DemoDashboardInner() {
         {!loading && user && token && (
           <>
             <section
-              className="relative overflow-hidden rounded-[24px] border px-6 py-6 md:px-8 md:py-9 lg:px-11 lg:py-10"
+              className="relative overflow-hidden rounded-[24px] border px-5 py-5 md:px-8 md:py-9 lg:px-11 lg:py-10"
               style={{
                 background:
                   "linear-gradient(135deg, rgba(30,20,80,0.85) 0%, rgba(20,30,80,0.8) 40%, rgba(15,35,70,0.85) 100%)",
@@ -320,8 +319,8 @@ function DemoDashboardInner() {
                 }}
               />
 
-              <div className="relative z-[1] flex items-center justify-between gap-4">
-                <div className="max-w-[85%]">
+              <div className="relative z-[1] flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="max-w-full md:max-w-[85%]">
                   <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.15em] text-cyan-400">
                     <span
                       className="h-1.5 w-1.5 rounded-full bg-cyan-400"
@@ -330,7 +329,7 @@ function DemoDashboardInner() {
                     Welcome back!
                   </p>
                   <h1
-                    className="mt-1 text-[26px] font-extrabold leading-tight tracking-[-0.02em] sm:text-[34px] lg:text-[40px]"
+                    className="mt-1 text-[22px] font-extrabold leading-tight tracking-[-0.02em] sm:text-[34px] lg:text-[40px]"
                     style={{
                       background:
                         "linear-gradient(135deg, #FFFFFF, #C7D2FE 50%, #67E8F9)",
@@ -359,7 +358,7 @@ function DemoDashboardInner() {
                   </p>
                 </div>
 
-                <div className="pointer-events-none hidden md:block">
+                <div className="pointer-events-none hidden min-[380px]:block">
                   <div
                     style={{ filter: "drop-shadow(0 0 16px rgba(99,102,241,0.5))" }}
                   >
@@ -369,7 +368,7 @@ function DemoDashboardInner() {
               </div>
             </section>
 
-            <div className="mt-6 grid grid-cols-3 gap-3">
+            <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
               {[
                 {
                   icon: <Zap className="h-5 w-5 text-indigo-300" />,
@@ -401,7 +400,7 @@ function DemoDashboardInner() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: card.delay }}
-                  className="group relative overflow-hidden rounded-[18px] border p-3 transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] sm:p-5"
+                  className="group relative overflow-hidden rounded-[18px] border p-[14px] transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] sm:p-5"
                   style={{
                     background: "rgba(15,20,50,0.7)",
                     borderColor: "rgba(99,102,241,0.12)",
@@ -417,7 +416,7 @@ function DemoDashboardInner() {
                     {card.icon}
                   </div>
                   <p
-                    className="mt-2 text-[30px] font-extrabold tracking-tight text-white"
+                    className="mt-2 text-[24px] font-extrabold tracking-tight text-white sm:text-[30px]"
                     style={{ animation: "count-up 0.5s ease both" }}
                   >
                     {card.value}
@@ -807,8 +806,14 @@ function DemoDashboardInner() {
       {!loading && user && token ? (
         <NOVAChat
           userName={userName}
+          childName={user?.childName}
+          userKey={user?.email || userName || undefined}
           xp={xp}
-          lessonsComplete={lessonsComplete}
+          lessonsComplete={user?.lessonsComplete ?? []}
+          quizScores={user?.quizScores}
+          badgeEarned={user?.badgeEarned}
+          currentModule={1}
+          lessonOrder={nextLessonId ?? 1}
           currentLesson="Demo Dashboard"
         />
       ) : null}
