@@ -4,44 +4,44 @@ This document is the **single source of truth** for **demo-akmind-app**: what it
 
 ---
 
-## 0. Latest Updates (Mar 2026)
+## 0. Latest Updates (Apr 2026)
 
 Recent production-facing changes implemented in this repository:
 
-- **Mobile-first dashboard and lesson UX refresh**
-  - Dashboard hero redesign, improved lesson cards, progress rail, daily tip card, and bottom nav on mobile.
-  - Lesson page interactions optimized for touch: larger quiz targets, stacked mobile layouts, and responsive stage/flow cards.
-  - Complete page mobile layout tightened (badge card sizing, stacked CTAs, full-screen style payment modal on mobile).
+- **NOVA AI companion (Groq) + voice**
+  - **`POST /api/nova`** (`src/app/api/nova/route.ts`): Groq **`llama-3.3-70b-versatile`**, short warm replies (1–2 sentences), in-memory conversation **`demoMemory`** keyed by `userId` / `userName` for continuity within a server instance.
+  - Lesson summaries and live demo stats are injected via **`src/lib/lesson-content.ts`** and **`src/lib/demo-nova-stats.ts`** so NOVA can answer progress/XP/quiz questions without inventing numbers.
+  - **`src/components/NOVAChat.tsx`**: floating launcher + chat panel; **`src/components/NOVACharacter.tsx`** (dashboard-style avatar, distinct from in-game `games/shared/NovaCharacter.tsx`).
+  - **`src/hooks/useNOVAVoice.ts`** + **`src/components/NOVAVoiceButton.tsx`**: Web Speech API (listen + speak), sentence-chunked TTS, Chrome keep-alive pause/resume, HTTPS check on non-localhost, clearer mic-permission copy, silent retry on `no-speech`, first-tap delay before starting recognition.
+  - **`GROQ_API_KEY`** required at runtime for full replies; ensure it is set in Amplify/hosting env vars.
+
+- **Mobile layout polish (NOVA + dashboard)**
+  - **`globals.css`**: `.nova-float-button` raises the closed NOVA FAB above the 64px bottom nav on viewports ≤768px (`bottom: 80px`, `right: 16px`).
+  - **`NOVAChat`**: full-screen panel on mobile; closed button position synced with resize; voice error banner only when `error && voiceState === "idle"`.
+  - **`src/app/demo/page.tsx`**: extra **`pb-20`** on main content so lists are not hidden behind bottom nav; hero/stats tuned for small screens (padding, heading size, stacked hero + optional NOVA character hidden below ~380px width).
+
+- **Cyberpunk demo UI**
+  - Dark navy glass aesthetic (`globals.css`), aligned with akmind-dashboard; dashboard, lesson flow, complete page, and NOVA chrome updated accordingly.
+
+- **Mobile-first dashboard and lesson UX (ongoing)**
+  - Bottom nav on mobile, touch-friendly quiz/lesson cards, complete page and modals responsive.
 
 - **Game mobile controls**
-  - Added shared touch overlay controls in `src/components/games/shared/GameTouchControls.tsx`.
-  - Wired controls into `GameShell2`, `GameShell3`, and `GameShell4`.
-  - Added mode/ammo touch rows for lessons 3/4 and boss quiz shortcuts where required.
+  - Shared touch overlay in `src/components/games/shared/GameTouchControls.tsx`; wired into `GameShell2`–`GameShell4`.
 
-- **Lesson content flow change**
-  - Removed YouTube embed dependency from lesson screens in active flow.
-  - Added animated **"Video Uploading Soon"** placeholder panel.
-  - Removed 10-second watch gate; users can continue immediately to game/quiz.
+- **Lesson content flow**
+  - **"Video Uploading Soon"** placeholder (no YouTube in active lesson flow); **no forced watch timer** — immediate continue to game/quiz where applicable.
 
-- **Admin QA/testing access improvements**
-  - Admin tester identity (email `admin@akmind.com` or name `Admin`) can bypass lesson lock progression and open any game/lesson for testing.
-  - Admin login screen is password-gated and uses session storage persistence.
+- **Admin QA**
+  - Tester identity (`admin@akmind.com` / name `Admin`) can unlock any lesson for testing; admin panel password/session gated.
+  - **`GET /api/demo/user`**: known admin dev token path provisions **`getOrCreateAdminUser()`** so DynamoDB deployments do not show "expired" when the admin row was missing.
 
-- **Security and API hardening**
-  - Added rate limiting utilities and route enforcement on demo endpoints.
-  - Added Zod validation + sanitization for registration/progress input paths.
-  - Added timing-safe token comparison + delayed invalid token response behavior.
-  - Added CORS and payload-size checks in middleware for API routes.
-  - Added hardened security headers in `next.config.ts`.
+- **Security / scale**
+  - Rate limits, Zod + sanitization, timing-safe token compare, CORS + payload limits in middleware, security headers in `next.config.ts`.
+  - **`USE_DYNAMODB=true`** + AWS table env vars for production concurrency (see `demo-db.ts`).
 
-- **Storage/concurrency upgrade path**
-  - `src/lib/demo-db.ts` supports DynamoDB mode (`USE_DYNAMODB=true`) and local JSON fallback.
-  - Added DynamoDB diagnostics and environment/table fallback support for production troubleshooting.
-  - Booking-side integration was updated in `akmind-master` so parent registration can create demo users directly in shared DynamoDB.
-
-- **Gameplay stability fixes (History Vault / lesson 2)**
-  - Fixed stale-loop closure behavior in `TimelineStage` by moving loop-time callbacks to refs (`onUpdateGameDataRef`, `onCompleteRef`, `playSoundRef`, `onXPRef`).
-  - This stabilizes platform landing outcomes, health updates, and timeline completion behavior under long-running animation loops.
+- **Gameplay stability (lesson 2 / History Vault)**
+  - `TimelineStage` ref-based callbacks for stable rAF loops (health, completion, sounds).
 
 ---
 
@@ -53,7 +53,7 @@ Recent production-facing changes implemented in this repository:
 
 - One-time demo per email (enforced at registration).
 - Token-based access to `/demo/**` (no full user accounts in this repo).
-- Local JSON "database" for demo users (`data/demo-users.json`).
+- Local JSON "database" for demo users (`data/demo-users.json`), **or** AWS **DynamoDB** when `USE_DYNAMODB=true`.
 - Optional Gmail SMTP to email demo links and notify admins.
 - Four thematic lessons aligned with introductory AI curriculum.
 - Three canvas/React **mini-games** (lessons 2–4) loaded with `dynamic(..., { ssr: false })`.
@@ -71,7 +71,8 @@ Recent production-facing changes implemented in this repository:
 | PDF | **jspdf** (badge download on complete page) |
 | Email | **nodemailer** (Gmail transport) |
 | Language | **TypeScript 5** |
-| Storage | **Node `fs`** + JSON file under `data/` |
+| Storage | **Node `fs`** + JSON under `data/` **or** **DynamoDB** (`@aws-sdk/*`) |
+| AI | **groq-sdk** — NOVA chat (`/api/nova`) |
 
 ---
 
@@ -94,22 +95,30 @@ demo-akmind-app/
 │   │   │   ├── complete/
 │   │   │   │   └── page.tsx     # Post-program: badge PDF, payment UI (mock flow)
 │   │   │   └── lesson/[id]/
-│   │   │       └── page.tsx     # Per-lesson: video → game? → quiz → results
-│   │   └── api/demo/
-│   │       ├── register/route.ts
-│   │       ├── user/route.ts
-│   │       ├── progress/route.ts
-│   │       ├── check/route.ts
-│   │       └── admin/route.ts   # Admin API: list users, reset progress
-│   ├── components/games/
-│   │   ├── shared/
-│   │   │   ├── AXCharacter.tsx  # Master player avatar (all lessons)
-│   │   │   └── NovaCharacter.tsx# Master guide character (all lessons)
-│   │   ├── lesson2/             # History Vault, NPC zone, timeline, boss
-│   │   ├── lesson3/             # The Divide (Human vs AI modes)
-│   │   └── lesson4/             # Classification arena (ammo types + boss)
+│   │   │       └── page.tsx     # Per-lesson: video placeholder → game? → quiz → results
+│   │   └── api/
+│   │       ├── nova/route.ts    # NOVA: Groq chat + server-side memory slice
+│   │       └── demo/
+│   │           ├── register/route.ts
+│   │           ├── user/route.ts
+│   │           ├── progress/route.ts
+│   │           ├── check/route.ts
+│   │           └── admin/route.ts   # Admin API: list users, reset progress
+│   ├── components/
+│   │   ├── NOVAChat.tsx         # Floating NOVA UI + voice controls
+│   │   ├── NOVACharacter.tsx    # Chat/dashboard avatar (distinct from games/shared)
+│   │   ├── NOVAVoiceButton.tsx
+│   │   └── games/
+│   │       ├── shared/          # AXCharacter, NovaCharacter, GameTouchControls, …
+│   │       ├── lesson2/
+│   │       ├── lesson3/
+│   │       └── lesson4/
+│   ├── hooks/
+│   │   └── useNOVAVoice.ts      # SpeechRecognition + speechSynthesis
 │   ├── lib/
-│   │   ├── demo-db.ts           # Read/write demo-users.json
+│   │   ├── demo-db.ts           # JSON or DynamoDB persistence
+│   │   ├── demo-nova-stats.ts   # Live XP/streak/badge stats for NOVA prompt
+│   │   ├── lesson-content.ts    # Module/lesson summaries for NOVA context
 │   │   ├── email.ts             # sendDemoLink, sendAdminNotification
 │   │   └── api-response.ts
 │   ├── types/demo.ts            # Client-facing DemoUser shape (subset of DB)
@@ -134,8 +143,15 @@ Typical **`.env.local`** entries (names matter for the code):
 | `GMAIL_USER` | SMTP from-address user. |
 | `GMAIL_APP_PASSWORD` | Gmail app password for nodemailer. |
 | `AKMIND_LOCAL_DB_PATH` | Optional; overrides `./data` root for JSON DB (see `demo-db.ts`). |
+| `GROQ_API_KEY` | Groq API key for **`POST /api/nova`** (set in hosting e.g. Amplify). |
+| `USE_DYNAMODB` | Set `true` to use DynamoDB instead of local JSON (production). |
+| `AWS_REGION` | AWS region for DynamoDB client. |
+| `DEMO_USERS_TABLE` | DynamoDB table name for demo users. |
+| `ADMIN_PASSWORD` | Protects admin UI/API where implemented (see routes). |
 
 **Client-exposed:** only variables prefixed with `NEXT_PUBLIC_`.
+
+**Voice:** Web Speech API requires a **secure context** on real devices — use **HTTPS** (e.g. production domain); `http://localhost` is exempt in the hook’s protocol check.
 
 ---
 
@@ -215,6 +231,16 @@ Returns full user list (all fields) for the admin dashboard. Protected by admin 
 
 **Response helpers:** `src/lib/api-response.ts` (`ok`, `fail`).
 
+### `POST /api/nova`
+
+**Body (typical):** `message`, optional `conversationHistory`, `userName`, `childName`, `userId`, `currentLesson`, `xp`, `lessonsComplete`, `currentModule`, `lessonOrder`, `quizScores`, `badgeEarned`.
+
+- Validates non-empty message and max length (~600 chars).
+- Merges **`demoMemory`** (Map) with client history, slices to recent turns, calls Groq with a system prompt built from **`buildDemoLiveStats`** + **`getModuleSummary` / `getLessonSummary`**.
+- Returns **`{ response: string }`**; on failure returns a friendly string with optional **`error: true`** (see route).
+
+**Note:** In-memory `demoMemory` resets when the serverless instance cold-starts; client `conversationHistory` still supplies continuity.
+
 ---
 
 ## 8. Email (`src/lib/email.ts`)
@@ -230,8 +256,8 @@ Returns full user list (all fields) for the admin dashboard. Protected by admin 
 | Route | Role |
 |-------|------|
 | `/` | Landing: starfield, registration context, manual token entry, validates token |
-| `/demo` | Dashboard: lesson cards, XP, locks, navigate to lesson |
-| `/demo/lesson/[id]` | Lesson flow: video → game (if any) → quiz → results |
+| `/demo` | Dashboard: lesson cards, XP, locks, **NOVAChat** launcher |
+| `/demo/lesson/[id]` | Lesson flow: video placeholder → game (if any) → quiz → results; **NOVAChat** with lesson context |
 | `/demo/complete` | Requires **`demoCompleted`**; confetti, badge PDF download, payment UI stub; redirects incomplete users to `/demo` |
 | `/admin` | Admin panel: user list, lesson progress, XP, quiz scores |
 
@@ -246,16 +272,16 @@ Content is primarily defined in **`src/app/demo/lesson/[id]/page.tsx`** (`LESSON
 ### Lesson 1 — Welcome to Artificial Intelligence
 
 - **Type:** Live recording (~15 min in UI).
-- **Video:** YouTube embed `ad79nYk2keg`.
+- **Video:** **"Video uploading soon"** animated placeholder (no external embed in the active flow).
 - **`hasGame`:** `false`.
 - **`xpReward` (quiz base):** 100 (scaled by quiz accuracy in results).
-- **Flow:** Video → auto "watched" after 30s timer → Quiz → Results → marks lesson done on progress post.
+- **Flow:** Video step → user can continue **immediately** → Quiz → Results → marks lesson done on progress post.
 - **Quiz:** 3 questions (AI definition, examples, learning from data).
 
 ### Lesson 2 — History of AI — From Dreams to Machines
 
 - **Type:** Self-paced + game.
-- **Video:** `JMUxmLyrhSk`.
+- **Video:** Same **placeholder** pattern as lesson 1 (no YouTube in active flow).
 - **`xpReward`:** 300 (quiz portion).
 - **`hasGame`:** `true` → **`GameShell2`** (`dynamic`, `ssr: false`).
 - **`GAME_BONUS_XP`:** +200 XP if game finished before quiz (see lesson page logic).
@@ -264,14 +290,14 @@ Content is primarily defined in **`src/app/demo/lesson/[id]/page.tsx`** (`LESSON
 
 ### Lesson 3 — AI vs Humans: What Can AI Do?
 
-- **Video:** `rcd7Ov9b5QM`.
+- **Video:** Placeholder panel (no YouTube in active flow).
 - **`hasGame`:** `true` → **`GameShell3`**.
 - **`GAME_MECHANICS[3]`:** Human/AI modes, The Divide.
 - **Quiz:** 5 questions (strengths, empathy, bias, sarcasm, collaboration).
 
 ### Lesson 4 — Types of AI: Narrow, General & Super
 
-- **Video:** `aWKNGWdAMGA`.
+- **Video:** Placeholder panel (no YouTube in active flow).
 - **`hasGame`:** `true` → **`GameShell4`**.
 - **`GAME_MECHANICS[4]`:** Classify Narrow/General/Super.
 - **Quiz:** 5 questions (assistants, AGI, AGI definition, today's AI, super AI).
@@ -317,7 +343,7 @@ Master player avatar used by all three game lessons (lesson2, lesson3, lesson4).
 
 ### NovaCharacter (`src/components/games/shared/NovaCharacter.tsx`)
 
-Master guide/narrator character used by all three game lessons. All lesson-specific copies have been deleted.
+Master guide/narrator character used by **in-game** lesson 2–4 shells. Distinct from **`src/components/NOVACharacter.tsx`**, which is the **dashboard/chat** NOVA avatar paired with **`NOVAChat`**.
 
 **Visual spec (holographic robot head):**
 - Antenna with gold tip + `nova-antenna-ping` pulse animation.
@@ -628,6 +654,7 @@ npm run dev
 
 ## 19. Conventions & extension points
 
+- **NOVA:** To teach NOVA new curriculum facts, extend **`src/lib/lesson-content.ts`** (summaries) and/or **`buildDemoLiveStats`** inputs in **`demo-nova-stats.ts`**. Wire additional props into **`NOVAChat`** from **`demo/page.tsx`** and **`lesson/[id]/page.tsx`** so `POST /api/nova` receives consistent `xp`, `lessonsComplete`, `quizScores`, `currentModule`, `lessonOrder`.
 - **New lesson:** Add to **`LESSONS`** in `lesson/[id]/page.tsx` + dashboard **`LESSONS`** in `demo/page.tsx`; wire `gameActive && lessonId === n` shell; bump progress logic if program length changes.
 - **New game shell:** Mirror `GameShell3`/`4`; export `onComplete(xp)` and `onExit()`; dynamic import with **`ssr: false`** if using canvas/window keys.
 - **New character:** Add to `src/components/games/shared/`; import via `@/components/games/shared/CharacterName`.
@@ -640,7 +667,8 @@ npm run dev
 ## 20. Glossary
 
 - **AX:** Player avatar name across games. Rendered by `shared/AXCharacter.tsx`.
-- **NOVA:** Guide character (dialogue). Rendered by `shared/NovaCharacter.tsx`.
+- **NOVA (chat):** AI assistant UI + **`POST /api/nova`**. Avatar: `src/components/NOVACharacter.tsx`.
+- **NOVA (in-game):** Guide portrait in games. `src/components/games/shared/NovaCharacter.tsx`.
 - **Chaos Bot / Time Corruptor / Divide Keeper / The Undefined:** Antagonists per lesson.
 - **Token:** `demoToken` string; not a JWT.
 - **GAME_BONUS_XP:** Flat +200 for finishing embedded game before quiz (lessons with games).
@@ -651,4 +679,4 @@ npm run dev
 
 ---
 
-*Last updated: Full visual overhaul — shared AXCharacter + NovaCharacter (holographic robot head), CinematicIntro2 rebuild (SVG skyline, SVG rotating clock, amber particles, scanlines, DialogueBox), NPCExploreZone2 rebuild (ember particles, ground glow, improved NPC rendering with glow/eyes/nameplates, AXCharacter HTML overlay, NPC→NOVA delay fix), TimelineStage mechanics (moving platforms, crumbling platforms, Time Bubbles, lowered heights, GRAVITY/JUMP_VY tuning), BossBattleLesson2 taunt system (3-phase TauntBanner), quiz option text brightened (slate-800 + indigo hover), admin panel added.*
+*Last updated: Apr 2026 — NOVA Groq chat + voice (`/api/nova`, `NOVAChat`, `useNOVAVoice`, `lesson-content` / `demo-nova-stats`), mobile NOVA/fullscreen chat + dashboard bottom-padding and `.nova-float-button`, cyberpunk UI; DynamoDB + admin token provisioning documented; lesson video steps documented as placeholder + immediate continue.*
