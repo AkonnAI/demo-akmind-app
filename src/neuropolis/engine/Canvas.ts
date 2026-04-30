@@ -31,7 +31,6 @@ export class Canvas {
     this.ctx.imageSmoothingEnabled = false
 
     window.addEventListener('resize', this.onResize)
-    // Also handle orientation change on mobile
     window.addEventListener('orientationchange', this.onOrientationChange)
 
     this.resize()

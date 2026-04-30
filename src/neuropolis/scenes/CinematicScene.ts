@@ -26,6 +26,7 @@ export class CinematicScene {
   private sceneIdx = 0
   private transitioning = false
   private started = false
+  private barH = 0       // cinematic bars
 
   private axSprite!: HTMLImageElement
   private axLoaded = false
@@ -40,9 +41,6 @@ export class CinematicScene {
     this.input = input
     this.onComplete = onComplete
     this.dialogue = new DialogueBox()
-    // Bottom panel sat over AX (characters live ~lower third). Top keeps sprites readable.
-    this.dialogue.setPosition('top')
-    this.dialogue.setHeight(112)
     this.nova = new NovaOrb()
     this.bg = new ParallaxBackground(3000)
 
@@ -384,9 +382,16 @@ export class CinematicScene {
     this.nova.update(dt)
     this.dialogue.update(dt)
 
-    if (!this.started) {
-      this.started = true
-      this.startScene(0)
+    // Cinematic bars slide in
+    if (this.barH < 70) {
+      this.barH += dt * 200
+      if (this.barH >= 70) {
+        this.barH = 70
+        if (!this.started) {
+          this.started = true
+          this.startScene(0)
+        }
+      }
     }
 
     // Fade
@@ -422,8 +427,13 @@ export class CinematicScene {
     // Rain overlay (always present)
     this.drawRain(ctx)
 
-    // Dialogue panel (position=top — does not cover ground-level characters)
+    // Dialogue bar
     this.dialogue.render(ctx)
+
+    // Cinematic bars top and bottom
+    ctx.fillStyle = '#000000'
+    ctx.fillRect(0, 0, W, this.barH)
+    ctx.fillRect(0, H - this.barH, W, this.barH)
 
     // Fade overlay
     if (this.fade > 0) {
@@ -441,7 +451,7 @@ export class CinematicScene {
     const drops = 40
     for (let i = 0; i < drops; i++) {
       const rx = ((i * 337 + this.time * 180) % CONFIG.CANVAS_WIDTH)
-      const ry = ((i * 193 + this.time * 300) % CONFIG.CANVAS_HEIGHT)
+      const ry = ((i * 193 + this.time * 300) % (CONFIG.CANVAS_HEIGHT - 130))
       ctx.globalAlpha = 0.12
       ctx.beginPath()
       ctx.moveTo(rx, ry)

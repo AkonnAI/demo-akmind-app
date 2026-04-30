@@ -61,7 +61,7 @@ export class HUD {
     ctx.font = `8px ${ORB}, sans-serif`
     ctx.fillStyle = '#334155'
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText('← → MOVE    ↑/SPACE JUMP    Z SHOOT    X WEAPON    E INTERACT', W / 2, 713)
+    ctx.fillText('← → / A D MOVE   ↑ / W / SPACE JUMP   Z SHOOT   X WEAPON   E INTERACT', W / 2, 713)
     ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left'
     ctx.restore()
   }

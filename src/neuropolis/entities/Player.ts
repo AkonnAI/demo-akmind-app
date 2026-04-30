@@ -203,10 +203,11 @@ export class Player {
         this.displayW * 0.6, this.displayH * 0.75)
       ctx.globalAlpha = 1
     } else {
+      const bx = Math.floor(this.x - cameraX)
       ctx.fillStyle = '#1E293B'
-      ctx.fillRect(this.x - cameraX, this.y, this.width, this.height)
+      ctx.fillRect(bx, this.y, this.width, this.height)
       ctx.fillStyle = '#00ffff'
-      ctx.fillRect(this.x - cameraX, this.y + 10, this.width, 8)
+      ctx.fillRect(bx, this.y + 10, this.width, 8)
     }
 
     // ── WEAPON RENDER ──────────────────────────────────────────
@@ -219,156 +220,112 @@ export class Player {
     _screenX: number,
     _screenY: number,
   ): void {
-    const ssx   = Math.floor(this.x - cameraX)
-    const ssy   = Math.floor(this.y)
-    const fr    = this.isFacingRight
-    const handY = ssy + Math.floor(this.height * 0.52)
+    const ssx = Math.floor(this.x - cameraX)
+    const ssy = Math.floor(this.y)
+    const fr = this.isFacingRight
+    const armY = ssy + 28
+    const cx = ssx + this.width / 2
+    const dir = fr ? 1 : -1
+    const armLen = 18
+    const armThick = 4
+    const tipX = cx + dir * armLen
+    const tipY = armY
+    const barLeft = fr ? cx : cx - armLen
 
     ctx.save()
     ctx.imageSmoothingEnabled = false
 
-    if (!fr) {
-      ctx.translate(ssx, 0)
-      ctx.scale(-1, 1)
-      ctx.translate(-ssx - this.width, 0)
-    }
-    const gunX = ssx + (fr ? this.width - 4 : 4)
     const wSlot = this.weaponSlot
 
-    if (wSlot === 0) {
-      ctx.fillStyle = '#1e2a3a'
-      ctx.fillRect(gunX - 2, handY - 3, 16, 6)
-      ctx.fillStyle = '#2a3a4a'
-      ctx.fillRect(gunX - 2, handY - 3, 16, 1)
-      ctx.fillStyle = '#0f1a24'
-      ctx.fillRect(gunX + 13, handY - 1, 7, 3)
-      ctx.fillStyle = '#00e5ff'
-      ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 5
-      ctx.fillRect(gunX + 19, handY - 1, 2, 3)
-      ctx.shadowBlur = 0
-      ctx.fillStyle = '#00e5ff'; ctx.globalAlpha = 0.6
-      ctx.fillRect(gunX + 2, handY - 2, 3, 4)
-      ctx.globalAlpha = 1
-      ctx.fillStyle = '#0f1a24'
-      ctx.fillRect(gunX + 4, handY + 3, 3, 4)
-
-    } else if (wSlot === 1) {
-      ctx.fillStyle = '#1a0a28'
-      ctx.fillRect(gunX - 2, handY - 4, 20, 8)
-      ctx.fillStyle = '#280f3a'
-      ctx.fillRect(gunX - 2, handY - 4, 20, 1)
-      ctx.fillStyle = '#0f0618'
-      ctx.fillRect(gunX + 17, handY - 2, 9, 4)
-      ctx.fillStyle = '#7c4dff'
-      ctx.shadowColor = '#7c4dff'; ctx.shadowBlur = 7
-      ctx.fillRect(gunX + 2, handY - 2, 3, 3)
-      ctx.fillRect(gunX + 2, handY + 2, 3, 3)
-      ctx.shadowBlur = 0
-      ctx.fillStyle = '#7c4dff'
-      ctx.shadowColor = '#7c4dff'; ctx.shadowBlur = 8
-      ctx.fillRect(gunX + 25, handY - 2, 2, 4)
-      ctx.shadowBlur = 0
-      ctx.fillStyle = '#120820'
-      ctx.fillRect(gunX + 6, handY + 4, 4, 5)
-
-    } else if (wSlot === 2) {
-      ctx.fillStyle = '#2a0a2e'
-      ctx.fillRect(gunX - 2, handY - 4, 18, 8)
-      ctx.fillStyle = '#3a1040'
-      ctx.fillRect(gunX - 2, handY - 4, 18, 1)
-      ctx.save()
-      ctx.translate(gunX + 18, handY)
-      ctx.rotate(Math.PI / 4)
-      ctx.fillStyle = '#e040fb'
-      ctx.shadowColor = '#e040fb'; ctx.shadowBlur = 8
-      ctx.fillRect(-4, -4, 8, 8)
-      ctx.shadowBlur = 0
-      ctx.restore()
-      ctx.strokeStyle = '#e040fb'; ctx.globalAlpha = 0.4; ctx.lineWidth = 0.5
+    const strokeArm = (stroke: string, fill: string) => {
+      ctx.strokeStyle = stroke
+      ctx.lineWidth = 2
+      ctx.strokeRect(barLeft + 0.5, armY - armThick / 2 + 0.5, armLen - 1, armThick - 1)
+      ctx.fillStyle = fill
+      ctx.fillRect(barLeft, armY - armThick / 2, armLen, armThick)
+      ctx.fillStyle = stroke
       ctx.beginPath()
-      ctx.moveTo(gunX + 2, handY - 3); ctx.lineTo(gunX + 14, handY + 3)
-      ctx.moveTo(gunX + 2, handY + 3); ctx.lineTo(gunX + 14, handY - 3)
-      ctx.stroke()
-      ctx.globalAlpha = 1
+      ctx.arc(tipX, tipY, 2, 0, Math.PI * 2)
+      ctx.fill()
+    }
 
+    if (wSlot === 0) {
+      ctx.fillStyle = '#00e5ff'
+      ctx.shadowColor = '#00e5ff'
+      ctx.shadowBlur = 6
+      ctx.fillRect(barLeft, armY - armThick / 2, armLen, armThick)
+      ctx.shadowBlur = 0
+      ctx.fillStyle = '#00e5ff'
+      ctx.beginPath()
+      ctx.arc(tipX, tipY, 2, 0, Math.PI * 2)
+      ctx.fill()
+    } else if (wSlot === 1) {
+      strokeArm('#7c4dff', '#1a0a28')
+      ctx.fillStyle = '#7c4dff'
+      ctx.fillRect(barLeft + 3, armY - 1, 4, 2)
+      ctx.fillRect(barLeft + 3, armY + 1, 4, 2)
+    } else if (wSlot === 2) {
+      strokeArm('#e040fb', '#2a0a2e')
     } else if (wSlot === 3) {
-      ctx.fillStyle = '#0a1428'
-      ctx.fillRect(gunX - 2, handY - 5, 22, 10)
-      ctx.fillStyle = '#14203a'
-      ctx.fillRect(gunX - 2, handY - 5, 22, 1)
-      ctx.fillStyle = '#060e1a'
-      ctx.fillRect(gunX + 19, handY - 3, 10, 6)
+      strokeArm('#00b4d8', '#0a1428')
       for (let gi = 0; gi < 3; gi++) {
-        ctx.strokeStyle = '#00b4d8'; ctx.globalAlpha = 0.15 + gi * 0.1; ctx.lineWidth = 1
-        ctx.beginPath(); ctx.arc(gunX + 8, handY, 3 + gi * 2, -Math.PI / 2, Math.PI / 2); ctx.stroke()
+        ctx.strokeStyle = '#00b4d8'
+        ctx.globalAlpha = 0.15 + gi * 0.1
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.arc(cx + dir * 8, armY, 3 + gi * 2, -Math.PI / 2, Math.PI / 2)
+        ctx.stroke()
       }
       ctx.globalAlpha = 1
     } else if (wSlot === 4) {
-      ctx.fillStyle = '#1a1e28'
-      ctx.fillRect(gunX - 2, handY - 4, 18, 8)
-      ctx.save()
-      ctx.translate(gunX + 16, handY)
-      ctx.rotate(Math.PI / 4)
-      ctx.fillStyle = '#e2e8f0'
-      ctx.shadowColor = '#e2e8f0'; ctx.shadowBlur = 6
-      ctx.fillRect(-3, -3, 6, 6)
-      ctx.shadowBlur = 0
-      ctx.restore()
+      strokeArm('#e2e8f0', '#1a1e28')
     } else if (wSlot === 5) {
       const charge = Math.min(1, this.chargeT / 0.8)
-      ctx.fillStyle = '#280808'
-      ctx.fillRect(gunX - 2, handY - 5, 24, 10)
-      ctx.fillStyle = '#3a1010'
-      ctx.fillRect(gunX - 2, handY - 5, 24, 1)
-      ctx.fillStyle = '#1a0404'
-      ctx.fillRect(gunX + 18, handY - 3, 12, 6)
+      strokeArm('#ff1744', '#280808')
       if (charge > 0) {
-        const r = 6 + charge * 10
         ctx.fillStyle = '#ff1744'
-        ctx.shadowColor = '#ff1744'; ctx.shadowBlur = 6 + charge * 12
+        ctx.shadowColor = '#ff1744'
+        ctx.shadowBlur = 6 + charge * 12
         ctx.globalAlpha = 0.5 + charge * 0.45
-        ctx.beginPath(); ctx.arc(gunX + 26, handY, r, 0, Math.PI * 2); ctx.fill()
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1
+        ctx.beginPath()
+        ctx.arc(tipX, tipY, 4 + charge * 8, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.shadowBlur = 0
+        ctx.globalAlpha = 1
       }
     } else if (wSlot === 6) {
       ctx.globalAlpha = 0.75
       ctx.fillStyle = 'rgba(200,180,255,0.55)'
-      ctx.beginPath()
-      ctx.ellipse(gunX + 10, handY, 12, 5, 0, 0, Math.PI * 2)
-      ctx.fill()
+      ctx.fillRect(barLeft, armY - 3, armLen, 6)
       ctx.globalAlpha = 0.35
       ctx.fillStyle = 'rgba(220,200,255,0.4)'
-      ctx.beginPath()
-      ctx.ellipse(gunX + 4, handY, 10, 4, 0, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.globalAlpha = 0.2
-      ctx.beginPath()
-      ctx.ellipse(gunX - 2, handY, 8, 3, 0, 0, Math.PI * 2)
-      ctx.fill()
+      ctx.fillRect(barLeft + 2, armY - 2, armLen - 4, 4)
       ctx.globalAlpha = 1
+      ctx.fillStyle = '#dcd0ff'
+      ctx.beginPath()
+      ctx.arc(tipX, tipY, 2, 0, Math.PI * 2)
+      ctx.fill()
     }
 
     ctx.restore()
 
-    // Muzzle flash
     if (this.muzzleFlashFrames > 0) {
       const flashColors = [
         '#00e5ff', '#7c4dff', '#e040fb', '#00b4d8', '#e2e8f0', '#ff1744',
         '#dcd0ff',
       ]
-      const fc    = flashColors[this.weaponSlot] ?? '#00e5ff'
+      const fc = flashColors[this.weaponSlot] ?? '#00e5ff'
       const alpha = this.muzzleFlashFrames / 4
-      const tipSX = fr ? ssx + this.width + 20 : ssx - 20
       ctx.save()
-      ctx.translate(tipSX, handY)
-      ctx.shadowColor = fc; ctx.shadowBlur = 14
-      ctx.fillStyle   = fc; ctx.globalAlpha = alpha
-      for (let fi = 0; fi < 4; fi++) {
-        ctx.save(); ctx.rotate(fi * Math.PI / 2)
-        ctx.fillRect(-1.5, -9, 3, 7); ctx.restore()
-      }
-      ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill()
-      ctx.shadowBlur = 0; ctx.globalAlpha = 1
+      ctx.shadowColor = fc
+      ctx.shadowBlur = 14
+      ctx.fillStyle = fc
+      ctx.globalAlpha = alpha
+      ctx.beginPath()
+      ctx.arc(tipX, tipY, 4, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.shadowBlur = 0
+      ctx.globalAlpha = 1
       ctx.restore()
     }
   }

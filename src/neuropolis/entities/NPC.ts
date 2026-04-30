@@ -30,12 +30,18 @@ export class NPC {
     return Math.abs(px - this.data.x) < 80
   }
 
-  render(ctx: CanvasRenderingContext2D, cameraX: number): void {
+  render(
+    ctx: CanvasRenderingContext2D,
+    cameraX: number,
+    playerCenterX?: number,
+  ): void {
     const sx = this.data.x - cameraX
     const GY = this.data.y
     if (sx < -60 || sx > CONFIG.CANVAS_WIDTH + 60) return
 
     const by = this.bobY
+    const near =
+      playerCenterX != null && this.isNear(playerCenterX)
 
     // Shadow
     ctx.fillStyle   = '#000000'
@@ -74,7 +80,7 @@ export class NPC {
     ctx.fillRect(sx - 5, GY - 63 + by, 3, 3)
     ctx.fillRect(sx + 3, GY - 63 + by, 3, 3)
 
-    // Talk indicator above head
+    // Talk indicator above head (first visit only)
     if (!this.data.talked) {
       const pulse = 0.5 + Math.sin(this.time * 3) * 0.4
       ctx.fillStyle   = '#ffcc00'
@@ -83,11 +89,13 @@ export class NPC {
       ctx.textAlign   = 'center'
       ctx.fillText('!', sx, GY - 88 + by)
       ctx.globalAlpha = 1
+    }
 
-      // Talk prompt
+    if (near) {
       ctx.fillStyle   = '#ffcc00'
       ctx.globalAlpha = 0.7
       ctx.font        = `9px Orbitron, sans-serif`
+      ctx.textAlign   = 'center'
       ctx.fillText('[E] TALK', sx, GY - 100 + by)
       ctx.textAlign   = 'left'
       ctx.globalAlpha = 1

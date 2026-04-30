@@ -5,13 +5,20 @@ import { Player } from '../entities/Player'
 import { Projectile } from '../entities/Projectile'
 import { Level3, LEVEL3_WORLD_WIDTH } from '../world/Level3'
 import { ParallaxBackground } from '../world/ParallaxBackground'
-import { updatePatternGrids } from '../systems/PatternGrid'
+import {
+  updatePatternGrids,
+  renderPatternGridFloorTiles,
+  renderPatternGridHudPanels,
+} from '../systems/PatternGrid'
 import { HUD } from '../ui/HUD'
 import { DialogueBox } from '../ui/DialogueBox'
 import { NovaOrb } from '../ui/NovaOrb'
 import { UpgradeShop } from '../ui/UpgradeShop'
 import { CONFIG } from '../constants/config'
 import { TouchControls } from '../ui/TouchControls'
+import { MarketEnforcer } from '../entities/MarketEnforcer'
+import { Drone } from '../entities/Drone'
+import type { LockTarget } from '../entities/Projectile'
 
 const DRONE_XP = 50
 const ENFORCER_XP = 80
@@ -23,8 +30,6 @@ type DialogueLine = {
   text: string
   expression?: string
 }
-
-type LockableEnemy = { x: number; y: number; active: boolean }
 
 interface L3Particle {
   x: number
@@ -90,8 +95,8 @@ export class GameScene3 {
   private damageFlashTimer = 0
   private shootCD = 0
   private shootCooldown = 0.28
-  private lockTarget: LockableEnemy | null = null
-  private lockables: LockableEnemy[] = []
+  private lockTarget: LockTarget | null = null
+  private lockables: LockTarget[] = []
   private lockCycleIndex = 0
   private lockTimer = 0
   private muzzleFlash = false
@@ -116,6 +121,11 @@ export class GameScene3 {
 
   private particles: L3Particle[] = []
   private respawnFlashTimer = 0
+
+  private gate1TutShown = false
+  private gate2TutShown = false
+  private gate3TutShown = false
+  private showLevelCompleteCard = false
 
   private onLevelComplete?: () => void
 
@@ -142,6 +152,7 @@ export class GameScene3 {
       () => this.hud.getXP(),
       (n: number) => this.hud.spendXP(n),
       (id: string) => this.handlePurchase(id),
+      (msg, d) => this.hud.showMessage(msg, d ?? 2),
     )
 
     const sx = opts.startX ?? SPAWN_X
@@ -348,13 +359,74 @@ export class GameScene3 {
     this.shakeY = (Math.random() - 0.5) * m
   }
 
-  private buildLockables(): LockableEnemy[] {
-    const list: LockableEnemy[] = []
-    for (const d of this.level.drones) if (d.active) list.push(d)
-    for (const c of this.level.cameras) list.push(c)
-    for (const e of this.level.enforcers)
-      if (e.active) list.push({ x: e.x, y: e.y - 10, active: true })
-    return list
+  /** Combat targets only (Level 1 locks drones; L3 adds ground enforcers). */
+  private buildLockables(): LockTarget[] {
+    const out: LockTarget[] = []
+    for (const d of this.level.drones) if (d.active) out.push(d)
+    for (const e of this.level.enforcers) if (e.active) out.push(e)
+    return out
+  }
+
+  /** World point used for range + reticle — entity body center, not wall props. */
+  private lockReticleY(e: LockTarget): number {
+    if (e instanceof MarketEnforcer) return e.y - 10
+    if (e instanceof Drone) return e.y + 3
+    return e.y
+  }
+
+  /**
+   * Same pattern as GameScene2: full lockables pool, Q cycles, auto-nearest
+   * within LOCK_RANGE (520) when not manually locked.
+   */
+  private updateLockTarget(): void {
+    if (this.lockTarget && !this.lockTarget.active) this.lockTarget = null
+
+    this.lockables = this.buildLockables()
+    const pool = this.lockables
+    if (pool.length === 0) {
+      this.lockTarget = null
+      this.lockCycleIndex = 0
+      return
+    }
+
+    if (this.input.isJustPressed('KeyQ')) {
+      this.lockCycleIndex = (this.lockCycleIndex + 1) % pool.length
+      this.lockTarget = pool[this.lockCycleIndex] ?? null
+      return
+    }
+
+    if (
+      this.lockTarget &&
+      this.lockTarget.active &&
+      pool.includes(this.lockTarget)
+    ) {
+      return
+    }
+
+    const pcx = this.player.getCenterX()
+    const pcy = this.player.y
+    const fr = this.player.isFacingRight
+    let nearest: LockTarget | null = null
+    let best = LOCK_RANGE
+    let nearestFront: LockTarget | null = null
+    let bestFront = LOCK_RANGE
+    for (const e of pool) {
+      const ty = this.lockReticleY(e)
+      const dd = Math.hypot(e.x - pcx, ty - pcy)
+      if (dd < best) {
+        best = dd
+        nearest = e
+      }
+      const inFront = fr ? e.x >= pcx - 80 : e.x <= pcx + 80
+      if (inFront && dd < bestFront) {
+        bestFront = dd
+        nearestFront = e
+      }
+    }
+    this.lockTarget = nearestFront ?? nearest
+    if (this.lockTarget != null) {
+      this.lockCycleIndex = Math.max(0, pool.indexOf(this.lockTarget))
+    }
   }
 
   private applyProjectileHits(): void {
@@ -552,6 +624,26 @@ export class GameScene3 {
       return
     }
 
+    if (this.showLevelCompleteCard) {
+      this.player.vx = 0
+      this.player.vy = 0
+      if (this.input.isJustPressed('Space')) {
+        this.onLevelComplete?.()
+      }
+      this.camera.follow(this.player.getCenterX(), LEVEL3_WORLD_WIDTH)
+      this.nova.moveTo(this.player.x + 70, this.player.y - 30)
+      this.level.update(
+        dt,
+        this.player.x,
+        this.player.y,
+        this.player.width,
+        this.player.height,
+      )
+      this.prevPlayerX = this.player.getCenterX()
+      this.input.update()
+      return
+    }
+
     this.player.update(dt, this.input)
 
     const platY = this.level.checkPlatformCollision(
@@ -576,7 +668,26 @@ export class GameScene3 {
       this.player.height,
     )
     if (gate) {
-      this.player.x -= this.player.vx * dt * 2
+      if (this.player.vx > 0) {
+        this.player.x = gate.x - this.player.width
+      } else if (this.player.vx < 0) {
+        this.player.x = gate.x + gate.w
+      }
+      this.player.vx = 0
+    }
+
+    const wall = this.level.getBlockingWall(
+      this.player.x,
+      this.player.y,
+      this.player.width,
+      this.player.height,
+    )
+    if (wall) {
+      if (this.player.vx > 0) {
+        this.player.x = wall.x - this.player.width
+      } else if (this.player.vx < 0) {
+        this.player.x = wall.x + wall.w
+      }
       this.player.vx = 0
     }
 
@@ -616,6 +727,81 @@ export class GameScene3 {
             expression: 'happy',
           },
         ])
+      }
+    }
+
+    const gateTutPlay = this.scene === 'play'
+    if (
+      gateTutPlay &&
+      !this.gate1TutShown &&
+      prevCenterX < 1500 &&
+      cxAfterMove >= 1500
+    ) {
+      if (!DialogueBox.hasFired('L3_GATE1_TUT')) {
+        DialogueBox.markFired('L3_GATE1_TUT')
+        this.gate1TutShown = true
+        this.talk([
+          {
+            speaker: 'NOVA',
+            text: 'Pattern Recognition Gate ahead. NeuroCorps locks sectors with AI-learned sequences.',
+          },
+          {
+            speaker: 'NOVA',
+            text: 'Four numbered tiles on the floor. Step on them 1 → 2 → 3 → 4 in order. Walk straight through — the numbers tell you the sequence.',
+          },
+          {
+            speaker: 'NOVA',
+            text: 'Wrong tile resets the lock. Take a second to read the numbers before you move.',
+          },
+        ])
+      } else {
+        this.gate1TutShown = true
+      }
+    }
+    if (
+      gateTutPlay &&
+      !this.gate2TutShown &&
+      prevCenterX < 3500 &&
+      cxAfterMove >= 3500
+    ) {
+      if (!DialogueBox.hasFired('L3_GATE2_TUT')) {
+        DialogueBox.markFired('L3_GATE2_TUT')
+        this.gate2TutShown = true
+        this.talk([
+          {
+            speaker: 'NOVA',
+            text: 'Evidence terminal ahead — Kiran stashed proof here. Press E when you reach the pedestal to collect it and unlock Gate 2.',
+          },
+        ])
+      } else {
+        this.gate2TutShown = true
+      }
+    }
+    if (
+      gateTutPlay &&
+      !this.gate3TutShown &&
+      prevCenterX < 6400 &&
+      cxAfterMove >= 6400
+    ) {
+      if (!DialogueBox.hasFired('L3_GATE3_TUT')) {
+        DialogueBox.markFired('L3_GATE3_TUT')
+        this.gate3TutShown = true
+        this.talk([
+          {
+            speaker: 'NOVA',
+            text: 'Second pattern lock. Same mechanic — tiles 1 through 4 in order.',
+          },
+          {
+            speaker: 'NOVA',
+            text: 'Look at the numbers before you step. This sequence runs right-to-left. Adjust your approach.',
+          },
+          {
+            speaker: 'NOVA',
+            text: 'After this gate, reach the green exit portal to complete the level.',
+          },
+        ])
+      } else {
+        this.gate3TutShown = true
       }
     }
 
@@ -663,14 +849,25 @@ export class GameScene3 {
         return
       }
       const npc = this.level.getNearNPC(this.player.getCenterX())
-      if (npc && !npc.data.talked) {
-        npc.data.talked = true
-        this.talk(npc.data.dialogue as DialogueLine[])
+      if (npc && npc.isNear(this.player.getCenterX())) {
+        if (!npc.data.talked) {
+          this.talk(npc.data.dialogue as DialogueLine[], () => {
+            npc.data.talked = true
+          })
+        } else {
+          const lines = npc.data.dialogue
+          const last = lines[lines.length - 1]
+          if (last) this.talk([last])
+        }
       }
     }
 
+    const pgSlice =
+      this.level.patternGrids[0]?.solved === true
+        ? this.level.patternGrids
+        : [this.level.patternGrids[0]!]
     const pgEv = updatePatternGrids(
-      this.level.patternGrids,
+      pgSlice,
       this.player.x,
       this.player.y,
       this.player.width,
@@ -682,6 +879,10 @@ export class GameScene3 {
       this.hud.addScore(100)
       this.score += 100
       this.hud.showMessage('PATTERN LOCK OPEN — +100 XP', 2)
+      if (pgEv.gridId === 1) {
+        const g2 = this.level.patternGrids.find(g => g.id === 2)
+        if (g2) g2.activated = true
+      }
       this.syncL3Objective()
     } else if (pgEv?.type === 'wrong') {
       this.hud.showMessage('PATTERN RESET', 0.8)
@@ -705,29 +906,7 @@ export class GameScene3 {
       }
     }
 
-    this.lockables = this.buildLockables()
-    let nearest: LockableEnemy | null = null
-    let best = LOCK_RANGE
-    const pcx = this.player.getCenterX()
-    const pcy = this.player.y + this.player.height / 2
-    for (const e of this.lockables) {
-      const dist = Math.hypot(e.x - pcx, e.y - pcy)
-      if (dist < best) {
-        best = dist
-        nearest = e
-      }
-    }
-    this.lockTarget = nearest
-
-    if (
-      this.input.isJustPressed('KeyQ') &&
-      this.lockables.length > 0
-    ) {
-      this.lockCycleIndex =
-        (this.lockCycleIndex + 1) % this.lockables.length
-      this.lockTarget =
-        this.lockables[this.lockCycleIndex] ?? null
-    }
+    this.updateLockTarget()
 
     if (this.input.isJustPressed('KeyZ') && this.shootCD <= 0) {
       this.shootCD = this.shootCooldown
@@ -745,6 +924,9 @@ export class GameScene3 {
       const lt = this.lockTarget
       if (lt && lt.active && this.player.weaponSlot === 0) {
         proj.lockOn(lt)
+      } else if (this.player.weaponSlot === 0) {
+        proj.vx = dir * 520
+        proj.vy = 0
       }
       this.level.addProjectile(proj)
       this.player.muzzleFlashFrames = 4
@@ -837,20 +1019,29 @@ export class GameScene3 {
       this.player.x > 9000 &&
       this.level.exitPortal.open) {
       this.level.levelComplete = true
+      this.player.vx = 0
+      this.player.vy = 0
       this.talk(
         [
           {
             speaker: 'NOVA',
-            text: 'Data Market cleared. Kiran is with us now.',
+            text: 'Data Market cleared. You\'ve seen how data moves through this city — bought, sold, stolen.',
           },
           {
-            speaker: 'KIRAN',
-            text: 'District 2 is different. Richer. They will not expect us.',
+            speaker: 'AX',
+            text: 'And how NeuroCorps uses it to control every district.',
           },
-          { speaker: 'AX', text: 'Good.' },
+          {
+            speaker: 'NOVA',
+            text: 'The Forge is next. District 3 — where they turn this data into AI. Where the bias gets baked in.',
+          },
+          {
+            speaker: 'AX',
+            text: 'Then that\'s where we go.',
+          },
         ],
         () => {
-          this.onLevelComplete?.()
+          this.showLevelCompleteCard = true
         },
       )
     }
@@ -879,6 +1070,103 @@ export class GameScene3 {
     this.input.update()
   }
 
+  private renderLevelCompleteCard(ctx: CanvasRenderingContext2D): void {
+    if (!this.showLevelCompleteCard) return
+    const ORB = 'Orbitron'
+    ctx.save()
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.globalAlpha = 1
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.fillStyle = 'rgba(0,0,0,0.92)'
+    ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT)
+
+    ctx.strokeStyle = '#e040fb'
+    ctx.lineWidth = 3
+    ctx.strokeRect(40, 40, CONFIG.CANVAS_WIDTH - 80, CONFIG.CANVAS_HEIGHT - 80)
+    ctx.strokeStyle = 'rgba(0,229,255,0.4)'
+    ctx.lineWidth = 1
+    ctx.strokeRect(48, 48, CONFIG.CANVAS_WIDTH - 96, CONFIG.CANVAS_HEIGHT - 96)
+
+    ctx.textAlign = 'center'
+    ctx.fillStyle = '#e040fb'
+    ctx.font = `14px ${ORB}, sans-serif`
+    ctx.fillText('DISTRICT 2', CONFIG.CANVAS_WIDTH / 2, 180)
+    ctx.fillStyle = '#00e5ff'
+    ctx.font = `22px ${ORB}, sans-serif`
+    ctx.fillText('DATA MARKET — CLEARED', CONFIG.CANVAS_WIDTH / 2, 220)
+
+    ctx.strokeStyle = '#e040fb'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(CONFIG.CANVAS_WIDTH / 2 - 200, 260)
+    ctx.lineTo(CONFIG.CANVAS_WIDTH / 2 + 200, 260)
+    ctx.stroke()
+
+    ctx.fillStyle = '#ffcc00'
+    ctx.font = `18px ${ORB}, sans-serif`
+    ctx.fillText('+ 500 XP', CONFIG.CANVAS_WIDTH / 2, 300)
+
+    ctx.fillStyle = '#ffffff'
+    ctx.font = `11px ${ORB}, sans-serif`
+    ctx.fillText(
+      'Lesson: AI is only as honest as the data it learns from.',
+      CONFIG.CANVAS_WIDTH / 2,
+      340,
+    )
+
+    ctx.fillStyle = '#94a3b8'
+    ctx.font = `italic 9px ${ORB}, sans-serif`
+    ctx.fillText(
+      '"Garbage in, garbage out. But this was worse — it was garbage put in on purpose."',
+      CONFIG.CANVAS_WIDTH / 2,
+      370,
+      500,
+    )
+
+    const patternsOk = this.level.patternGrids.every(g => g.solved)
+    const evidenceOk = this.level.evidenceCollected
+    const kiranNpc = this.level.npcs.find(n => n.data.isKiran)
+    const kiranOk = kiranNpc?.data.talked === true
+    const badgeOk = [patternsOk, evidenceOk, kiranOk]
+    const labels = ['PATTERNS', 'EVIDENCE', 'KIRAN'] as const
+    const left0 = CONFIG.CANVAS_WIDTH / 2 - 80 - 40
+    for (let i = 0; i < 3; i++) {
+      const xl = left0 + i * (80 + 40)
+      const ok = badgeOk[i]
+      ctx.fillStyle = ok ? '#00ff88' : '#475569'
+      ctx.fillRect(xl, 420, 80, 80)
+      if (ok) {
+        ctx.fillStyle = '#0a0614'
+        ctx.font = `bold 32px ${ORB}, sans-serif`
+        ctx.fillText('✓', xl + 40, 475)
+      }
+      ctx.fillStyle = '#e040fb'
+      ctx.font = `8px ${ORB}, sans-serif`
+      ctx.fillText(labels[i]!, xl + 40, 510)
+    }
+
+    const pulse = Math.sin(this.time * 4) * 0.3 + 0.7
+    ctx.globalAlpha = pulse
+    ctx.fillStyle = '#00e5ff'
+    ctx.font = `10px ${ORB}, sans-serif`
+    ctx.fillText(
+      '[SPACE] CONTINUE TO DISTRICT 3',
+      CONFIG.CANVAS_WIDTH / 2,
+      520,
+    )
+    ctx.globalAlpha = 1
+
+    for (let y = 0; y < CONFIG.CANVAS_HEIGHT; y += 3) {
+      ctx.fillStyle = 'rgba(0,0,0,0.04)'
+      ctx.fillRect(0, y, CONFIG.CANVAS_WIDTH, 1)
+    }
+
+    ctx.globalAlpha = 1
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.textAlign = 'left'
+    ctx.restore()
+  }
+
   private applyDamage(amount: number): void {
     if (this.playerShield && !this.playerShieldConsumed) {
       this.playerShieldConsumed = true
@@ -895,8 +1183,11 @@ export class GameScene3 {
       this.hp = 3
       this.hud.setHP(3)
       this.playerShieldConsumed = false
-      this.player.x = this.level.checkpoints.find(c => c.activated)?.x ?? 180
+      const respawnX = [...this.level.checkpoints].reverse().find(c => c.activated)?.x ?? 180
+      this.player.x = respawnX
       this.player.y = this.groundY - this.player.height
+      this.level.applySectionStart(respawnX)
+      this.syncL3Objective()
       this.respawnFlashTimer = 0.6
     }
   }
@@ -915,10 +1206,25 @@ export class GameScene3 {
 
     ctx.imageSmoothingEnabled = false
     this.bg.render(ctx, this.camera.x)
-    this.level.render(ctx, this.camera.x)
+    this.level.render(ctx, this.camera.x, this.player.getCenterX())
+    this.level.renderProjectiles(ctx, this.camera.x)
     this.renderParticles(ctx, this.camera.x)
     this.player.render(ctx, this.camera.x)
     this.nova.render(ctx, this.camera.x)
+    renderPatternGridFloorTiles(
+      ctx,
+      this.level.patternGrids,
+      this.camera.x,
+      this.time,
+      this.player.x,
+    )
+    renderPatternGridHudPanels(
+      ctx,
+      this.level.patternGrids,
+      this.camera.x,
+      this.time,
+      this.player.x,
+    )
 
     if (this.damageFlashTimer > 0) {
       const alpha = (this.damageFlashTimer / 0.4) * 0.22
@@ -939,7 +1245,7 @@ export class GameScene3 {
     const lock = this.lockTarget
     if (lock && lock.active) {
       const rx = lock.x - this.camera.x
-      const ry = lock.y
+      const ry = this.lockReticleY(lock)
       ctx.save()
       ctx.strokeStyle = '#4a9eff'
       ctx.lineWidth = 2
@@ -969,6 +1275,7 @@ export class GameScene3 {
     }
 
     this.hud.render(ctx, { deferControls: true })
+    this.renderLevelCompleteCard(ctx)
     if (this.introCinematicActive) {
       ctx.fillStyle = '#000000'
       ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, 56)
@@ -987,8 +1294,10 @@ export class GameScene3 {
     ctx.textAlign = 'center'
     ctx.fillText(
       this.shop.isOpen()
-        ? '↑↓ SELECT   Z PURCHASE   F CLOSE'
-        : '← → MOVE  ↑/SPACE JUMP  Z SHOOT  X WEAPON  Q TARGET  E INTERACT',
+        ? '↑↓ SELECT   E / SPACE CONFIRM   F CLOSE   (Z CONFIRMS BUY)'
+        : this.showLevelCompleteCard
+          ? '[SPACE] CONTINUE'
+          : '← → / A D MOVE  ↑ / W / SPACE JUMP  Z SHOOT  X WEAPON  Q TARGET  E INTERACT',
       640,
       712,
     )

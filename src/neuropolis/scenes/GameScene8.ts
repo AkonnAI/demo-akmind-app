@@ -181,8 +181,6 @@ export class GameScene8 {
       if (this.player.x > 580 && !this.cinematicPlayed) {
         this.cinematicPlayed = true
         this.phase = 'nova_talk'
-        this.dialogue.setPosition('top')
-        this.dialogue.setHeight(112)
         this.bars = new CinematicBars()
         this.bars.open()
         this.talk(
@@ -224,8 +222,6 @@ export class GameScene8 {
               ],
               () => {
                 this.bars = null
-                this.dialogue.setPosition('bottom')
-                this.dialogue.setHeight(130)
                 this.phase = 'fight'
                 this.boss = new ChaosBoss()
                 this.player.x = 420

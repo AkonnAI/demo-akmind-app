@@ -64,29 +64,36 @@ export class UpgradeShop {
   private openTimer = 0
   private items: ShopItem[]
   private selectedIdx = 0
+  private confirmMode = false
+  private pendingIdx = 0
   private xpRef: () => number
   private spendXP: (n: number) => boolean
   private onPurchase: (id: string) => void
+  private toast: (msg: string, duration?: number) => void
 
   constructor(
     xpRef: () => number,
     spendXP: (n: number) => boolean,
     onPurchase: (id: string) => void,
+    toast?: (msg: string, duration?: number) => void,
   ) {
     this.xpRef = xpRef
     this.spendXP = spendXP
     this.onPurchase = onPurchase
+    this.toast = toast ?? (() => {})
     this.items = DEFAULT_ITEMS()
   }
 
   open(): void {
     this.visible = true
     this.selectedIdx = 0
+    this.confirmMode = false
     this.openTimer = 2.5
   }
 
   close(): void {
     this.visible = false
+    this.confirmMode = false
   }
 
   isOpen(): boolean {
@@ -99,6 +106,17 @@ export class UpgradeShop {
 
   handleInput(input: InputManager): void {
     if (!this.visible) return
+    if (this.confirmMode) {
+      if (input.isJustPressed('KeyX') || input.isJustPressed('Escape')) {
+        this.confirmMode = false
+        return
+      }
+      if (input.isJustPressed('KeyZ')) {
+        this.doPurchase(this.pendingIdx)
+        this.confirmMode = false
+      }
+      return
+    }
     if (input.isJustPressed('ArrowUp') || input.isJustPressed('KeyW')) {
       this.selectedIdx =
         (this.selectedIdx - 1 + this.items.length) % this.items.length
@@ -106,25 +124,31 @@ export class UpgradeShop {
     if (input.isJustPressed('ArrowDown') || input.isJustPressed('KeyS')) {
       this.selectedIdx = (this.selectedIdx + 1) % this.items.length
     }
-    if (input.isJustPressed('KeyZ') || input.isJustPressed('Space')) {
-      this.tryPurchase(this.selectedIdx)
+    if (input.isJustPressed('KeyE') || input.isJustPressed('Space')) {
+      this.pendingIdx = this.selectedIdx
+      this.confirmMode = true
+      return
     }
     if (input.isJustPressed('KeyF') || input.isJustPressed('Escape')) {
       this.close()
     }
   }
 
-  private tryPurchase(idx: number): void {
+  private doPurchase(idx: number): void {
     const item = this.items[idx]
     if (!item) return
     if (item.id === 'health_refill') {
-      if (this.spendXP(item.cost)) this.onPurchase(item.id)
+      if (this.spendXP(item.cost)) {
+        this.onPurchase(item.id)
+        this.toast('+UPGRADE UNLOCKED', 2)
+      }
       return
     }
     if (item.purchased) return
     if (this.spendXP(item.cost)) {
       item.purchased = true
       this.onPurchase(item.id)
+      this.toast('+UPGRADE UNLOCKED', 2)
     }
   }
 
@@ -267,7 +291,9 @@ export class UpgradeShop {
     ctx.fillStyle = '#475569'
     ctx.textAlign = 'center'
     ctx.fillText(
-      '↑↓ SELECT   Z / SPACE PURCHASE   F / ESC CLOSE',
+      this.confirmMode
+        ? ''
+        : '↑↓ SELECT   E / SPACE CONFIRM   F / ESC CLOSE',
       PX + PW / 2,
       PY + PH - 12,
     )
@@ -292,6 +318,42 @@ export class UpgradeShop {
       ctx.shadowBlur = 0
       ctx.textAlign = 'left'
       ctx.restore()
+    }
+
+    if (this.confirmMode) {
+      const item = this.items[this.pendingIdx]
+      ctx.fillStyle = 'rgba(0,0,0,0.7)'
+      ctx.fillRect(0, 0, W, H)
+      const bx = W / 2 - 160
+      const by = H / 2 - 70
+      ctx.fillStyle = '#0a0614'
+      ctx.strokeStyle = '#ffcc00'
+      ctx.lineWidth = 2
+      ctx.fillRect(bx, by, 320, 140)
+      ctx.strokeRect(bx + 0.5, by + 0.5, 319, 139)
+      ctx.textAlign = 'center'
+      ctx.font = "bold 12px Orbitron, monospace"
+      ctx.fillStyle = '#ffcc00'
+      ctx.fillText('CONFIRM PURCHASE?', W / 2, by + 28)
+      if (item) {
+        ctx.font = '11px Orbitron, monospace'
+        ctx.fillStyle = '#ffffff'
+        ctx.fillText(item.name, W / 2, by + 52)
+        ctx.fillStyle = '#ffcc00'
+        ctx.fillText(`${item.cost} XP`, W / 2, by + 72)
+      }
+      ctx.fillStyle = '#ffffff'
+      ctx.font = '10px Orbitron, monospace'
+      ctx.fillText(`YOUR XP: ${Math.floor(this.xpRef())}`, W / 2, by + 92)
+      ctx.font = '11px Orbitron, monospace'
+      ctx.fillStyle = '#00ff88'
+      ctx.fillText('[Z] CONFIRM', W / 2 - 70, by + 118)
+      ctx.fillStyle = '#ff4444'
+      ctx.fillText('[X / ESC] CANCEL', W / 2 + 70, by + 118)
+      ctx.font = '9px Orbitron, monospace'
+      ctx.fillStyle = '#94a3b8'
+      ctx.fillText('Z to buy · X or ESC to cancel', W / 2, by + 132)
+      ctx.textAlign = 'left'
     }
 
     ctx.restore()

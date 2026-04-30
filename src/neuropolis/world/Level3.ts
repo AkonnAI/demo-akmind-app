@@ -4,12 +4,11 @@ import { OldCamera } from '../entities/OldCamera'
 import { Projectile } from '../entities/Projectile'
 import { NPC, type NPCData } from '../entities/NPC'
 import { MarketEnforcer } from '../entities/MarketEnforcer'
-import { DataWraith } from '../entities/DataWraith'
+import type { DataWraith } from '../entities/DataWraith'
 import { WeaponCrate } from '../entities/WeaponCrate'
 import {
   createL3PatternGrid1,
   createL3PatternGrid2,
-  renderPatternGrids,
   type PatternGrid,
 } from '../systems/PatternGrid'
 import type { Platform } from './Level1'
@@ -48,6 +47,14 @@ export interface L3SectionTrigger {
 /** Passed from `GameScene3` for ambient crowd tension near sector gates. */
 export type CrowdMoodEvent = 'stood_near_gate'
 
+export interface InvisibleWall {
+  x: number
+  w: number
+  y: number
+  h: number
+  open: boolean
+}
+
 export class Level3 {
   readonly groundY: number
   readonly levelEnd = LEVEL_END_X
@@ -69,8 +76,13 @@ export class Level3 {
   patternGrids: PatternGrid[] = []
   shopTerminalXs: number[] = []
   evidenceCollected = false
-  readonly evidenceX = 5500
+  readonly evidenceX = 4300
   readonly evidencePedestalY: number
+
+  /** Invisible sector barriers (synced with pattern / evidence progress). */
+  wall1: InvisibleWall
+  wall2: InvisibleWall
+  wall3: InvisibleWall
 
   sectionTriggers: L3SectionTrigger[] = []
   levelComplete = false
@@ -99,7 +111,7 @@ export class Level3 {
       color: ACCENT,
       collected: false,
     })
-    for (let i = 0; i < 16; i++) this.crowdXs.push(120 + i * 560 + (i % 3) * 40)
+    for (let i = 0; i < 10; i++) this.crowdXs.push(140 + i * 820 + (i % 3) * 40)
     this.buildPlatforms()
     this.buildGates()
     this.buildCheckpoints()
@@ -108,6 +120,10 @@ export class Level3 {
     this.buildCameras()
     this.buildSectionTriggers()
     this.shopTerminalXs = [1400, 4000, 6200]
+    const gyW = this.groundY
+    this.wall1 = { x: 2200 + 60, w: 20, y: 0, h: gyW, open: false }
+    this.wall2 = { x: 4800 + 60, w: 20, y: 0, h: gyW, open: false }
+    this.wall3 = { x: 7000 + 60, w: 20, y: 0, h: gyW, open: false }
   }
 
   private buildPlatforms(): void {
@@ -204,47 +220,27 @@ export class Level3 {
 
   private buildEnemies(): void {
     const GY = this.groundY
+    // Sparse patrols — Data Market stays readable; no floating wraiths.
     this.enforcers = [
-      new MarketEnforcer(520, GY, 350, 900),
-      new MarketEnforcer(980, GY, 800, 1300),
-      new MarketEnforcer(1500, GY, 1300, 1900),
-      new MarketEnforcer(2100, GY, 1900, 2500),
-      new MarketEnforcer(2700, GY, 2400, 3100),
-      new MarketEnforcer(3400, GY, 3100, 3800),
-      new MarketEnforcer(4100, GY, 3800, 4500),
-      new MarketEnforcer(4900, GY, 4500, 5200),
-      new MarketEnforcer(5600, GY, 5200, 5900),
-      new MarketEnforcer(6300, GY, 5900, 6600),
-      new MarketEnforcer(7000, GY, 6600, 7300),
-      new MarketEnforcer(7700, GY, 7300, 8000),
-      new MarketEnforcer(8200, GY, 8000, 8600),
-      new MarketEnforcer(8800, GY, 8600, 9100),
+      new MarketEnforcer(900, GY, 650, 1250),
+      new MarketEnforcer(2100, GY, 1750, 2450),
+      new MarketEnforcer(3800, GY, 3400, 4300),
+      new MarketEnforcer(5200, GY, 4800, 5650),
+      new MarketEnforcer(7000, GY, 6600, 7450),
+      new MarketEnforcer(8600, GY, 8100, 9050),
     ]
-    this.wraiths = [
-      new DataWraith(2400, GY - 120),
-      new DataWraith(3100, GY - 160),
-      new DataWraith(3600, GY - 140),
-      new DataWraith(4200, GY - 150),
-      new DataWraith(5200, GY - 130),
-      new DataWraith(6000, GY - 170),
-      new DataWraith(6800, GY - 140),
-      new DataWraith(7600, GY - 160),
-    ]
+    this.wraiths = []
     this.drones = [
-      new Drone(650, GY - 200, 100, 80, 50),
-      new Drone(1750, GY - 210, 95, 85, 51),
-      new Drone(3200, GY - 200, 100, 90, 52),
-      new Drone(4500, GY - 220, 90, 100, 53),
-      new Drone(5800, GY - 200, 105, 95, 54),
-      new Drone(7100, GY - 210, 100, 100, 55),
-      new Drone(8000, GY - 200, 95, 105, 56),
-      new Drone(8900, GY - 220, 100, 90, 57),
+      new Drone(1100, GY - 200, 800, 1400, 52),
+      new Drone(3200, GY - 210, 2800, 3600, 52),
+      new Drone(5400, GY - 200, 5000, 5800, 54),
+      new Drone(7600, GY - 215, 7200, 8000, 53),
     ]
   }
 
   private buildCameras(): void {
     const GY = this.groundY
-    const xs = [400, 900, 1400, 2200, 3000, 3800, 4600, 5400, 6200, 7800]
+    const xs = [700, 3200, 5200, 7200, 8800]
     this.cameras = xs.map(x => new OldCamera(x, GY - 180))
   }
 
@@ -268,7 +264,7 @@ export class Level3 {
     }
     const kiran1: NPCData = {
       id: 'KIRAN_PRE',
-      x: 4600,
+      x: 3700,
       y: GY,
       name: 'KIRAN',
       color: '#2a1040',
@@ -302,6 +298,10 @@ export class Level3 {
           speaker: 'KIRAN',
           text: 'District 2 is where that data came from. Let us go find it.',
         },
+        {
+          speaker: 'KIRAN',
+          text: "District 3 is beyond Gate 3. I'll meet you there, bhai.",
+        },
       ],
       talked: false,
       isKiran: true,
@@ -324,12 +324,12 @@ export class Level3 {
       },
       {
         key: 'l3_sec2',
-        x: 2100,
+        x: 1600,
         fired: false,
         dialogue: [
           {
             speaker: 'NOVA',
-            text: 'Pattern lock. AI learned these sequences. Reproduce them.',
+            text: 'Pattern lock ahead. AI learned these sequences from training data. Reproduce them to pass.',
           },
         ],
       },
@@ -450,6 +450,20 @@ export class Level3 {
     return null
   }
 
+  getBlockingWall(ax: number, ay: number, aw: number, ah: number): InvisibleWall | null {
+    for (const wall of [this.wall1, this.wall2, this.wall3]) {
+      if (wall.open) continue
+      if (
+        ax + aw > wall.x &&
+        ax < wall.x + wall.w &&
+        ay + ah > wall.y &&
+        ay < wall.y + wall.h
+      )
+        return wall
+    }
+    return null
+  }
+
   updateCheckpointsForPlayer(playerCenterX: number): Checkpoint | null {
     for (const cp of this.checkpoints) {
       if (cp.activated) continue
@@ -472,6 +486,25 @@ export class Level3 {
         g.hacked = true
       }
     }
+
+    // Sync puzzle state so walls match the now-open gates.
+    const gate1Open = this.gates.find(g => g.id === 1)?.open ?? false
+    const gate2Open = this.gates.find(g => g.id === 2)?.open ?? false
+    const gate3Open = this.gates.find(g => g.id === 3)?.open ?? false
+
+    if (gate1Open) {
+      if (this.patternGrids[0]) {
+        this.patternGrids[0].solved = true
+        this.patternGrids[0].activated = true
+      }
+      // Gate 1 solved means grid 2 should be unlocked for play.
+      if (this.patternGrids[1]) this.patternGrids[1].activated = true
+    }
+    if (gate2Open) this.evidenceCollected = true
+    if (gate3Open && this.patternGrids[1]) {
+      this.patternGrids[1].solved = true
+    }
+
     const g2 = this.gates[1]
     if (g2 && startX > g2.x) this.crowdMood = 100
     this.refreshExitPortal()
@@ -546,6 +579,7 @@ export class Level3 {
         return 'touch'
     }
     for (const w of this.wraiths) {
+      if (!w.active) continue
       for (const c of w.childWraiths) {
         const r = { x: c.x - 8, y: c.y - 8, w: 16, h: 16 }
         if (
@@ -567,16 +601,30 @@ export class Level3 {
     pW: number,
     pH: number,
   ): void {
+    this.wall1.open = (this.patternGrids[0]?.solved ?? false) || (this.gates.find(g => g.id === 1)?.open ?? false)
+    this.wall2.open = this.evidenceCollected
+    this.wall3.open = (this.patternGrids[1]?.solved ?? false) || (this.gates.find(g => g.id === 3)?.open ?? false)
+
     this.time += dt
     this.weaponCrate.update(dt)
 
     const pcx = playerX + pW / 2
     const pcy = playerY + pH / 2
 
-    for (const d of this.drones) d.update(dt)
+    for (const n of this.npcs) n.update(dt)
+    for (const d of this.drones) {
+      if (!d.active) continue
+      d.update(dt)
+    }
     for (const c of this.cameras) c.update(dt)
-    for (const e of this.enforcers) e.update(dt, pcx, playerY + pH / 2)
-    for (const w of this.wraiths) w.update(dt, pcx, pcy)
+    for (const e of this.enforcers) {
+      if (!e.active) continue
+      e.update(dt, pcx, playerY + pH / 2)
+    }
+    for (const w of this.wraiths) {
+      if (!w.active) continue
+      w.update(dt, pcx, pcy)
+    }
 
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i]!
@@ -777,7 +825,15 @@ export class Level3 {
     ctx.restore()
   }
 
-  render(ctx: CanvasRenderingContext2D, cameraX: number): void {
+  renderProjectiles(ctx: CanvasRenderingContext2D, cameraX: number): void {
+    for (const p of this.projectiles) p.render(ctx, cameraX)
+  }
+
+  render(
+    ctx: CanvasRenderingContext2D,
+    cameraX: number,
+    playerCenterX?: number,
+  ): void {
     if (!this.skipInlineBackground) this.renderInlineBackground(ctx, cameraX)
     else {
       ctx.save()
@@ -793,13 +849,11 @@ export class Level3 {
     for (const d of this.drones) d.render(ctx, cameraX)
     for (const e of this.enforcers) e.render(ctx, cameraX)
     for (const w of this.wraiths) w.render(ctx, cameraX)
-    for (const n of this.npcs) n.render(ctx, cameraX)
+    for (const n of this.npcs) n.render(ctx, cameraX, playerCenterX)
     this.weaponCrate.render(ctx, cameraX)
     this.renderEvidence(ctx, cameraX)
-    renderPatternGrids(ctx, this.patternGrids, cameraX, this.time)
     this.renderShops(ctx, cameraX)
     this.renderGates(ctx, cameraX)
-    for (const p of this.projectiles) p.render(ctx, cameraX)
     this.renderCheckpoints(ctx, cameraX)
     this.renderExit(ctx, cameraX)
   }

@@ -215,17 +215,7 @@ export class GameScene2 {
     void _loop
     const opts = parseGameScene2Fourth(fourth)
     this.touchControls = opts.touchControls
-    // Fade in from black at vault entry (matches arena fade-out/in machinery).
-    // Previously alpha was 1 with phase 'none', so updateArenaFade never ran → permanent black screen.
-    if (opts.startX == null && !opts.bossArena) {
-      this.arenaFadeAlpha = 1
-      this.arenaFadePhase = 'in'
-      this.arenaFadeTimer = 0
-    } else {
-      this.arenaFadeAlpha = 0
-      this.arenaFadePhase = 'none'
-      this.arenaFadeTimer = 0
-    }
+    this.arenaFadeAlpha = opts.startX == null && !opts.bossArena ? 1 : 0
     this.input    = input
     this.camera   = new Camera()
     this.bg       = new ParallaxBackground(WORLD_WIDTH)
