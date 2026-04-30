@@ -1,10 +1,11 @@
 "use client";
 
+import VideoPlayer from "@/components/lesson/VideoPlayer";
 import NOVAChat from "@/components/NOVAChat";
 import type { DemoUser } from "@/types/demo";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, CheckCircle2, PlayCircle } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2 } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Suspense,
@@ -42,7 +43,7 @@ const LESSONS: Record<number, LessonContent> = {
     xpReward: 100,
     description:
       "Icebreaker, defining AI, real-world examples kids use daily.",
-    hasGame: false,
+    hasGame: true,
     quiz: [
       {
         q: "What does AI stand for?",
@@ -234,23 +235,16 @@ const LESSONS: Record<number, LessonContent> = {
 };
 
 const GAME_MECHANICS: Record<number, string> = {
-  2: "Travel through AI history as AX. Restore erased milestones. Defeat the Time Corruptor.",
-  3: "Switch between Human and AI modes. Cross The Divide. Unite two worlds.",
-  4: "Identify Narrow, General and Super AI in the wild. Classify to survive.",
+  1: "Neuropolis Level 1 — guide AX through the district with NOVA. Jump, explore, and complete the lesson arc.",
+  2: "Neuropolis Level 2 — The Vault: timelines, ciphers, and the Glitch Twin.",
+  3: "Neuropolis Level 3 — The Divide: switch modes and cross Human vs AI zones.",
+  4: "Neuropolis Level 4 — classify Narrow, General, and Super AI in the wild.",
 };
 
 const GAME_BONUS_XP = 200;
 
-const GameShell2 = dynamic(
-  () => import("@/components/games/lesson2/GameShell2"),
-  { ssr: false }
-);
-const GameShell3 = dynamic(
-  () => import("@/components/games/lesson3/GameShell3"),
-  { ssr: false }
-);
-const GameShell4 = dynamic(
-  () => import("@/components/games/lesson4/GameShell4"),
+const NeuropolisShell = dynamic(
+  () => import("@/components/games/neuropolis/NeuropolisShell"),
   { ssr: false }
 );
 const LandscapeWrapper = dynamic(
@@ -596,7 +590,9 @@ function LessonPageInner() {
   const q = lesson.quiz[currentQuestion];
   const durationMin = Math.round(lesson.duration / 60);
   const typeLabel =
-    lesson.type === "live" ? "Live session" : "Self-paced + game";
+    lesson.type === "live"
+      ? "Live instructor after purchase · Demo: recording + game"
+      : "Self-paced + game";
 
   return (
     <div className="min-h-screen overflow-x-hidden">
@@ -699,33 +695,25 @@ function LessonPageInner() {
               backdropFilter: "blur(20px)",
             }}
           >
-            <div
-              className="relative aspect-video w-full"
-              style={{
-                background:
-                  "linear-gradient(135deg, rgba(30,20,80,0.9), rgba(15,30,70,0.9))",
-              }}
-            >
+            <VideoPlayer lessonId={lessonId} />
+
+            {lessonId === 1 && (
               <div
-                className="absolute inset-x-0 top-0 h-[2px]"
+                className="mx-4 mt-4 rounded-xl border px-4 py-3 text-sm text-slate-200 sm:mx-6 sm:mt-5 sm:px-5 sm:py-4"
                 style={{
-                  background:
-                    "linear-gradient(90deg, transparent, #06B6D4, transparent)",
-                  animation: "scan-line 5s ease-in-out infinite",
+                  background: "rgba(99,102,241,0.08)",
+                  borderColor: "rgba(99,102,241,0.25)",
+                  backdropFilter: "blur(12px)",
                 }}
-              />
-              <div className="relative z-[1] flex h-full flex-col items-center justify-center px-6 text-center">
-                <PlayCircle className="h-16 w-16 text-white/60" />
-                <p className="mt-4 text-lg font-bold text-white">Video Uploading Soon</p>
-                <p className="mt-2 max-w-md text-sm text-slate-300">
-                  We are preparing the lesson video for this module. You can
-                  continue to the game and quiz right away.
+              >
+                <p className="font-semibold text-indigo-200">
+                  About the live track
                 </p>
-                <p className="mt-3 text-sm font-semibold text-cyan-400">
-                  Continue to {lesson.hasGame ? "Game" : "Quiz"} →
+                <p className="mt-1 text-slate-400">
+                  Scheduled live lessons with an instructor unlock after you purchase the full course. This demo still includes the recorded lesson and the Neuropolis game so you can try the full flow.
                 </p>
               </div>
-            </div>
+            )}
 
             <div className="p-6 sm:p-7">
               <h2 className="text-[22px] font-bold tracking-tight text-white">{lesson.title}</h2>
@@ -766,33 +754,10 @@ function LessonPageInner() {
               maxHeight: "100vh",
             }}
           >
-            {gameActive && lessonId === 2 && (
+            {gameActive && lessonId >= 1 && lessonId <= 4 && (
               <LandscapeWrapper>
-                <GameShell2
-                  onComplete={async () => {
-                    await exitGame();
-                    setGameComplete(true);
-                    setPhase("quiz");
-                  }}
-                  onExit={exitGame}
-                />
-              </LandscapeWrapper>
-            )}
-            {gameActive && lessonId === 3 && (
-              <LandscapeWrapper>
-                <GameShell3
-                  onComplete={async () => {
-                    await exitGame();
-                    setGameComplete(true);
-                    setPhase("quiz");
-                  }}
-                  onExit={exitGame}
-                />
-              </LandscapeWrapper>
-            )}
-            {gameActive && lessonId === 4 && (
-              <LandscapeWrapper>
-                <GameShell4
+                <NeuropolisShell
+                  level={lessonId as 1 | 2 | 3 | 4}
                   onComplete={async () => {
                     await exitGame();
                     setGameComplete(true);
@@ -803,7 +768,7 @@ function LessonPageInner() {
               </LandscapeWrapper>
             )}
 
-            {gameActive && lessonId !== 2 && lessonId !== 3 && lessonId !== 4 && (
+            {gameActive && (lessonId < 1 || lessonId > 4) && (
               <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900 px-6 text-center text-white">
                 <p className="text-4xl">🎮</p>
                 <p className="mt-4 text-2xl font-bold">Game Coming Soon</p>

@@ -12,13 +12,13 @@ const LESSONS = [
   {
     id: 1,
     title: "Welcome to Artificial Intelligence",
-    type: "Live Recording",
+    type: "Live recording + demo game",
     description:
       "Icebreaker, defining AI, real-world examples kids use daily.",
     duration: "15 min",
     xpReward: 100,
     color: "indigo" as const,
-    hasGame: false,
+    hasGame: true,
   },
   {
     id: 2,

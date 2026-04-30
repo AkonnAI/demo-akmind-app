@@ -8,6 +8,11 @@ This document is the **single source of truth** for **demo-akmind-app**: what it
 
 Recent production-facing changes implemented in this repository:
 
+- **Lesson video playback (S3 CDN)**
+  - **`src/components/lesson/VideoPlayer.tsx`** streams MP4 from **`NEXT_PUBLIC_CDN_URL`** using paths `videos/lesson-{n}/1080p.mp4` and optional **`poster.jpg`** / **`captions.vtt`** (when captions are enabled in **`src/lib/lesson-videos.ts`**).
+  - The animated **"Video Uploading Soon"** placeholder has been removed from the lesson video step; if the CDN URL is missing, the UI shows a clear configuration message instead of crashing.
+  - **No forced watch timer** — the existing **Continue** control still advances immediately.
+
 - **NOVA AI companion (Groq) + voice**
   - **`POST /api/nova`** (`src/app/api/nova/route.ts`): Groq **`llama-3.3-70b-versatile`**, short warm replies (1–2 sentences), in-memory conversation **`demoMemory`** keyed by `userId` / `userName` for continuity within a server instance.
   - Lesson summaries and live demo stats are injected via **`src/lib/lesson-content.ts`** and **`src/lib/demo-nova-stats.ts`** so NOVA can answer progress/XP/quiz questions without inventing numbers.
@@ -30,7 +35,7 @@ Recent production-facing changes implemented in this repository:
   - Shared touch overlay in `src/components/games/shared/GameTouchControls.tsx`; wired into `GameShell2`–`GameShell4`.
 
 - **Lesson content flow**
-  - **"Video Uploading Soon"** placeholder (no YouTube in active lesson flow); **no forced watch timer** — immediate continue to game/quiz where applicable.
+  - Lesson videos use **`VideoPlayer`** + **`lesson-videos.ts`** (S3 URLs); **no forced watch timer** — immediate continue to game/quiz where applicable.
 
 - **Admin QA**
   - Tester identity (`admin@akmind.com` / name `Admin`) can unlock any lesson for testing; admin panel password/session gated.
@@ -95,7 +100,7 @@ demo-akmind-app/
 │   │   │   ├── complete/
 │   │   │   │   └── page.tsx     # Post-program: badge PDF, payment UI (mock flow)
 │   │   │   └── lesson/[id]/
-│   │   │       └── page.tsx     # Per-lesson: video placeholder → game? → quiz → results
+│   │   │       └── page.tsx     # Per-lesson: VideoPlayer (S3) → game? → quiz → results
 │   │   └── api/
 │   │       ├── nova/route.ts    # NOVA: Groq chat + server-side memory slice
 │   │       └── demo/
@@ -108,6 +113,8 @@ demo-akmind-app/
 │   │   ├── NOVAChat.tsx         # Floating NOVA UI + voice controls
 │   │   ├── NOVACharacter.tsx    # Chat/dashboard avatar (distinct from games/shared)
 │   │   ├── NOVAVoiceButton.tsx
+│   │   ├── lesson/
+│   │   │   └── VideoPlayer.tsx  # S3-streamed lesson MP4 + poster
 │   │   └── games/
 │   │       ├── shared/          # AXCharacter, NovaCharacter, GameTouchControls, …
 │   │       ├── lesson2/
@@ -119,6 +126,7 @@ demo-akmind-app/
 │   │   ├── demo-db.ts           # JSON or DynamoDB persistence
 │   │   ├── demo-nova-stats.ts   # Live XP/streak/badge stats for NOVA prompt
 │   │   ├── lesson-content.ts    # Module/lesson summaries for NOVA context
+│   │   ├── lesson-videos.ts     # CDN URLs + lesson video metadata
 │   │   ├── email.ts             # sendDemoLink, sendAdminNotification
 │   │   └── api-response.ts
 │   ├── types/demo.ts            # Client-facing DemoUser shape (subset of DB)
@@ -138,6 +146,7 @@ Typical **`.env.local`** entries (names matter for the code):
 
 | Variable | Purpose |
 |----------|---------|
+| `NEXT_PUBLIC_CDN_URL` | Public S3 base URL for lesson videos and posters. |
 | `NEXT_PUBLIC_APP_URL` | Base URL embedded in demo emails (link: `?token=...`). |
 | `NEXT_PUBLIC_LANDING_URL` | Main marketing site link (default `https://www.akmind.com`). |
 | `GMAIL_USER` | SMTP from-address user. |
@@ -257,7 +266,7 @@ Returns full user list (all fields) for the admin dashboard. Protected by admin 
 |-------|------|
 | `/` | Landing: starfield, registration context, manual token entry, validates token |
 | `/demo` | Dashboard: lesson cards, XP, locks, **NOVAChat** launcher |
-| `/demo/lesson/[id]` | Lesson flow: video placeholder → game (if any) → quiz → results; **NOVAChat** with lesson context |
+| `/demo/lesson/[id]` | Lesson flow: **VideoPlayer** (S3) → game (if any) → quiz → results; **NOVAChat** with lesson context |
 | `/demo/complete` | Requires **`demoCompleted`**; confetti, badge PDF download, payment UI stub; redirects incomplete users to `/demo` |
 | `/admin` | Admin panel: user list, lesson progress, XP, quiz scores |
 
@@ -272,7 +281,7 @@ Content is primarily defined in **`src/app/demo/lesson/[id]/page.tsx`** (`LESSON
 ### Lesson 1 — Welcome to Artificial Intelligence
 
 - **Type:** Live recording (~15 min in UI).
-- **Video:** **"Video uploading soon"** animated placeholder (no external embed in the active flow).
+- **Video:** Streamed via `<VideoPlayer>` (`src/components/lesson/VideoPlayer.tsx`) from the S3 CDN. User can continue immediately — no forced watch timer.
 - **`hasGame`:** `false`.
 - **`xpReward` (quiz base):** 100 (scaled by quiz accuracy in results).
 - **Flow:** Video step → user can continue **immediately** → Quiz → Results → marks lesson done on progress post.
@@ -281,7 +290,7 @@ Content is primarily defined in **`src/app/demo/lesson/[id]/page.tsx`** (`LESSON
 ### Lesson 2 — History of AI — From Dreams to Machines
 
 - **Type:** Self-paced + game.
-- **Video:** Same **placeholder** pattern as lesson 1 (no YouTube in active flow).
+- **Video:** Streamed via `<VideoPlayer>` (`src/components/lesson/VideoPlayer.tsx`) from the S3 CDN. User can continue immediately — no forced watch timer.
 - **`xpReward`:** 300 (quiz portion).
 - **`hasGame`:** `true` → **`GameShell2`** (`dynamic`, `ssr: false`).
 - **`GAME_BONUS_XP`:** +200 XP if game finished before quiz (see lesson page logic).
@@ -290,14 +299,14 @@ Content is primarily defined in **`src/app/demo/lesson/[id]/page.tsx`** (`LESSON
 
 ### Lesson 3 — AI vs Humans: What Can AI Do?
 
-- **Video:** Placeholder panel (no YouTube in active flow).
+- **Video:** Streamed via `<VideoPlayer>` (`src/components/lesson/VideoPlayer.tsx`) from the S3 CDN. User can continue immediately — no forced watch timer.
 - **`hasGame`:** `true` → **`GameShell3`**.
 - **`GAME_MECHANICS[3]`:** Human/AI modes, The Divide.
 - **Quiz:** 5 questions (strengths, empathy, bias, sarcasm, collaboration).
 
 ### Lesson 4 — Types of AI: Narrow, General & Super
 
-- **Video:** Placeholder panel (no YouTube in active flow).
+- **Video:** Streamed via `<VideoPlayer>` (`src/components/lesson/VideoPlayer.tsx`) from the S3 CDN. User can continue immediately — no forced watch timer.
 - **`hasGame`:** `true` → **`GameShell4`**.
 - **`GAME_MECHANICS[4]`:** Classify Narrow/General/Super.
 - **Quiz:** 5 questions (assistants, AGI, AGI definition, today's AI, super AI).
@@ -679,4 +688,4 @@ npm run dev
 
 ---
 
-*Last updated: Apr 2026 — NOVA Groq chat + voice (`/api/nova`, `NOVAChat`, `useNOVAVoice`, `lesson-content` / `demo-nova-stats`), mobile NOVA/fullscreen chat + dashboard bottom-padding and `.nova-float-button`, cyberpunk UI; DynamoDB + admin token provisioning documented; lesson video steps documented as placeholder + immediate continue.*
+*Last updated: Apr 2026 — S3 **VideoPlayer** (`lesson-videos.ts`, `NEXT_PUBLIC_CDN_URL`); NOVA Groq + voice; mobile NOVA; cyberpunk UI; DynamoDB + admin token provisioning; lesson flow keeps immediate Continue (no watch gate).*
