@@ -1,3 +1,4 @@
+import { DEMO_TOKEN_COOKIE_MAX_AGE_SECONDS } from "@/lib/demo-session";
 import { NextRequest, NextResponse } from "next/server";
 
 export function middleware(req: NextRequest) {
@@ -58,7 +59,7 @@ export function middleware(req: NextRequest) {
 
   const res = NextResponse.next();
   res.cookies.set("demo_token", token, {
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: DEMO_TOKEN_COOKIE_MAX_AGE_SECONDS,
     path: "/",
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

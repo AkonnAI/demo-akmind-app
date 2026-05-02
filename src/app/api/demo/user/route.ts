@@ -1,4 +1,5 @@
 import { fail } from "@/lib/api-response";
+import { DEMO_USER_API_RATE_LIMIT_PER_MINUTE } from "@/lib/demo-session";
 import {
   getDemoUserByToken,
   getOrCreateAdminUser,
@@ -23,7 +24,11 @@ function safeTokenCompare(a: string, b: string): boolean {
 
 export async function GET(req: NextRequest) {
   const ip = getIP(req);
-  const { allowed } = checkRateLimit(ip, 30, 60 * 1000);
+  const { allowed } = checkRateLimit(
+    ip,
+    DEMO_USER_API_RATE_LIMIT_PER_MINUTE,
+    60 * 1000,
+  );
   if (!allowed) {
     return fail("Too many requests", 429);
   }
