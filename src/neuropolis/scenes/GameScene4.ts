@@ -20,7 +20,6 @@ import { renderGravityFieldsVfx } from '../systems/gravityFieldVfx'
 const DRONE_XP = 50
 const AUDIT_XP = 70
 const SPAWN_X = 180
-const LOCK_RANGE = 520
 const DAMAGE_IFRAMES = 1.5
 const SHOOT_COOLDOWN = 0.28
 const GRAVITY_FIRE_COOLDOWN = 2.5
@@ -111,12 +110,27 @@ export class GameScene4 {
   private respawnX = SPAWN_X
   private respawnY = 0
 
+  // Fix 2 — Drone detection state
+  private detectionWarningShown = false
+  private detectionEndTimer = 0
+  private prevDetecting = false
+
+  // Fix 9C / Fix 10 — Scale balanced rising-edge flags
+  private balancedFlags = [false, false]
+
+  // Fix 10 — Level complete card
+  private levelCompleteTriggered = false
+  private showLevelCompleteCard = false
+
   private prevPlayerX = 0
   private lastOnGround = true
   private gateHack: GateHackState | null = null
   private gravityFields: GravityField[] = []
   private gravityFireCD = 0
   private scaleHintCD = 0
+
+  /** Picked-up data block (E to carry / drop) for balance scales. */
+  private heldDataBlock: { scaleIdx: number; blockIdx: number } | null = null
 
   private onLevelComplete?: () => void
 
@@ -160,14 +174,69 @@ export class GameScene4 {
     console.log('[GameScene4] Level 4 — Bias Engine.')
   }
 
+  private applyCarriedDataBlockPosition(): void {
+    if (!this.heldDataBlock) return
+    const sc = this.level.balanceScales[this.heldDataBlock.scaleIdx]
+    const b = sc?.blocks[this.heldDataBlock.blockIdx]
+    if (!b) {
+      this.heldDataBlock = null
+      return
+    }
+    b.carried = true
+    const dir = this.player.isFacingRight ? 1 : -1
+    b.x = Math.round(
+      this.player.x + (dir > 0 ? this.player.width + 4 : -b.w - 4),
+    )
+    b.y = Math.round(this.player.y - b.h - 6)
+    b.vx = 0
+    b.onPan = 'none'
+  }
+
+  /** E near block: pick up; E again: drop at feet. */
+  private tryToggleHeldDataBlock(): boolean {
+    if (this.heldDataBlock) {
+      const sc = this.level.balanceScales[this.heldDataBlock.scaleIdx]
+      const b = sc?.blocks[this.heldDataBlock.blockIdx]
+      if (b) {
+        b.carried = false
+        b.x = Math.round(this.player.getCenterX() - b.w / 2)
+        b.y = this.groundY - b.h
+        b.vx = 0
+      }
+      this.heldDataBlock = null
+      this.hud.showMessage('DROP BLOCK — E', 1)
+      return true
+    }
+    const pcx = this.player.getCenterX()
+    const pcy = this.player.y + this.player.height / 2
+    let best: { sc: number; bi: number; d: number } | null = null
+    for (let si = 0; si < this.level.balanceScales.length; si++) {
+      const scale = this.level.balanceScales[si]!
+      if (scale.solved) continue
+      for (let bi = 0; bi < scale.blocks.length; bi++) {
+        const block = scale.blocks[bi]!
+        if (block.carried) continue
+        const bx = block.x + block.w / 2
+        const by = block.y + block.h / 2
+        const d = Math.hypot(bx - pcx, by - pcy)
+        if (d < 72 && (!best || d < best.d)) best = { sc: si, bi, d }
+      }
+    }
+    if (!best) return false
+    this.heldDataBlock = { scaleIdx: best.sc, blockIdx: best.bi }
+    this.level.balanceScales[best.sc]!.blocks[best.bi]!.carried = true
+    this.hud.showMessage('CARRYING BLOCK — E DROP', 2.2)
+    return true
+  }
+
   private syncL4Objective(): void {
     const g1 = this.level.gates.find(g => g.id === 1)?.open
     const g2 = this.level.gates.find(g => g.id === 2)?.open
     const g3 = this.level.gates.find(g => g.id === 3)?.open
     let obj: string
-    if (!g1) obj = 'GATE 1 — BALANCE SCALE (120 EACH SIDE)'
-    else if (!g2) obj = 'GATE 2 — TERMINAL QTE (E AT CONSOLE)'
-    else if (!g3) obj = 'GATE 3 — BALANCE SCALE (160 EACH SIDE)'
+    if (!g1) obj = 'GATE 1 — SCALE 120 / PAN'
+    else if (!g2) obj = 'GATE 2 — CONSOLE QTE (E)'
+    else if (!g3) obj = 'GATE 3 — SCALE 160 / PAN'
     else obj = 'REACH FACILITY EXIT PORTAL'
     this.hud.setObjective(obj)
   }
@@ -180,12 +249,14 @@ export class GameScene4 {
     })
   }
 
-  private triggerShake(m: number, d: number): void {
-    if (d <= 0) return
-    this.shakeMag = m
-    this.shakeDecay = m / d
-    this.shakeX = (Math.random() - 0.5) * m
-    this.shakeY = (Math.random() - 0.5) * m
+  /** Level 4 — keep view stable (no camera shake; enemies already convey impact). */
+  private triggerShake(_m: number, _d: number): void {
+    this.shakeMag = 0
+    this.shakeX = 0
+    this.shakeY = 0
+    this.shakeDecay = 0
+    void _m
+    void _d
   }
 
   private spawnFireDeath(x: number, y: number): void {
@@ -259,21 +330,19 @@ export class GameScene4 {
 
   private buildLockables(): LockableEnemy[] {
     const list: LockableEnemy[] = []
+    const pcx = this.player.getCenterX()
+    const pcy = this.player.y
     for (const d of this.level.drones) {
-      if (
-        !d.active ||
-        !(d as { activated?: boolean }).activated
-      )
-        continue
-      list.push(d)
+      if (!d.active || !(d as { activated?: boolean }).activated) continue
+      if (Math.hypot(d.x - pcx, (d.y + 10) - pcy) < 440) list.push(d)
     }
     for (const a of this.level.auditBots) {
       if (!a.active || !a.activated) continue
-      list.push({ x: a.x, y: a.y - 8, active: true })
+      if (Math.hypot(a.x - pcx, (a.y + 10) - pcy) < 440) list.push(a)
     }
     for (const s of this.level.swarms) {
       if (!s.active || !s.activated) continue
-      list.push({ x: s.x, y: s.y, active: true })
+      if (Math.hypot(s.x - pcx, (s.y + 10) - pcy) < 440) list.push(s)
     }
     return list
   }
@@ -329,6 +398,7 @@ export class GameScene4 {
       const pull = 200 * dt
       for (const sc of this.level.balanceScales) {
         for (const b of sc.blocks) {
+          if (b.carried) continue
           const cx = b.x + b.w / 2
           const cy = b.y + b.h / 2
           const dx = gf.x - cx
@@ -363,6 +433,15 @@ export class GameScene4 {
     }
   }
 
+  private spawnImpactBurst(wx: number, wy: number, proj: { color: string | null; empMode: boolean; prismMode: boolean; gravityMode: boolean }): void {
+    const c = proj.color ?? (proj.empMode ? '#7c4dff' : proj.prismMode ? '#e040fb' : proj.gravityMode ? '#00b4d8' : '#00e5ff')
+    for (let k = 0; k < 4; k++) {
+      const a = (k / 4) * Math.PI * 2
+      const speed = 80 + Math.random() * 40
+      this.particles.push({ x: wx, y: wy, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, life: 0.3, color: c, life0: 0.3 })
+    }
+  }
+
   private applyProjectileHits(): void {
     for (const proj of this.level.projectiles) {
       if (!proj.active) continue
@@ -372,24 +451,42 @@ export class GameScene4 {
         if (!rectsOverlap(d.getRect(), proj.getRect())) continue
         if (proj.empMode) d.stun(1.5)
         d.takeHit()
+        this.spawnImpactBurst(proj.x, proj.y, proj)
         proj.active = false
         break
       }
       if (!proj.active) continue
 
       for (const c of this.level.cameras) {
-        if (
-          !rectsOverlap(proj.getRect(), {
-            x: c.x - 20,
-            y: c.y - 10,
-            w: 40,
-            h: 40,
-          })
-        )
-          continue
+        if (!rectsOverlap(proj.getRect(), { x: c.x - 20, y: c.y - 10, w: 40, h: 40 })) continue
         if (proj.empMode) c.stun(1.5)
+        this.spawnImpactBurst(proj.x, proj.y, proj)
         proj.active = false
         break
+      }
+      if (!proj.active) continue
+
+      blockLoop: for (const sc of this.level.balanceScales) {
+        for (const b of sc.blocks) {
+          if (b.carried) continue
+          if (
+            !rectsOverlap(proj.getRect(), {
+              x: b.x,
+              y: b.y,
+              w: b.w,
+              h: b.h,
+            })
+          )
+            continue
+          const imp =
+            Math.abs(proj.vx) > 45
+              ? proj.vx * 0.88
+              : Math.sign(proj.vx || 1) * 300
+          b.vx += imp
+          this.spawnImpactBurst(proj.x, proj.y, proj)
+          proj.active = false
+          break blockLoop
+        }
       }
       if (!proj.active) continue
 
@@ -399,6 +496,7 @@ export class GameScene4 {
         if (proj.prismMode) continue
         if (proj.empMode) a.stun(3)
         else a.takeHit()
+        this.spawnImpactBurst(proj.x, proj.y, proj)
         proj.active = false
         break
       }
@@ -409,10 +507,16 @@ export class GameScene4 {
         for (const cr of sw.getCubeRects()) {
           if (!rectsOverlap(proj.getRect(), cr)) continue
           sw.hitCube(cr.idx)
+          this.spawnImpactBurst(proj.x, proj.y, proj)
           proj.active = false
           break swarmLoop
         }
       }
+    }
+
+    // Fix 7 — Remove deactivated projectiles immediately so render doesn't show hit ones
+    for (let i = this.level.projectiles.length - 1; i >= 0; i--) {
+      if (!this.level.projectiles[i]!.active) this.level.projectiles.splice(i, 1)
     }
   }
 
@@ -423,6 +527,17 @@ export class GameScene4 {
     this.damageFlashTimer = 0.4
     this.triggerShake(6, 0.35)
     if (this.hp <= 0) {
+      if (this.heldDataBlock) {
+        const sc = this.level.balanceScales[this.heldDataBlock.scaleIdx]
+        const b = sc?.blocks[this.heldDataBlock.blockIdx]
+        if (b) {
+          b.carried = false
+          b.x = Math.round(this.player.getCenterX() - b.w / 2)
+          b.y = this.groundY - b.h
+          b.vx = 0
+        }
+        this.heldDataBlock = null
+      }
       this.hud.showMessage('RESPAWNING', 2)
       this.hp = 3
       this.hud.setHP(3)
@@ -433,6 +548,18 @@ export class GameScene4 {
   }
 
   update(dt: number): void {
+    // Fix 10 — Level complete card blocks all other input
+    if (this.showLevelCompleteCard) {
+      this.time += dt
+      this.nova.update(dt)
+      this.hud.update(dt)
+      if (this.input.isJustPressed('Space')) {
+        this.onLevelComplete?.()
+      }
+      this.input.update()
+      return
+    }
+
     const prevCenterX = this.prevPlayerX
     this.time += dt
     this.nova.update(dt)
@@ -543,8 +670,12 @@ export class GameScene4 {
       this.player.width,
       this.player.height,
     )
-    if (gateBlock) {
-      this.player.x -= this.player.vx * dt * 2
+    if (gateBlock && !gateBlock.open) {
+      if (this.player.vx > 0) {
+        this.player.x = gateBlock.x - this.player.width - 1
+      } else if (this.player.vx < 0) {
+        this.player.x = gateBlock.x + gateBlock.w + 1
+      }
       this.player.vx = 0
     }
 
@@ -618,6 +749,8 @@ export class GameScene4 {
       if (npc && !npc.data.talked) {
         npc.data.talked = true
         this.talk(npc.data.dialogue as DialogueLine[])
+      } else {
+        this.tryToggleHeldDataBlock()
       }
     }
 
@@ -666,26 +799,20 @@ export class GameScene4 {
       this.hud.showMessage('GRAVITY BOLT — Z TO FIRE (COOLDOWN)', 2.8)
     }
 
-    this.lockables = this.buildLockables()
-    let nearest: LockableEnemy | null = null
-    let best = LOCK_RANGE
-    const pcx = this.player.getCenterX()
-    const pcy = this.player.y + this.player.height / 2
-    for (const e of this.lockables) {
-      const dist = Math.hypot(e.x - pcx, e.y - pcy)
-      if (dist < best) {
-        best = dist
-        nearest = e
-      }
-    }
-    this.lockTarget = nearest
+    // Fix 5 — Clear dead lock target first, then find nearest live enemy
+    if (this.lockTarget && !this.lockTarget.active) this.lockTarget = null
 
-    if (
-      this.input.isJustPressed('KeyQ') &&
-      this.lockables.length > 0
-    ) {
-      this.lockCycleIndex =
-        (this.lockCycleIndex + 1) % this.lockables.length
+    this.lockables = this.buildLockables()
+    if (!this.lockTarget && this.lockables.length > 0) {
+      this.lockTarget = this.lockables.reduce((nearest, e) => {
+        const dE = Math.hypot(e.x - this.player.getCenterX(), e.y - this.player.y)
+        const dN = Math.hypot(nearest.x - this.player.getCenterX(), nearest.y - this.player.y)
+        return dE < dN ? e : nearest
+      })
+    }
+
+    if (this.input.isJustPressed('KeyQ') && this.lockables.length > 0) {
+      this.lockCycleIndex = (this.lockCycleIndex + 1) % this.lockables.length
       this.lockTarget = this.lockables[this.lockCycleIndex] ?? null
     }
 
@@ -738,22 +865,26 @@ export class GameScene4 {
       }
     }
 
-    if (
-      this.damageTimer <= 0 &&
-      this.level.auditBots.some(a =>
-        a.active && a.checkShotHit(
-          this.player.x,
-          this.player.y,
-          this.player.width,
-          this.player.height,
-        ),
-      )
-    ) {
+    // Fix 6 — AuditBot shot damage (guards: active, i-frames, distance)
+    for (const a of this.level.auditBots) {
+      if (!a.active) continue
+      if (this.damageTimer > 0) break
+      if (!a.checkShotHit(this.player.x, this.player.y, this.player.width, this.player.height)) continue
+      if (Math.hypot(a.x - this.player.x, a.y - this.player.y) < 35) {
+        this.applyDamage(1)
+        this.hud.showMessage('SYSTEM DAMAGE — HP -1', 2, '#ff4444')
+        break
+      }
+      // Shot damage (can hit from any range)
       this.applyDamage(1)
+      this.hud.showMessage('SYSTEM DAMAGE — HP -1', 2, '#ff4444')
+      break
     }
 
+    // Fix 6 — Swarm scatter contact (guards: active, i-frames)
     for (const sw of this.level.swarms) {
-      if (this.damageTimer > 0) break
+      if (!sw.active) continue
+      if (this.damageTimer > 0) continue
       for (const r of sw.getScatterRects()) {
         if (
           rectsOverlap(r, {
@@ -764,10 +895,49 @@ export class GameScene4 {
           })
         ) {
           this.applyDamage(1)
+          this.hud.showMessage('SYSTEM DAMAGE — HP -1', 2, '#ff4444')
           break
         }
       }
     }
+
+    // Fix 2 — Drone detection with learning arc
+    {
+      let anyDetecting = false
+      for (const d of this.level.drones) {
+        if (!d.active || !(d as { activated?: boolean }).activated) continue
+        if (!d.isDetecting(this.player.getCenterX(), this.player.y + this.player.height / 2)) continue
+        anyDetecting = true
+        if (this.damageTimer <= 0) {
+          this.applyDamage(1)
+          this.hud.showMessage('DETECTED — AI LEARNING', 2, '#ff4444')
+        }
+        if (!this.detectionWarningShown) {
+          this.detectionWarningShown = true
+          if (!DialogueBox.hasFired('l4_drone_detect')) {
+            DialogueBox.markFired('l4_drone_detect')
+            this.talk([
+              { speaker: 'NOVA', text: 'That drone just learned your movement pattern. AI improves from every interaction.' },
+            ])
+          }
+          d.addScanBonus(0.2, 2)
+        }
+        this.detectionEndTimer = 3
+        break
+      }
+
+      if (!anyDetecting && this.prevDetecting) {
+        this.hud.showMessage('SCAN EVADED', 1.5, '#00ff88')
+      }
+      this.prevDetecting = anyDetecting
+
+      if (!anyDetecting && this.detectionWarningShown) {
+        this.detectionEndTimer = Math.max(0, this.detectionEndTimer - dt)
+        if (this.detectionEndTimer <= 0) this.detectionWarningShown = false
+      }
+    }
+
+    this.applyCarriedDataBlockPosition()
 
     this.level.update(
       dt,
@@ -783,32 +953,55 @@ export class GameScene4 {
     this.resolvePrismWallHits()
     this.applyProjectileHits()
 
+    // Fix 9C — Scale balanced rising-edge effects
+    for (let i = 0; i < this.level.balanceScales.length; i++) {
+      const sc = this.level.balanceScales[i]!
+      const nowBalanced = sc.isBalanced()
+      if (nowBalanced && !this.balancedFlags[i]) {
+        this.balancedFlags[i] = true
+        this.triggerShake(4, 0.4)
+        this.hud.showMessage('SCALE BALANCED — GATE OPEN', 3, '#00ff88')
+        for (let k = 0; k < 8; k++) {
+          const a = (k / 8) * Math.PI * 2
+          this.particles.push({
+            x: sc.x, y: sc.panSurfaceY - 48,
+            vx: Math.cos(a) * 100, vy: Math.sin(a) * 100,
+            life: 0.6, color: '#00ff88', life0: 0.6,
+          })
+        }
+        this.syncL4Objective()
+      } else if (!nowBalanced) {
+        this.balancedFlags[i] = false
+      }
+    }
+
     this.camera.follow(this.player.getCenterX(), LEVEL4_WORLD_WIDTH)
     this.nova.moveTo(this.player.x + 70, this.player.y - 30)
 
+    // Fix 10 — Level complete: both scales balanced + player past level end
     if (
-      !this.level.levelComplete &&
-      this.player.x > 9000 &&
-      this.level.exitPortal.open
+      !this.levelCompleteTriggered &&
+      this.level.scale1.isBalanced() &&
+      this.level.scale2.isBalanced() &&
+      this.player.x > this.level.levelEnd
     ) {
+      this.levelCompleteTriggered = true
       this.level.levelComplete = true
+      this.player.vx = 0
+      this.player.vy = 0
       this.talk(
         [
-          {
-            speaker: 'NOVA',
-            text: 'Bias Engine disabled. The weighted scales are evidence.',
-          },
-          {
-            speaker: 'NPC',
-            text: 'Take it. I cannot undo what I built. But you can expose it.',
-          },
-          {
-            speaker: 'KIRAN',
-            text: 'District 3. The Social Prediction Lab. That is where they use this data.',
-          },
-          { speaker: 'AX', text: 'Then that is where we go.' },
+          { speaker: 'NOVA', text: 'You balanced the scales. Literally and conceptually.' },
+          { speaker: 'AX',   text: 'NeuroCorps never ran this test on their real training data.' },
+          { speaker: 'NOVA', text: 'They knew what balanced data would show. They chose not to look.' },
+          { speaker: 'AX',   text: 'The Learning Forge is next. Where they turn this corrupted data into AI.' },
+          { speaker: 'NOVA', text: 'District 5. The Mirror Lab. Where bias gets reflected and amplified.' },
         ],
-        () => this.onLevelComplete?.(),
+        () => {
+          this.hud.addScore(500)
+          this.score += 500
+          this.showLevelCompleteCard = true
+        },
       )
     }
 
@@ -838,7 +1031,7 @@ export class GameScene4 {
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.globalAlpha = 1
     ctx.globalCompositeOperation = 'source-over'
-    ctx.fillStyle = '#e8e8f0'
+    ctx.fillStyle = '#070b14'
     ctx.fillRect(0, 0, 1280, 720)
 
     ctx.save()
@@ -882,13 +1075,22 @@ export class GameScene4 {
     this.hud.render(ctx, { deferControls: true })
     this.dialogue.render(ctx)
 
-    ctx.fillStyle = '#1a2030'
-    ctx.font = '8px Orbitron, sans-serif'
+    ctx.fillStyle = 'rgba(0,0,0,0.88)'
+    ctx.fillRect(0, 684, 1280, 36)
+    ctx.strokeStyle = 'rgba(0,181,216,0.35)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(0, 684.5)
+    ctx.lineTo(1280, 684.5)
+    ctx.stroke()
+    ctx.fillStyle = '#f1f5f9'
+    ctx.imageSmoothingEnabled = false
+    ctx.font = 'bold 11px Orbitron, sans-serif'
     ctx.textAlign = 'center'
     ctx.fillText(
-      '← → MOVE  ↑/SPACE JUMP  Z SHOOT  X WEAPON  Q TARGET  E INTERACT',
+      'ARROWS MOVE  ·  SPACE JUMP  ·  Z  ·  X  ·  Q  ·  E (CARRY/DROP)',
       640,
-      712,
+      706,
     )
     ctx.textAlign = 'left'
 
@@ -901,6 +1103,105 @@ export class GameScene4 {
       renderGateHackOverlay(ctx, this.gateHack, this.time)
 
     ctx.restore()
+
+    // Fix 10 — Level complete card (outside shake transform)
+    if (this.showLevelCompleteCard) {
+      this.renderLevelCompleteCard(ctx)
+    }
+  }
+
+  private renderLevelCompleteCard(ctx: CanvasRenderingContext2D): void {
+    const W = 1280, H = 720
+    ctx.setLineDash([])
+
+    // Base
+    ctx.fillStyle = 'rgba(0,0,0,0.92)'
+    ctx.fillRect(0, 0, W, H)
+
+    // Outer border
+    ctx.lineWidth = 3
+    ctx.strokeStyle = '#4a9eff'
+    ctx.strokeRect(40.5, 40.5, W - 81, H - 81)
+
+    // Inner accent border
+    ctx.lineWidth = 1
+    ctx.strokeStyle = 'rgba(0,229,255,0.3)'
+    ctx.strokeRect(50.5, 50.5, W - 101, H - 101)
+
+    ctx.textAlign = 'center'
+    ctx.imageSmoothingEnabled = false
+
+    // District label
+    ctx.font = '13px Orbitron, sans-serif'
+    ctx.fillStyle = '#4a9eff'
+    ctx.fillText('DISTRICT 4', W / 2, 180)
+
+    // Title
+    ctx.font = '24px Orbitron, sans-serif'
+    ctx.fillStyle = '#00e5ff'
+    ctx.fillText('TOOL TOWER — CLEARED', W / 2, 230)
+
+    // Red separator
+    ctx.lineWidth = 2
+    ctx.strokeStyle = '#ff3030'
+    ctx.beginPath(); ctx.moveTo(W / 2 - 200, 270); ctx.lineTo(W / 2 + 200, 270); ctx.stroke()
+
+    // XP
+    ctx.font = '20px Orbitron, sans-serif'
+    ctx.fillStyle = '#ffcc00'
+    ctx.fillText('+ 500 XP', W / 2, 320)
+
+    // Lesson lines
+    ctx.font = '11px Orbitron, sans-serif'
+    ctx.fillStyle = '#ffffff'
+    ctx.fillText('Give AI a task too vague and it becomes everything.', W / 2, 360)
+    ctx.font = '10px Orbitron, sans-serif'
+    ctx.fillStyle = '#94a3b8'
+    ctx.fillText('Give it a specific purpose and it becomes useful.', W / 2, 385)
+
+    // Progress badges
+    const badges = [
+      { label: 'SCALE 1', done: this.level.scale1.isBalanced() },
+      { label: 'SCALE 2', done: this.level.scale2.isBalanced() },
+      { label: 'ARCHIVE', done: this.level.gates.find(g => g.id === 3)?.open ?? false },
+    ]
+    const badgeCenters = [W / 2 - 100, W / 2, W / 2 + 100]
+    for (let i = 0; i < badges.length; i++) {
+      const bx = badgeCenters[i]! - 45
+      const by = 430
+      ctx.fillStyle = badges[i]!.done ? '#00ff88' : '#1e293b'
+      ctx.fillRect(bx, by, 90, 80)
+      ctx.lineWidth = 2
+      ctx.strokeStyle = badges[i]!.done ? '#00ff88' : '#334155'
+      ctx.strokeRect(bx + 1, by + 1, 88, 78)
+      ctx.font = '10px Orbitron, sans-serif'
+      ctx.fillStyle = badges[i]!.done ? '#001a0a' : '#475569'
+      ctx.fillText(badges[i]!.label, badgeCenters[i]!, by + 35)
+      if (badges[i]!.done) {
+        ctx.font = '20px Orbitron, sans-serif'
+        ctx.fillText('✓', badgeCenters[i]!, by + 60)
+      }
+    }
+
+    // Danger stripe
+    ctx.fillStyle = 'rgba(255,40,40,0.3)'
+    ctx.fillRect(40, 620, 1200, 20)
+
+    // Space prompt (pulsing)
+    const pulse = 0.6 + 0.4 * Math.abs(Math.sin(this.time * 3))
+    ctx.globalAlpha = pulse
+    ctx.font = '11px Orbitron, sans-serif'
+    ctx.fillStyle = '#00e5ff'
+    ctx.fillText('[SPACE] CONTINUE TO DISTRICT 5', W / 2, 560)
+    ctx.globalAlpha = 1
+
+    // Scanlines
+    ctx.fillStyle = 'rgba(0,0,0,0.04)'
+    for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 1)
+
+    ctx.textAlign = 'left'
+    ctx.globalAlpha = 1
+    ctx.globalCompositeOperation = 'source-over'
   }
 
 }

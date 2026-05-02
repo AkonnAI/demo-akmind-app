@@ -74,6 +74,7 @@ export class Level4 {
   readonly evidencePedestalY: number
 
   private time = 0
+  private playerX = 0
 
   constructor(groundY: number) {
     this.groundY = groundY
@@ -90,19 +91,19 @@ export class Level4 {
     })
 
     this.balanceScales = [
-      createBalanceScale(0, 2400, GY, 120, 1, [
-        { weight: 40, label: 'D1: 40', spawnX: 2080 },
-        { weight: 80, label: 'D2: 80', spawnX: 2140 },
-        { weight: 40, label: 'D1: 40', spawnX: 2620 },
-        { weight: 80, label: 'D3: 80', spawnX: 2680 },
+      createBalanceScale(0, 1150, GY, 120, 1, [
+        { weight: 40, label: '40', spawnX: 930 },
+        { weight: 80, label: '80', spawnX: 990 },
+        { weight: 40, label: '40', spawnX: 1370 },
+        { weight: 80, label: '80', spawnX: 1430 },
       ]),
       createBalanceScale(1, 6800, GY, 160, 3, [
-        { weight: 80, label: 'D2: 80', spawnX: 6520 },
-        { weight: 80, label: 'D3: 80', spawnX: 6580 },
-        { weight: 40, label: 'D1: 40', spawnX: 7040 },
-        { weight: 40, label: 'D1: 40', spawnX: 7100 },
-        { weight: 80, label: 'D2: 80', spawnX: 6640 },
-        { weight: 40, label: 'D1: 40', spawnX: 7000 },
+        { weight: 80, label: '80', spawnX: 6520 },
+        { weight: 80, label: '80', spawnX: 6580 },
+        { weight: 40, label: '40', spawnX: 7040 },
+        { weight: 40, label: '40', spawnX: 7100 },
+        { weight: 80, label: '80', spawnX: 6640 },
+        { weight: 40, label: '40', spawnX: 7000 },
       ]),
     ]
 
@@ -312,6 +313,7 @@ export class Level4 {
   }
 
   private buildSectionTriggers(): void {
+    const target2 = this.balanceScales[1]?.target ?? 160
     this.sectionTriggers = [
       {
         key: 'l4_sec280',
@@ -322,6 +324,46 @@ export class Level4 {
             speaker: 'NOVA',
             text: 'NeuroCorps data facility. Everything here runs the algorithm.',
           },
+        ],
+      },
+      // Scale room 1 — before Sector A gate (gate 1 at x=2000)
+      {
+        key: 'L4_SCALE1_TUT',
+        x: 920,
+        fired: false,
+        dialogue: [
+          {
+            speaker: 'NOVA',
+            text: 'Balance scale. Those dark blocks are Data Blocks — each label shows its weight.',
+          },
+          {
+            speaker: 'NOVA',
+            text: 'Press E near a block to carry it, or Z to shoot and slide it onto the pans — the small platforms on each arm.',
+          },
+          {
+            speaker: 'NOVA',
+            text: 'Match the LEFT and RIGHT pan totals to the target shown above — 120 on each side here.',
+          },
+          { speaker: 'AX',   text: 'Equal weight on both sides. Like balanced training data.' },
+          { speaker: 'NOVA', text: 'Exactly. Unequal data in, unequal decisions out. Balance it.' },
+        ],
+      },
+      // Approaching Sector A gate after the first scale
+      {
+        key: 'L4_SECTORA_TUT',
+        x: 1780,
+        fired: false,
+        dialogue: [
+          {
+            speaker: 'NOVA',
+            text: 'The sector gate opens only when the scale reads equal — both pans at the target weight.',
+          },
+          {
+            speaker: 'NOVA',
+            text: 'NeuroCorps trained their models on imbalance until imbalance looked normal.',
+          },
+          { speaker: 'AX',  text: 'So they never balanced their scales.' },
+          { speaker: 'NOVA', text: 'Never. And the algorithm learned that skew was the default.' },
         ],
       },
       {
@@ -335,6 +377,23 @@ export class Level4 {
           },
         ],
       },
+      // Fix 10 — Scale Room 2 entry (just past gate 2 at x=5200)
+      {
+        key: 'L4_SCALE2_TUT',
+        x: 5250,
+        fired: false,
+        dialogue: [
+          { speaker: 'NOVA', text: 'Second scale. Heavier blocks — larger weight values.' },
+          {
+            speaker: 'NOVA',
+            text: `Same mechanic. Balance both pans to ${target2} each.`,
+          },
+          {
+            speaker: 'NOVA',
+            text: 'Solve this and the Archive unlocks. The evidence is right behind it.',
+          },
+        ],
+      },
       {
         key: 'l4_sec5300',
         x: 5300,
@@ -343,6 +402,30 @@ export class Level4 {
           {
             speaker: 'AX',
             text: 'The weights are wrong. They were always wrong.',
+          },
+        ],
+      },
+      // Fix 8 System B — Archive gate approach dialogue (200px before gate 3 at x=7200)
+      {
+        key: 'L4_ARCHIVE_HINT',
+        x: 7000,
+        fired: false,
+        dialogue: [
+          {
+            speaker: 'NOVA',
+            text: 'The Archive gate. It holds the original District 1 income dataset — before it was manipulated.',
+          },
+          {
+            speaker: 'NOVA',
+            text: 'But it requires both balance scales to be solved first. Complete Scale Room 2 to unlock the Archive.',
+          },
+          {
+            speaker: 'AX',
+            text: "They hid the evidence behind their own test. That's almost elegant.",
+          },
+          {
+            speaker: 'NOVA',
+            text: 'Almost. Solve the second scale and the Archive opens automatically.',
           },
         ],
       },
@@ -407,6 +490,10 @@ export class Level4 {
     if (this.gates.every(x => x.open)) this.exitPortal.open = true
   }
 
+  get scale1(): BalanceScale { return this.balanceScales[0]! }
+  get scale2(): BalanceScale { return this.balanceScales[1]! }
+  get scaleRoom2Gate(): Gate { return this.gates.find(g => g.id === 2)! }
+
   getNearNPC(cx: number): NPC | null {
     for (const n of this.npcs) if (n.isNear(cx)) return n
     return null
@@ -437,17 +524,28 @@ export class Level4 {
   ): number | null {
     if (vy < 0) return null
     const feet = py + ph
-    if (vy >= 0) {
-      for (const pl of this.platforms) {
-        if (
-          px + pw > pl.x &&
-          px < pl.x + pl.w &&
-          feet >= pl.y &&
-          feet <= pl.y + pl.h + 10 &&
-          py < pl.y + 5
-        ) {
-          return pl.y - ph
-        }
+    for (const pl of this.platforms) {
+      if (
+        px + pw > pl.x &&
+        px < pl.x + pl.w &&
+        feet >= pl.y &&
+        feet <= pl.y + pl.h + 10 &&
+        py < pl.y + 5
+      ) {
+        return pl.y - ph
+      }
+    }
+    // Gate tops act as one-way platforms
+    for (const g of this.gates) {
+      if (g.open) continue
+      if (
+        px + pw > g.x &&
+        px < g.x + g.w &&
+        vy >= 0 &&
+        feet <= g.y + 12 &&
+        feet >= g.y - 5
+      ) {
+        return g.y - ph
       }
     }
     return null
@@ -461,10 +559,11 @@ export class Level4 {
   ): Gate | null {
     for (const g of this.gates) {
       if (g.open) continue
+      // Shrink collision box 8px from top so standing on the gate top doesn't trigger pushback
       if (
         ax + aw > g.x &&
         ax < g.x + g.w + 16 &&
-        ay + ah > g.y &&
+        ay + ah > g.y + 8 &&
         ay < g.y + g.h
       )
         return g
@@ -553,8 +652,8 @@ export class Level4 {
     pvx: number,
   ): void {
     this.time += dt
+    this.playerX = playerX + pW / 2
     this.weaponCrate.update(dt)
-    this.syncScaleGates()
 
     const pcx = playerX + pW / 2
     const pcy = playerY + pH / 2
@@ -571,6 +670,17 @@ export class Level4 {
       this.platforms,
       LEVEL4_WORLD_WIDTH,
     )
+
+    // After physics: open sector gates linked to solved scales (same frame as trySolve)
+    this.syncScaleGates()
+
+    // Fix 10 Part A — Scale Room 2 gate opens when Scale 1 is tolerance-balanced
+    const srg2 = this.scaleRoom2Gate
+    if (srg2 && !srg2.open && this.scale1.isBalanced()) {
+      srg2.open = true
+      srg2.hacked = true
+      this.refreshExitPortal()
+    }
 
     for (const d of this.drones) {
       const dg = d as Drone & { activated?: boolean }
@@ -599,114 +709,201 @@ export class Level4 {
     }
   }
 
+  private renderProximityHints(ctx: CanvasRenderingContext2D, cameraX: number): void {
+    const pcx = this.playerX
+
+    // Fix 8 System A — Archive gate floating hint
+    const archiveGate = this.gates.find(g => g.id === 3)
+    if (archiveGate && !archiveGate.open &&
+        Math.abs(pcx - (archiveGate.x + archiveGate.w / 2)) < 200) {
+      const hx = archiveGate.x - cameraX + 20
+      const hy = archiveGate.y - 40
+      const alpha = 0.7 + 0.3 * Math.sin(this.time * 3)
+      ctx.save()
+      ctx.globalAlpha = alpha
+      ctx.fillStyle = 'rgba(0,0,0,0.8)'
+      ctx.fillRect(hx - 80, hy - 16, 160, 32)
+      ctx.lineWidth = 1
+      ctx.strokeStyle = '#4a9eff'
+      ctx.strokeRect(hx - 80 + 0.5, hy - 15.5, 159, 31)
+      ctx.font = '9px Orbitron, sans-serif'
+      ctx.fillStyle = '#00e5ff'
+      ctx.textAlign = 'center'
+      ctx.fillText('[E] ACCESS ARCHIVE', hx, hy + 4)
+      ctx.textAlign = 'left'
+      ctx.globalAlpha = 1
+      ctx.restore()
+    }
+
+    // Fix 10 Part A — Scale Room 2 "SCALE 1 REQUIRED" hint (150px before gate 2)
+    const g2 = this.gates.find(g => g.id === 2)
+    if (g2 && !g2.open && !this.scale1.isBalanced()) {
+      const gsx = g2.x - cameraX
+      if (gsx > -300 && gsx < CONFIG.CANVAS_WIDTH + 300 && pcx > g2.x - 150) {
+        const hx = g2.x - cameraX + 20
+        const hy = g2.y - 40
+        const alpha = 0.7 + 0.3 * Math.sin(this.time * 3)
+        ctx.save()
+        ctx.globalAlpha = alpha
+        ctx.fillStyle = 'rgba(0,0,0,0.8)'
+        ctx.fillRect(hx - 80, hy - 16, 160, 32)
+        ctx.lineWidth = 1
+        ctx.strokeStyle = '#ff9100'
+        ctx.strokeRect(hx - 80 + 0.5, hy - 15.5, 159, 31)
+        ctx.font = '9px Orbitron, sans-serif'
+        ctx.fillStyle = '#ff9100'
+        ctx.textAlign = 'center'
+        ctx.fillText('SCALE 1 REQUIRED', hx, hy + 4)
+        ctx.textAlign = 'left'
+        ctx.globalAlpha = 1
+        ctx.restore()
+      }
+    }
+  }
+
   private renderBackground(ctx: CanvasRenderingContext2D, cameraX: number): void {
     const W = CONFIG.CANVAS_WIDTH
     const H = CONFIG.CANVAS_HEIGHT
     const GY = this.groundY
+    const time = this.time
+
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.globalAlpha = 1
     ctx.globalCompositeOperation = 'source-over'
+    ctx.setLineDash([])
 
-    ctx.fillStyle = '#e8eaf0'
-    ctx.fillRect(0, 0, W, GY)
+    // LAYER 1 — Dark facility sky (Level 2–style mood, not clinical white)
+    const sky = ctx.createLinearGradient(0, 0, 0, 720)
+    sky.addColorStop(0, '#05030e')
+    sky.addColorStop(0.45, '#0c0520')
+    sky.addColorStop(1, '#120828')
+    ctx.fillStyle = sky
+    ctx.fillRect(0, 0, W, H)
 
-    for (let wx = 0; wx < LEVEL4_WORLD_WIDTH; wx += 720) {
-      const sx = wx - cameraX * 0.04
-      if (sx < -200 || sx > W + 200) continue
-      const th = 200 + (wx % 300)
-      ctx.fillStyle = '#c8ccd8'
-      ctx.fillRect(sx, GY - th, 90, th)
-      for (let wy = GY - th + 24; wy < GY - 8; wy += 24) {
-        for (let ix = 8; ix < 80; ix += 24) {
-          ctx.fillStyle = '#00b4d833'
-          ctx.fillRect(sx + ix, wy, 4, 4)
+    // Subtle vignette
+    const vig = ctx.createRadialGradient(W * 0.5, H * 0.35, 120, W * 0.5, H * 0.5, 520)
+    vig.addColorStop(0, 'rgba(0,0,0,0)')
+    vig.addColorStop(1, 'rgba(0,0,0,0.45)')
+    ctx.fillStyle = vig
+    ctx.fillRect(0, 0, W, H)
+
+    // LAYER 2 — Dim grid (readable, not bright)
+    ctx.lineWidth = 0.5
+    ctx.strokeStyle = 'rgba(0, 180, 255, 0.06)'
+    for (let y = 0; y < H; y += 48) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
+    }
+    for (let x = 0; x < W; x += 80) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke()
+    }
+
+    // LAYER 3 — Far towers as dark silhouettes
+    const towerXs =  [200, 1140, 2080, 3020, 3960, 4900, 5840, 6780, 7720, 8660]
+    const towerWs =  [160,  140,  200,  180,  160,  200,  140,  180,  160,  200]
+    const towerHs =  [380,  460,  300,  500,  380,  420,  340,  480,  360,  440]
+    for (let i = 0; i < towerXs.length; i++) {
+      const tx = towerXs[i]! - cameraX * 0.1
+      if (tx < -200 || tx > 1480) continue
+      const tw = towerWs[i]!
+      const th = towerHs[i]!
+      ctx.fillStyle = 'rgba(8, 10, 22, 0.92)'
+      ctx.fillRect(tx, 0, tw, th)
+      ctx.lineWidth = 1
+      ctx.strokeStyle = 'rgba(0, 180, 255, 0.12)'
+      ctx.strokeRect(tx + 0.5, 0.5, tw - 1, th - 1)
+    }
+
+    // LAYER 4 — Mid panels (muted, recessed)
+    const panelXs = [300, 2100, 4000, 5800, 7200, 8400]
+    for (const pwx of panelXs) {
+      const px = pwx - cameraX * 0.4
+      if (px < -300 || px > W + 300) continue
+      ctx.fillStyle = 'rgba(15, 18, 32, 0.85)'
+      ctx.fillRect(px, 80, 300, 250)
+      ctx.lineWidth = 1
+      ctx.strokeStyle = 'rgba(0, 181, 216, 0.2)'
+      ctx.strokeRect(px + 1, 81, 298, 248)
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          const sx2 = px + 20 + col * 80
+          const sy2 = 100 + row * 60
+          ctx.fillStyle = 'rgba(0, 80, 140, 0.12)'
+          ctx.fillRect(sx2, sy2, 40, 30)
+          ctx.lineWidth = 1
+          ctx.strokeStyle = 'rgba(0, 181, 216, 0.15)'
+          ctx.strokeRect(sx2 + 0.5, sy2 + 0.5, 39, 29)
         }
       }
     }
-    const tallSx = 4200 - cameraX * 0.04
-    if (tallSx > -120 && tallSx < W + 120) {
-      ctx.fillStyle = '#b8bcc8'
-      ctx.fillRect(tallSx, GY - 420, 110, 420)
-      ctx.strokeStyle = '#00b4d8'
-      ctx.lineWidth = 2
-      ctx.strokeRect(tallSx + 0.5, GY - 420.5, 109, 419)
-      ctx.fillStyle = '#00b4d8'
-      ctx.font = 'bold 10px Orbitron, sans-serif'
-      ctx.fillText('N', tallSx + 55, GY - 380)
-    }
 
-    for (let wx = 0; wx < LEVEL4_WORLD_WIDTH; wx += 520) {
-      const sx = wx - cameraX * 0.12
-      if (sx < -180 || sx > W + 180) continue
-      ctx.fillStyle = '#d0d4e0'
-      ctx.fillRect(sx, GY - 260, 140, 260)
-      for (let fy = GY - 250; fy < GY - 20; fy += 32) {
-        ctx.strokeStyle = '#b8bcc8'
-        ctx.lineWidth = 0.5
-        ctx.beginPath()
-        ctx.moveTo(sx + 4, fy)
-        ctx.lineTo(sx + 136, fy)
-        ctx.stroke()
-      }
-      ctx.fillStyle = '#00b4d822'
-      ctx.fillRect(sx + 20, GY - 200, 36, 120)
-    }
-
-    for (let wx = 0; wx < LEVEL4_WORLD_WIDTH; wx += 640) {
-      const sx = wx - cameraX * 0.25
-      if (sx < -200 || sx > W + 200) continue
-      ctx.fillStyle = '#c0c4d0'
-      ctx.fillRect(sx, GY - 180, 100, 100)
-      for (let led = 0; led < 4; led++) {
-        const on = (this.time + led + wx * 0.01) % 1.4 < 0.7
-        ctx.fillStyle = on ? '#00b4d8' : '#1a2030'
-        ctx.fillRect(sx + 12 + led * 18, GY - 160, 6, 6)
-      }
-    }
-
-    for (let wx = 0; wx < LEVEL4_WORLD_WIDTH; wx += 80) {
-      const sx = wx - cameraX * 0.5
-      if (sx < -20 || sx > W + 20) continue
-      ctx.strokeStyle = '#a0a4b0'
-      ctx.lineWidth = 0.5
+    // LAYER 5 — Hazard strip at walkway (cyan-red accent)
+    const stripY = GY - 2
+    ctx.lineWidth = 2
+    ctx.strokeStyle = 'rgba(255, 60, 80, 0.45)'
+    ctx.beginPath(); ctx.moveTo(0, stripY); ctx.lineTo(W, stripY); ctx.stroke()
+    const diagOffset = -(cameraX % 120)
+    for (let i = -1; i < Math.ceil(W / 120) + 2; i++) {
+      const dx = diagOffset + i * 120
+      if (dx < -20 || dx > W + 20) continue
+      ctx.fillStyle = '#c41e3a'
       ctx.beginPath()
-      ctx.moveTo(sx, GY - 40)
-      ctx.lineTo(sx + 14, GY - 10)
-      ctx.stroke()
-      ctx.beginPath()
-      ctx.moveTo(sx + 14, GY - 40)
-      ctx.lineTo(sx, GY - 10)
-      ctx.stroke()
-      if (wx % 400 === 0) {
-        ctx.fillStyle = '#ff1744'
-        ctx.beginPath()
-        ctx.moveTo(sx + 7, GY - 52)
-        ctx.lineTo(sx - 2, GY - 40)
-        ctx.lineTo(sx + 16, GY - 40)
-        ctx.closePath()
-        ctx.fill()
-      }
+      ctx.moveTo(dx,     stripY - 7)
+      ctx.lineTo(dx + 7, stripY)
+      ctx.lineTo(dx,     stripY + 7)
+      ctx.lineTo(dx - 7, stripY)
+      ctx.closePath()
+      ctx.fill()
     }
 
-    ctx.fillStyle = '#c8ccd8'
+    // Walk deck (standing surface over the lower pit)
+    ctx.fillStyle = '#151b2b'
+    ctx.fillRect(0, GY - 14, W, 14)
+    ctx.strokeStyle = 'rgba(0, 181, 216, 0.4)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(0, GY)
+    ctx.lineTo(W, GY)
+    ctx.stroke()
+
+    // LAYER 6 — Floor depth (dark pit below deck)
+    ctx.fillStyle = '#06080f'
     ctx.fillRect(0, GY, W, H - GY)
-    ctx.strokeStyle = '#a8aab8'
     ctx.lineWidth = 0.5
-    const gxOff = -(cameraX * 0.06) % 64
-    for (let gx = gxOff - 64; gx < W + 64; gx += 64) {
-      ctx.beginPath()
-      ctx.moveTo(gx, GY)
-      ctx.lineTo(gx, H)
-      ctx.stroke()
+    ctx.strokeStyle = 'rgba(0, 181, 216, 0.08)'
+    for (let fy = GY + 20; fy < H; fy += 20) {
+      ctx.beginPath(); ctx.moveTo(0, fy); ctx.lineTo(W, fy); ctx.stroke()
     }
-    for (let gy = GY + 48; gy < H; gy += 48) {
-      ctx.beginPath()
-      ctx.moveTo(0, gy)
-      ctx.lineTo(W, gy)
-      ctx.stroke()
+    const floorVOff = -(cameraX * 0.06) % 80
+    ctx.strokeStyle = 'rgba(0, 181, 216, 0.06)'
+    for (let fx = floorVOff - 80; fx < W + 80; fx += 80) {
+      ctx.beginPath(); ctx.moveTo(fx, GY); ctx.lineTo(fx, H); ctx.stroke()
+      for (let gy2 = GY + 80; gy2 < H; gy2 += 80) {
+        ctx.fillStyle = 'rgba(0, 120, 180, 0.08)'
+        ctx.beginPath(); ctx.arc(fx, gy2, 2.5, 0, Math.PI * 2); ctx.fill()
+      }
     }
-    ctx.fillStyle = '#00b4d811'
-    ctx.fillRect(0, GY, W, 8)
+
+    // LAYER 7 — Ceiling duct (dark)
+    ctx.fillStyle = 'rgba(8, 10, 24, 0.95)'
+    ctx.fillRect(0, 0, W, 50)
+    ctx.lineWidth = 1
+    ctx.strokeStyle = 'rgba(0, 181, 216, 0.18)'
+    ctx.beginPath(); ctx.moveTo(0, 50); ctx.lineTo(W, 50); ctx.stroke()
+    for (let lx = 0; lx < W; lx += 160) {
+      ctx.lineWidth = 1
+      ctx.strokeStyle = 'rgba(0, 181, 216, 0.12)'
+      ctx.beginPath(); ctx.moveTo(lx, 50); ctx.lineTo(lx, 72); ctx.stroke()
+      ctx.fillStyle = 'rgba(0, 181, 216, 0.15)'
+      ctx.beginPath(); ctx.arc(lx, 72, 5, 0, Math.PI * 2); ctx.fill()
+    }
+
+    // LAYER 8 — Slow scan line (subtle)
+    const pulseY = (time * 60) % 720
+    ctx.fillStyle = 'rgba(0, 181, 216, 0.04)'
+    ctx.fillRect(0, pulseY, W, 2)
+
+    ctx.globalAlpha = 1
+    ctx.globalCompositeOperation = 'source-over'
   }
 
   private renderPlatforms(ctx: CanvasRenderingContext2D, cameraX: number): void {
@@ -714,14 +911,15 @@ export class Level4 {
       const sx = p.x - cameraX
       if (sx + p.w < -20 || sx > CONFIG.CANVAS_WIDTH + 20) continue
       ctx.save()
-      ctx.fillStyle = 'rgba(0,0,0,0.1)'
+      ctx.imageSmoothingEnabled = false
+      ctx.fillStyle = 'rgba(0,0,0,0.45)'
       ctx.fillRect(sx + 2, p.y + 6, p.w - 4, p.h + 4)
-      ctx.fillStyle = '#d0d4e0'
+      ctx.fillStyle = '#1c2538'
       ctx.fillRect(sx, p.y, p.w, p.h)
       ctx.fillStyle = ACCENT
       ctx.fillRect(sx, p.y, p.w, 4)
       for (const cx of [sx + 4, sx + p.w - 4]) {
-        ctx.fillStyle = '#a8b0c0'
+        ctx.fillStyle = '#4a5a70'
         ctx.beginPath()
         ctx.arc(cx, p.y + 4, 2.5, 0, Math.PI * 2)
         ctx.fill()
@@ -739,7 +937,7 @@ export class Level4 {
     ctx.fillRect(sx - 24, this.evidencePedestalY - 32, 48, 32)
     ctx.strokeStyle = ACCENT
     ctx.strokeRect(sx - 24 + 0.5, this.evidencePedestalY - 32.5, 47, 31)
-    ctx.font = '7px Orbitron, sans-serif'
+    ctx.font = 'bold 10px Orbitron, sans-serif'
     ctx.fillStyle = ACCENT
     ctx.textAlign = 'center'
     ctx.fillText('EVIDENCE', sx, this.evidencePedestalY - 40)
@@ -759,9 +957,18 @@ export class Level4 {
       ctx.lineWidth = 3
       ctx.fillRect(sx, g.y, g.w, g.h)
       ctx.strokeRect(sx + 0.5, g.y + 0.5, g.w - 1, g.h - 1)
-      ctx.fillStyle = '#0a1420'
-      ctx.font = '6px Orbitron, sans-serif'
-      ctx.fillText(g.label, sx + 2, g.y + g.h / 2)
+      ctx.fillStyle = '#e8f0ff'
+      ctx.imageSmoothingEnabled = false
+      ctx.font = 'bold 11px Orbitron, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.save()
+      ctx.translate(sx + g.w / 2, g.y + g.h / 2)
+      ctx.rotate(-Math.PI / 2)
+      ctx.fillText(g.label, 0, 0)
+      ctx.restore()
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'alphabetic'
       ctx.restore()
 
       if (g.mechanic === 'qte') {
@@ -850,6 +1057,7 @@ export class Level4 {
     this.renderEvidence(ctx, cameraX)
     this.weaponCrate.render(ctx, cameraX)
     this.renderGates(ctx, cameraX)
+    this.renderProximityHints(ctx, cameraX)
     for (const p of this.projectiles) p.render(ctx, cameraX)
     this.renderCheckpoints(ctx, cameraX)
     this.renderExit(ctx, cameraX)

@@ -25,6 +25,12 @@ export class Drone {
   private hitTimer = 0
   private stunTimer = 0
 
+  // Scan learning bonus
+  scanBonus = 0
+  private scanBonusTimer = 0
+  private scanBonusInitial = 0
+  private scanBonusDuration = 1
+
   constructor(
     x: number, y: number,
     patrolLeft: number, patrolRight: number,
@@ -42,10 +48,26 @@ export class Drone {
     this.stunTimer = duration
   }
 
+  addScanBonus(amount: number, duration: number): void {
+    this.scanBonus = amount
+    this.scanBonusInitial = amount
+    this.scanBonusDuration = duration
+    this.scanBonusTimer = duration
+  }
+
   update(dt: number): void {
     if (!this.active) return
     this.time += dt
     this.hitTimer = Math.max(0, this.hitTimer - dt)
+    if (this.scanBonusTimer > 0) {
+      this.scanBonusTimer -= dt
+      if (this.scanBonusTimer <= 0) {
+        this.scanBonus = 0
+        this.scanBonusTimer = 0
+      } else {
+        this.scanBonus = this.scanBonusInitial * (this.scanBonusTimer / this.scanBonusDuration)
+      }
+    }
     if (this.stunTimer > 0) {
       this.stunTimer -= dt
       return
@@ -78,7 +100,7 @@ export class Drone {
     const angleToAX = Math.atan2(dy, dx)
     const coneCenter = Math.PI / 2  // pointing down
     const diff = Math.abs(angleToAX - coneCenter)
-    return diff < this.SCAN_HALF_ANGLE + Math.abs(this.scanAngle)
+    return diff < this.SCAN_HALF_ANGLE + this.scanBonus + Math.abs(this.scanAngle)
   }
 
   takeHit(): void {

@@ -9,6 +9,9 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 const CONFETTI_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#a855f7"];
 const LANDING_URL = process.env.NEXT_PUBLIC_LANDING_URL ?? "https://www.akmind.com";
+const FULL_COURSE_LINE = "Full course launching June 2026";
+const STAY_TUNED_LINE = "Stay tuned for more updates.";
+
 const CONFETTI_PIECES = Array.from({ length: 20 }, (_, i) => ({
   left: `${(i * 4.7 + ((i * 11) % 9)) % 100}%`,
   duration: 2.6 + (i % 6) * 0.35,
@@ -17,8 +20,6 @@ const CONFETTI_PIECES = Array.from({ length: 20 }, (_, i) => ({
   dx: `${((i % 9) - 4) * 18}px`,
   spin: `${540 + (i % 6) * 120}deg`,
 }));
-
-type PaymentMethod = "upi" | "card" | "netbank" | "emi";
 
 function readCookieToken(): string | null {
   if (typeof document === "undefined") return null;
@@ -35,13 +36,7 @@ function CompletePageInner() {
   const [bootStatus, setBootStatus] = useState<"loading" | "ready" | "noop">(
     "loading"
   );
-  const [showPayment, setShowPayment] = useState(false);
   const [badgeDownloading, setBadgeDownloading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [fullName, setFullName] = useState("");
-  const [emailInput, setEmailInput] = useState("");
-  const [phoneInput, setPhoneInput] = useState("");
 
   const loadUser = useCallback(
     async (t: string) => {
@@ -60,9 +55,6 @@ function CompletePageInner() {
           return;
         }
         setUser(data);
-        setFullName(data.name || "");
-        setEmailInput(data.email || "");
-        setPhoneInput(data.phone || "");
         setBootStatus("ready");
       } catch {
         setUser(null);
@@ -88,76 +80,82 @@ function CompletePageInner() {
     setBadgeDownloading(true);
     try {
       const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-      doc.setFillColor(79, 70, 229);
+      doc.setFillColor(15, 23, 42);
       doc.rect(0, 0, 297, 210, "F");
+      doc.setFillColor(79, 70, 229);
+      doc.roundedRect(14, 14, 269, 182, 6, 6, "F");
       doc.setFillColor(255, 255, 255);
-      doc.roundedRect(20, 20, 257, 170, 8, 8, "F");
+      doc.roundedRect(18, 18, 261, 174, 5, 5, "F");
+      doc.setDrawColor(34, 211, 238);
+      doc.setLineWidth(0.8);
+      doc.roundedRect(22, 22, 253, 166, 4, 4, "S");
       doc.setDrawColor(79, 70, 229);
-      doc.setLineWidth(2);
-      doc.roundedRect(20, 20, 257, 170, 8, 8, "S");
-      doc.setFontSize(28);
+      doc.setLineWidth(1.2);
+      doc.roundedRect(18, 18, 261, 174, 5, 5, "S");
+
+      doc.setFontSize(26);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(79, 70, 229);
-      doc.text("AKMIND", 148, 50, { align: "center" });
-      doc.setFontSize(11);
+      doc.text("AKMIND", 148, 44, { align: "center" });
+      doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
-      doc.text("Dream. Discover. Shine.", 148, 60, { align: "center" });
-      doc.setFontSize(22);
+      doc.text("Dream. Discover. Shine.", 148, 52, { align: "center" });
+
+      doc.setFontSize(20);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 41, 59);
-      doc.text("AI EXPLORER DEMO CERTIFICATE", 148, 85, { align: "center" });
-      doc.setFontSize(13);
+      doc.text("AI EXPLORER — DEMO CERTIFICATE", 148, 74, { align: "center" });
+
+      doc.setFontSize(12);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(71, 85, 105);
-      doc.text("This certifies that", 148, 105, { align: "center" });
-      doc.setFontSize(24);
+      doc.text("This certifies that", 148, 92, { align: "center" });
+      doc.setFontSize(22);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(79, 70, 229);
-      doc.text(user.childName || "Student", 148, 120, { align: "center" });
-      doc.setFontSize(12);
+      doc.text(user.childName || "Student", 148, 106, { align: "center" });
+
+      doc.setFontSize(11);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(71, 85, 105);
       doc.text(
         "has successfully completed the AKMIND AI Explorers Demo Program",
         148,
-        133,
+        120,
         { align: "center" }
       );
       doc.text(
-        "covering 4 lessons on Artificial Intelligence fundamentals",
+        "covering 4 lessons on Artificial Intelligence fundamentals.",
         148,
-        142,
+        128,
         { align: "center" }
       );
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(8, 145, 178);
+      doc.text(FULL_COURSE_LINE, 148, 142, { align: "center" });
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(100, 116, 139);
+      doc.text(STAY_TUNED_LINE, 148, 150, { align: "center" });
+
       const dateStr = new Date().toLocaleDateString("en-IN", {
         day: "numeric",
         month: "long",
         year: "numeric",
       });
-      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
       doc.setTextColor(100, 116, 139);
-      doc.text(`Date: ${dateStr}`, 60, 165);
-      doc.text(`XP Earned: ${user.xp ?? 0}`, 148, 165, { align: "center" });
-      doc.text("akmind.com", 237, 165, { align: "right" });
+      doc.text(`Issued: ${dateStr}`, 55, 172);
+      doc.text(`XP earned: ${user.xp ?? 0}`, 148, 172, { align: "center" });
+      doc.text("akmind.com", 242, 172, { align: "right" });
+
       doc.save(`AKMIND-Demo-Certificate-${user.childName || "Student"}.pdf`);
     } finally {
       setBadgeDownloading(false);
     }
-  };
-
-  const openPayment = () => {
-    setPaymentSuccess(false);
-    setShowPayment(true);
-  };
-
-  const closePayment = () => {
-    setShowPayment(false);
-    setPaymentSuccess(false);
-  };
-
-  const handlePayClick = () => {
-    setPaymentSuccess(true);
   };
 
   const confetti = useMemo(
@@ -276,53 +274,71 @@ function CompletePageInner() {
             ))}
           </div>
 
-          <div className="mt-10 text-center">
-            <button
-              type="button"
-              className="rounded-[14px] px-10 py-4 text-base font-black text-slate-900 transition duration-200 hover:-translate-y-0.5"
-              style={{
-                background: "linear-gradient(135deg, #F59E0B, #F97316)",
-                boxShadow: "0 8px 32px rgba(245,158,11,0.4)",
-              }}
-              onClick={openPayment}
-            >
-              Upgrade to Full Program
-            </button>
-            <p className="mt-3 text-[13px] text-slate-500">
-              60 lessons · 3 programs · Live classes
+          <div
+            className="mx-auto mt-10 max-w-xl rounded-2xl border p-6 text-center sm:p-8"
+            style={{
+              background:
+                "linear-gradient(145deg, rgba(34,211,238,0.12), rgba(99,102,241,0.08))",
+              borderColor: "rgba(34,211,238,0.35)",
+              boxShadow: "0 12px 40px rgba(34,211,238,0.08)",
+            }}
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">
+              Coming next
             </p>
+            <p className="mt-3 text-xl font-black text-white sm:text-2xl">
+              {FULL_COURSE_LINE}
+            </p>
+            <p className="mt-2 text-sm text-slate-300">{STAY_TUNED_LINE}</p>
           </div>
 
-          <div className="mt-8 flex flex-col items-center gap-3">
+          <div className="mt-10 flex flex-col items-center gap-4">
             <div
-              className="w-full max-w-sm rounded-2xl border p-6 text-center"
+              className="relative w-full max-w-md overflow-hidden rounded-2xl border-2 p-8 text-center sm:p-10"
               style={{
-                background: "rgba(15,20,50,0.65)",
-                borderColor: "rgba(99,102,241,0.15)",
+                background:
+                  "linear-gradient(180deg, rgba(15,23,42,0.95), rgba(30,27,75,0.92))",
+                borderColor: "rgba(34,211,238,0.45)",
+                boxShadow:
+                  "0 0 0 1px rgba(99,102,241,0.3), 0 20px 50px rgba(0,0,0,0.35)",
               }}
             >
-              <p className="font-mono text-sm tracking-[0.25em] text-indigo-200">
+              <div
+                className="pointer-events-none absolute inset-2 rounded-xl border border-indigo-400/20"
+                aria-hidden
+              />
+              <p className="relative font-mono text-xs tracking-[0.35em] text-indigo-300">
                 AKMIND
               </p>
-              <p className="my-2 text-6xl">🏅</p>
-              <p className="text-2xl font-black text-white">AI EXPLORER</p>
-              <p className="mt-1 text-xs tracking-[0.25em] text-indigo-300">
-                DEMO CERTIFICATE
+              <p className="relative my-3 text-7xl drop-shadow-lg">🏅</p>
+              <p className="relative text-3xl font-black tracking-tight text-white">
+                AI EXPLORER
               </p>
-              <p className="mt-3 text-lg font-bold text-slate-200">{childName}</p>
+              <p className="relative mt-1 text-[11px] font-semibold tracking-[0.28em] text-cyan-400">
+                DEMO CERTIFICATE OF COMPLETION
+              </p>
+              <div className="relative mx-auto my-5 h-px w-24 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-80" />
+              <p className="relative text-xl font-bold text-slate-100">{childName}</p>
+              <p className="relative mt-3 text-xs leading-relaxed text-slate-400">
+                Completed all four demo lessons · {certDate}
+              </p>
+              <p className="relative mt-4 text-sm font-semibold text-cyan-300">
+                {FULL_COURSE_LINE}
+              </p>
+              <p className="relative mt-1 text-xs text-slate-500">{STAY_TUNED_LINE}</p>
             </div>
             <button
               type="button"
               disabled={badgeDownloading}
-              className="rounded-xl border border-indigo-400/30 bg-indigo-500/15 px-6 py-3 font-bold text-indigo-200 hover:bg-indigo-500/25 disabled:opacity-60"
+              className="rounded-xl border border-amber-400/40 bg-gradient-to-r from-amber-500/20 to-orange-500/15 px-8 py-3.5 font-bold text-amber-100 shadow-lg shadow-amber-900/20 hover:from-amber-500/30 hover:to-orange-500/25 disabled:opacity-60"
               onClick={downloadBadge}
             >
-              {badgeDownloading ? "Preparing PDF…" : "Download Badge PDF"}
+              {badgeDownloading ? "Preparing PDF…" : "Download certificate PDF"}
             </button>
           </div>
 
           <p className="mt-8 text-center text-xs text-slate-600">
-            Keep your badge and come back anytime.
+            Thank you for exploring with AKMIND.
           </p>
           <div className="mt-3 text-center">
             <Link
@@ -336,137 +352,6 @@ function CompletePageInner() {
           </div>
         </div>
       </section>
-
-      {showPayment && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4">
-          <div
-            className="relative flex max-h-[100dvh] w-full flex-col overflow-y-auto rounded-t-2xl border p-5 sm:max-h-[90vh] sm:max-w-md sm:rounded-2xl sm:p-8"
-            style={{
-              background: "rgba(8,10,22,0.96)",
-              borderColor: "rgba(99,102,241,0.2)",
-              backdropFilter: "blur(24px)",
-            }}
-          >
-            <button
-              type="button"
-              className="absolute right-3 top-3 rounded-lg p-2 text-slate-500 hover:bg-white/5 hover:text-slate-200"
-              aria-label="Close"
-              onClick={closePayment}
-            >
-              ✕
-            </button>
-
-            {!paymentSuccess ? (
-              <>
-                <h3 className="pr-10 text-lg font-bold text-white sm:text-xl">
-                  Complete Your Enrollment
-                </h3>
-                <p className="text-sm text-indigo-300">AI Explorers Program</p>
-
-                <div className="mt-4 rounded-xl border border-indigo-400/20 bg-indigo-500/10 p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="font-medium text-slate-100">
-                      AI Explorers — Full Program
-                    </span>
-                    <span className="text-xl font-bold text-amber-300">₹29,999/-</span>
-                  </div>
-                  <p className="mt-1 text-xs text-amber-400">Available from August 2026</p>
-                </div>
-
-                <p className="mt-6 text-sm font-medium text-slate-300">
-                  Select Payment Method
-                </p>
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  {(
-                    [
-                      { id: "upi" as const, title: "📱 UPI", sub: "Google Pay, PhonePe, Paytm" },
-                      { id: "card" as const, title: "💳 Credit / Debit Card", sub: "Visa, Mastercard, RuPay" },
-                      { id: "netbank" as const, title: "🏦 Net Banking", sub: "All major banks" },
-                      { id: "emi" as const, title: "📅 EMI", sub: "3 / 6 / 12 months" },
-                    ] as const
-                  ).map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setPaymentMethod(m.id)}
-                      className={`rounded-xl border p-3 text-center text-sm transition ${
-                        paymentMethod === m.id
-                          ? "border-indigo-400 bg-indigo-500/15"
-                          : "border-indigo-300/20 hover:border-indigo-300/40"
-                      }`}
-                    >
-                      <span className="block font-semibold text-slate-100">{m.title}</span>
-                      <span className="mt-1 block text-xs text-slate-500">{m.sub}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <label className="mt-4 block text-left text-xs font-medium text-slate-400">
-                  Full Name
-                  <input
-                    type="text"
-                    className="mt-1 w-full rounded-xl border border-indigo-300/20 bg-white/5 p-3 text-sm text-slate-100"
-                    placeholder="Full Name"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                  />
-                </label>
-                <label className="mt-3 block text-left text-xs font-medium text-slate-400">
-                  Email
-                  <input
-                    type="email"
-                    className="mt-1 w-full rounded-xl border border-indigo-300/20 bg-white/5 p-3 text-sm text-slate-100"
-                    placeholder="you@example.com"
-                    value={emailInput}
-                    onChange={(e) => setEmailInput(e.target.value)}
-                  />
-                </label>
-                <label className="mt-3 block text-left text-xs font-medium text-slate-400">
-                  Phone
-                  <input
-                    type="tel"
-                    className="mt-1 w-full rounded-xl border border-indigo-300/20 bg-white/5 p-3 text-sm text-slate-100"
-                    placeholder="Phone number"
-                    value={phoneInput}
-                    onChange={(e) => setPhoneInput(e.target.value)}
-                  />
-                </label>
-
-                <button
-                  type="button"
-                  className="mt-6 w-full rounded-xl py-4 font-black text-slate-900"
-                  style={{
-                    background: "linear-gradient(135deg, #F59E0B, #F97316)",
-                    boxShadow: "0 8px 30px rgba(245,158,11,0.35)",
-                  }}
-                  onClick={handlePayClick}
-                >
-                  Pay ₹29,999/- →
-                </button>
-                <p className="mt-3 text-center text-xs text-slate-600">
-                  Secure payment · Full refund if course doesn&apos;t launch · No charges until August 2026
-                </p>
-              </>
-            ) : (
-              <div className="pt-2 text-center">
-                <p className="text-5xl">✅</p>
-                <h3 className="mt-4 text-2xl font-bold text-white">Payment Received!</h3>
-                <p className="mt-2 text-slate-400">
-                  Thank you {user.name}! Your spot is reserved for AI Explorers
-                  starting August 2026.
-                </p>
-                <button
-                  type="button"
-                  className="mt-6 w-full rounded-xl border border-indigo-300/25 py-3 font-semibold text-slate-200 hover:bg-white/5"
-                  onClick={closePayment}
-                >
-                  Close
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

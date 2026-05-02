@@ -9,7 +9,12 @@ export const registerSchema = z.object({
 });
 
 export const progressSchema = z.object({
-  token: z.string().min(8).max(64).trim(),
+  token: z
+    .string()
+    .min(8)
+    .max(64)
+    .trim()
+    .transform((s) => s.toLowerCase()),
   lessonId: z.number().int().min(1).max(4),
   quizScore: z.number().min(0).max(100).optional(),
   xp: z.number().min(0).max(9999).optional(),

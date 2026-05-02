@@ -1,5 +1,9 @@
 import { fail } from "@/lib/api-response";
-import { getDemoUserByToken, getOrCreateAdminUser } from "@/lib/demo-db";
+import {
+  getDemoUserByToken,
+  getOrCreateAdminUser,
+  normalizeDemoToken,
+} from "@/lib/demo-db";
 import { checkRateLimit, getIP } from "@/lib/rate-limit";
 import { tokenSchema } from "@/lib/validators";
 import { timingSafeEqual } from "node:crypto";
@@ -29,10 +33,11 @@ export async function GET(req: NextRequest) {
   if (!parsed.success) {
     return fail("Invalid input", 422);
   }
-  const token = parsed.data.token;
+  // Stored tokens are always lowercased in createDemoUser; compare consistently.
+  const token = normalizeDemoToken(parsed.data.token);
 
   const user =
-    token === ADMIN_DEV_TOKEN
+    token === normalizeDemoToken(ADMIN_DEV_TOKEN)
       ? await getOrCreateAdminUser()
       : await getDemoUserByToken(token);
   if (!user || !safeTokenCompare(token, user.demoToken)) {

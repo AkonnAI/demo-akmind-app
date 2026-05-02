@@ -101,7 +101,7 @@ export class AuditBot {
   }
 
   render(ctx: CanvasRenderingContext2D, cameraX: number): void {
-    if (!this.activated) return
+    if (!this.activated || !this.active) return
     const sx = this.x - cameraX
     if (sx < -60 || sx > CONFIG.CANVAS_WIDTH + 60) return
 

@@ -13,10 +13,11 @@ export class HUD {
   private score      = 0
   private level      = 'LEVEL 1 — THE SCAN'
   private objective  = 'REACH THE SMART LOCK AT THE END'
-  private message    = ''
-  private msgTimer   = 0
-  private time       = 0
-  private weaponName = ''
+  private message      = ''
+  private msgTimer     = 0
+  private messageColor = '#00e5ff'
+  private time         = 0
+  private weaponName   = ''
 
   setHP(hp: number): void        { this.hp        = Math.max(0, hp) }
   setWeapon(name: string): void  { this.weaponName = name }
@@ -36,9 +37,10 @@ export class HUD {
   setLevel(s: string): void     { this.level     = s }
   setObjective(s: string): void { this.objective = s }
 
-  showMessage(msg: string, duration = 3): void {
-    this.message  = msg
-    this.msgTimer = duration
+  showMessage(msg: string, duration = 3, color?: string): void {
+    this.message      = msg
+    this.msgTimer     = duration
+    this.messageColor = color ?? '#00e5ff'
   }
 
   update(dt: number): void {
@@ -58,8 +60,8 @@ export class HUD {
     ctx.fillRect(0, 700, W, 20)
     ctx.strokeStyle = '#1a1035'; ctx.lineWidth = 1
     ctx.beginPath(); ctx.moveTo(0, 700.5); ctx.lineTo(W, 700.5); ctx.stroke()
-    ctx.font = `8px ${ORB}, sans-serif`
-    ctx.fillStyle = '#334155'
+    ctx.font = `bold 11px ${ORB}, sans-serif`
+    ctx.fillStyle = '#e2e8f0'
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
     ctx.fillText('← → / A D MOVE   ↑ / W / SPACE JUMP   Z SHOOT   X WEAPON   E INTERACT', W / 2, 713)
     ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left'
@@ -116,8 +118,8 @@ export class HUD {
 
     const objA = 0.7 + Math.sin(this.time * 1.5) * 0.3
     ctx.globalAlpha = objA
-    ctx.font = `11px ${ORB}, sans-serif`
-    ctx.fillStyle = '#6366f1'; ctx.textAlign = 'center'
+    ctx.font = `13px ${ORB}, sans-serif`
+    ctx.fillStyle = '#cbd5e1'; ctx.textAlign = 'center'
     ctx.fillText(this.objective.slice(0, 52), 640, 50)
     ctx.globalAlpha = 1
 
@@ -132,7 +134,7 @@ export class HUD {
       ctx.fillStyle = '#000000'; ctx.globalAlpha = 0.8 * alpha
       ctx.fillRect(W / 2 - mw / 2, 300, mw, 28)
       ctx.globalAlpha = alpha
-      ctx.fillStyle = '#00e5ff'
+      ctx.fillStyle = this.messageColor
       ctx.fillText(this.message, W / 2, 320)
       ctx.restore()
     }

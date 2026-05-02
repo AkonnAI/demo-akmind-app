@@ -1,5 +1,10 @@
 import { fail, ok } from "@/lib/api-response";
-import { createDemoUser, generateDemoToken, hasUsedDemo } from "@/lib/demo-db";
+import {
+  createDemoUser,
+  generateDemoToken,
+  hasUsedDemo,
+  normalizeDemoToken,
+} from "@/lib/demo-db";
 import { sendAdminNotification, sendDemoLink } from "@/lib/email";
 import { getIP, checkRateLimit } from "@/lib/rate-limit";
 import { sanitizeString } from "@/lib/sanitize";
@@ -54,7 +59,7 @@ export async function POST(req: NextRequest) {
     name: parentNameSafe,
     childName: childNameSafe,
     phone: phoneSafe,
-    demoToken: token,
+    demoToken: normalizeDemoToken(token),
     demoStarted: false,
     demoCompleted: false,
     lessonsComplete: [],
@@ -63,14 +68,15 @@ export async function POST(req: NextRequest) {
     badgeEarned: false,
   });
 
-  void sendDemoLink(emailSafe, parentNameSafe, childNameSafe, token);
+  const tokenOut = normalizeDemoToken(token);
+  void sendDemoLink(emailSafe, parentNameSafe, childNameSafe, tokenOut);
   void sendAdminNotification(
     parentNameSafe,
     emailSafe,
     phoneSafe,
     childNameSafe,
-    token
+    tokenOut
   );
 
-  return ok({ success: true, token });
+  return ok({ success: true, token: tokenOut });
 }

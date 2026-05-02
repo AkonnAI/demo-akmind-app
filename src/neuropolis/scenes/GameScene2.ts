@@ -215,7 +215,17 @@ export class GameScene2 {
     void _loop
     const opts = parseGameScene2Fourth(fourth)
     this.touchControls = opts.touchControls
-    this.arenaFadeAlpha = opts.startX == null && !opts.bossArena ? 1 : 0
+    // Fade in from black at vault entry — must use arenaFadePhase 'in' so updateArenaFade
+    // runs; alpha=1 + phase 'none' leaves a permanent black overlay if decay never applies.
+    if (opts.startX == null && !opts.bossArena) {
+      this.arenaFadeAlpha = 1
+      this.arenaFadePhase = 'in'
+      this.arenaFadeTimer = 0
+    } else {
+      this.arenaFadeAlpha = 0
+      this.arenaFadePhase = 'none'
+      this.arenaFadeTimer = 0
+    }
     this.input    = input
     this.camera   = new Camera()
     this.bg       = new ParallaxBackground(WORLD_WIDTH)
@@ -373,6 +383,10 @@ export class GameScene2 {
 
     this.time += dt
     this.updateArenaFade(dt)
+    // Campaign intro: constructor sets alpha=1; decay while not in boss fade (same as GameScene3).
+    if (this.arenaFadePhase === 'none' && this.arenaFadeAlpha > 0) {
+      this.arenaFadeAlpha = Math.max(0, this.arenaFadeAlpha - dt * 2.0)
+    }
     if (this.respawnFlashTimer > 0) {
       this.respawnFlashTimer = Math.max(0, this.respawnFlashTimer - dt)
     }
