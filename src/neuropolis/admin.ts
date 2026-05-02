@@ -10,6 +10,7 @@ import { GameScene6 }   from './scenes/GameScene6'
 import { GameScene7 }   from './scenes/GameScene7'
 import { GameScene8 }   from './scenes/GameScene8'
 import { TouchControls } from './ui/TouchControls'
+import { DeviceManager } from './engine/DeviceManager'
 
 // ──────────────────────────────────────────────────────────────
 // ADMIN ENTRY POINT
@@ -270,13 +271,17 @@ function launchLevel(num: number, options?: LaunchOptions): void {
   if (!(wrap instanceof HTMLElement)) {
     throw new Error('Admin: missing #admin-game-container')
   }
-  if (!touchControls) touchControls = new TouchControls(wrap)
+  if (!sharedInput) sharedInput = new InputManager()
+
+  if (!touchControls) {
+    touchControls = new TouchControls(wrap, sharedInput)
+  } else {
+    touchControls.setInput(sharedInput)
+  }
   touchControls.show()
 
   if (!sharedCanvas) sharedCanvas = new Canvas('admin-game-canvas')
-  else               sharedCanvas.resize()
-
-  if (!sharedInput)  sharedInput  = new InputManager()
+  else sharedCanvas.resize()
 
   const ctx   = sharedCanvas.getContext()
   const input = sharedInput
@@ -321,6 +326,7 @@ function launchLevel(num: number, options?: LaunchOptions): void {
                 })
               : new GameScene(input, loop, undefined, {
                   startX: options?.startX,
+                  touchControls: touchControls!,
                 })
 
   loop.onUpdate((dt) => {
@@ -349,6 +355,7 @@ function stopCurrentLevel(): void {
 // ─── BOOTSTRAP ────────────────────────────────────────────────
 
 function main(): void {
+  DeviceManager.init()
   buildGrid()
   const backBtn = el<HTMLButtonElement>('#back-btn')
   backBtn.addEventListener('click', () => stopCurrentLevel())

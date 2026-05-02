@@ -3,6 +3,7 @@ import { GameLoop } from '../engine/GameLoop'
 import { Player } from '../entities/Player'
 import { Projectile } from '../entities/Projectile'
 import { Level8 } from '../world/Level8'
+import { Haptics } from '../engine/Haptics'
 import { ChaosBoss, CHAOS_ARENA_FLOOR_Y } from '../bosses/ChaosBoss'
 import { HUD } from '../ui/HUD'
 import { DialogueBox } from '../ui/DialogueBox'
@@ -130,6 +131,7 @@ export class GameScene8 {
 
   private applyDamage(n: number): void {
     this.hp -= n
+    Haptics.fire('playerDamage')
     this.hud.setHP(this.hp)
     this.damageTimer = 1.2
     this.damageFlashTimer = 0.35

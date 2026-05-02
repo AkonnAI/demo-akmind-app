@@ -323,6 +323,7 @@ function LessonPageInner() {
   const [pickedOption, setPickedOption] = useState<number | null>(null);
   const [resultsXp, setResultsXp] = useState(0);
   const [showQuizResults, setShowQuizResults] = useState(false);
+  const [videoWatchSatisfied, setVideoWatchSatisfied] = useState(false);
   const progressPosted = useRef(false);
   const resultsInitialized = useRef(false);
 
@@ -505,7 +506,14 @@ function LessonPageInner() {
     setGameComplete(false);
     setGameActive(false);
     setPhase("video");
+    setVideoWatchSatisfied(false);
   }, [lessonId]);
+
+  useEffect(() => {
+    if (user && isAdminTester(user)) {
+      setVideoWatchSatisfied(true);
+    }
+  }, [user, lessonId]);
 
   const advanceQuestion = () => {
     if (!lesson) return;
@@ -567,6 +575,8 @@ function LessonPageInner() {
   }
 
   const adminMode = isAdminTester(user);
+  const canContinueFromVideo = adminMode || videoWatchSatisfied;
+
   if (user && !lessonUnlocked(lessonId, user.lessonsComplete)) {
     if (!adminMode) {
       return (
@@ -585,6 +595,10 @@ function LessonPageInner() {
       );
     }
   }
+
+  // Hide lesson NOVA widget during fullscreen Neuropolis so it never steals taps
+  // (including dialogue-advance and canvas input). Admins use Exit + dashboard for chat.
+  const suppressNovaChatFab = phase === "game" && gameActive;
 
   const totalQs = lesson.quiz.length;
   const q = lesson.quiz[currentQuestion];
@@ -695,7 +709,11 @@ function LessonPageInner() {
               backdropFilter: "blur(20px)",
             }}
           >
-            <VideoPlayer lessonId={lessonId} />
+            <VideoPlayer
+              lessonId={lessonId}
+              enforceWatchThrough={!adminMode}
+              onWatchSatisfied={() => setVideoWatchSatisfied(true)}
+            />
 
             {lessonId === 1 && (
               <div
@@ -726,9 +744,25 @@ function LessonPageInner() {
                   {typeLabel}
                 </span>
               </div>
+              {!canContinueFromVideo && !adminMode && (
+                <p className="mt-4 text-xs text-slate-500">
+                  Watch the lesson video until you&apos;ve played through it (about
+                  the full length). Continue unlocks when you&apos;re done.
+                </p>
+              )}
+              {adminMode && (
+                <p className="mt-4 text-xs text-amber-200/80">
+                  Admin / tester: you can continue without watching the full video.
+                </p>
+              )}
               <button
                 type="button"
-                className="mt-6 rounded-xl px-7 py-3 font-semibold text-white transition-all duration-200 hover:-translate-y-0.5"
+                disabled={!canContinueFromVideo}
+                className={`mt-6 rounded-xl px-7 py-3 font-semibold text-white transition-all duration-200 ${
+                  canContinueFromVideo
+                    ? "hover:-translate-y-0.5"
+                    : "cursor-not-allowed opacity-45"
+                }`}
                 style={{
                   background: "linear-gradient(135deg, #6366F1, #4F46E5)",
                   boxShadow: "var(--glow-indigo)",
@@ -1049,7 +1083,7 @@ function LessonPageInner() {
         )}
       </main>
 
-      {!userLoading && user && token ? (
+      {!userLoading && user && token && !suppressNovaChatFab ? (
         <NOVAChat
           userName={user?.name || ""}
           childName={user?.childName}

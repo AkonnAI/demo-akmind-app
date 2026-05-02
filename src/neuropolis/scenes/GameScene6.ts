@@ -4,6 +4,7 @@ import { Camera } from '../engine/Camera'
 import { Player } from '../entities/Player'
 import { Projectile, type GravityField } from '../entities/Projectile'
 import { Level6, LEVEL6_WORLD_WIDTH } from '../world/Level6'
+import { Haptics } from '../engine/Haptics'
 import {
   renderMHzDialFullscreen,
   type MHzDialTerminal,
@@ -413,6 +414,7 @@ export class GameScene6 {
 
   private applyDamage(n: number): void {
     this.hp -= n
+    Haptics.fire('playerDamage')
     this.hud.setHP(this.hp)
     this.damageTimer = DAMAGE_IFRAMES
     this.damageFlashTimer = 0.35
@@ -482,6 +484,7 @@ export class GameScene6 {
         dt,
         this.input,
         () => {
+          Haptics.fire('puzzleSolved')
           this.injectHack = null
           this.level.injectUsed = true
           this.talk(
@@ -528,6 +531,7 @@ export class GameScene6 {
       if (this.input.isJustPressed('KeyE')) {
         if (Math.abs(d.currentFreq - d.targetFreq) <= d.tolerance) {
           d.solved = true
+          Haptics.fire('puzzleSolved')
           this.level.openGate(d.gateId)
           this.dialMode = null
           this.hud.showMessage('FREQUENCY LOCKED', 2)
@@ -770,6 +774,7 @@ export class GameScene6 {
     for (const d of this.level.drones) {
       if (!d.active && !d.exploded) {
         d.exploded = true
+        Haptics.fire('enemyDestroyed')
         this.hud.addScore(DRONE_XP)
         this.score += DRONE_XP
       }
@@ -777,6 +782,7 @@ export class GameScene6 {
     for (const s of this.level.sentinels) {
       if (!s.active && !s.scoreEmitted) {
         s.scoreEmitted = true
+        Haptics.fire('enemyDestroyed')
         this.hud.addScore(SENTINEL_XP)
         this.score += SENTINEL_XP
       }
@@ -784,6 +790,7 @@ export class GameScene6 {
     const nx = this.level.nexus
     if (nx && !nx.active && !nx.scoreEmitted) {
       nx.scoreEmitted = true
+      Haptics.fire('enemyDestroyed')
       this.hud.addScore(NEXUS_XP)
       this.score += NEXUS_XP
     }

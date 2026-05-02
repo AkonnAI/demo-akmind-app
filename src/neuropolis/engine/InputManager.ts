@@ -1,5 +1,5 @@
 // Keys we care about in Neuropolis
-type GameKey =
+export type GameKey =
   | 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown'
   | 'Space' | 'KeyZ' | 'KeyE' | 'KeyF' | 'KeyQ' | 'KeyX' | 'KeyW' | 'KeyS' | 'KeyA' | 'KeyD'
   | 'Escape'
@@ -9,13 +9,17 @@ export class InputManager {
   private justPressed = new Set<GameKey>()
   private justReleased = new Set<GameKey>()
 
+  private readonly boundKeyDown = (e: KeyboardEvent): void => {
+    this.onKeyDown(e)
+  }
+  private readonly boundKeyUp = (e: KeyboardEvent): void => {
+    this.onKeyUp(e)
+  }
+
   private validKeys: GameKey[] = [
     'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
     'Space', 'KeyZ', 'KeyE', 'KeyF', 'KeyQ', 'KeyX', 'KeyW', 'KeyS', 'KeyA', 'KeyD', 'Escape',
   ]
-
-  private readonly boundKeyDown = (e: KeyboardEvent) => this.onKeyDown(e)
-  private readonly boundKeyUp = (e: KeyboardEvent) => this.onKeyUp(e)
 
   constructor() {
     window.addEventListener('keydown', this.boundKeyDown)
@@ -64,6 +68,15 @@ export class InputManager {
     return this.justPressed.has(key)
   }
   isJustReleased(key: GameKey): boolean  { return this.justReleased.has(key) }
+
+  simulateKeyDown(code: GameKey): void {
+    if (!this.held.has(code)) this.justPressed.add(code)
+    this.held.add(code)
+  }
+
+  simulateKeyUp(code: GameKey): void {
+    this.held.delete(code)
+  }
 
   update(): void {
     this.justPressed.clear()

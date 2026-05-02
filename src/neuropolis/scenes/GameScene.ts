@@ -1,3 +1,4 @@
+import { DeviceManager }      from '../engine/DeviceManager'
 import { InputManager }       from '../engine/InputManager'
 import { GameLoop }           from '../engine/GameLoop'
 import { Camera }             from '../engine/Camera'
@@ -9,14 +10,17 @@ import { Level1 }             from '../world/Level1'
 import { HUD }                from '../ui/HUD'
 import { DialogueBox }        from '../ui/DialogueBox'
 import { NovaOrb }            from '../ui/NovaOrb'
+import type { TouchControls } from '../ui/TouchControls'
+import { attachDialoguePointerAdvance } from '../ui/dialoguePointerAdvance'
 import { CONFIG }             from '../constants/config'
+import { Haptics }            from '../engine/Haptics'
 
 type Scene        = 'play' | 'dialogue'
 type SpeakerTag   = 'NOVA' | 'AX' | 'KIRAN' | 'NPC'
 type DialogueLine = { speaker: SpeakerTag; text: string; expression?: string }
 type QuizLike     = { explanation: string }
 
-export type GameSceneLaunchOptions = { startX?: number }
+export type GameSceneLaunchOptions = { startX?: number; touchControls?: TouchControls }
 
 export class GameScene {
   private input:    InputManager
@@ -27,6 +31,9 @@ export class GameScene {
   private hud:      HUD
   private dialogue: DialogueBox
   private nova:     NovaOrb
+
+  private touchControls?: TouchControls
+  private dialoguePointerDetach: (() => void) | null = null
 
   private readonly WORLD_WIDTH = 12000
   private hp           = 3
@@ -56,6 +63,7 @@ export class GameScene {
     onLevelComplete?: () => void,
     options?: GameSceneLaunchOptions,
   ) {
+    this.touchControls = options?.touchControls
     this.input    = input
     this.camera   = new Camera()
     this.bg       = new ParallaxBackground(this.WORLD_WIDTH)
@@ -74,15 +82,24 @@ export class GameScene {
     this.hud.setHP(3)
     this.hud.setLevel('LEVEL 1 — THE SCAN')
     this.hud.setObjective('REACH THE SMART LOCK AT THE END')
-    this.nova.show(260, this.bg.getGroundY() - 100)
     this.onLevelComplete = onLevelComplete
     console.log('[GameScene] Level 1 — The Scan loaded.')
   }
 
   private talk(lines: DialogueLine[], onDone?: () => void): void {
     this.scene = 'dialogue'
+    this.nova.show(this.player.x + 70, this.player.y - 30)
+    this.touchControls?.hide()
+    this.dialoguePointerDetach?.()
+    this.dialoguePointerDetach = attachDialoguePointerAdvance(() => {
+      this.dialogue.advance()
+    })
     this.dialogue.show(lines, () => {
+      this.dialoguePointerDetach?.()
+      this.dialoguePointerDetach = null
+      this.touchControls?.show()
       this.scene = 'play'
+      this.nova.hide()
       onDone?.()
     })
   }
@@ -114,6 +131,7 @@ export class GameScene {
     for (const d of this.level.drones) {
       if (!d.active && !d.exploded) {
         d.exploded = true
+        Haptics.fire('enemyDestroyed')
         this.screenShake = 5
         this.explosions.push({ x: d.x, y: d.y, t: 0.6, maxT: 0.6 })
         this.score += 50
@@ -327,6 +345,7 @@ export class GameScene {
         this.detectedTimer <= 0 &&
         this.damageTimer   <= 0) {
       this.hp--
+      Haptics.fire('playerDamage')
       this.hud.setHP(this.hp)
       this.damageTimer   = 1.5
       this.detectedTimer = 2.5
@@ -402,6 +421,7 @@ export class GameScene {
 
   private handleQuizResult(correct: boolean, quiz: QuizLike): void {
     if (correct) {
+      Haptics.fire('gateOpen')
       this.score += 100
       this.hud.addScore(100)
       this.hud.showMessage('CORRECT! +100 XP — GATE OPEN', 2.5)
@@ -436,7 +456,9 @@ export class GameScene {
     ctx.imageSmoothingEnabled = false
     this.level.render(ctx, this.camera.x)
     this.player.render(ctx, this.camera.x)
-    this.nova.render(ctx, this.camera.x)
+    if (this.scene === 'dialogue') {
+      this.nova.render(ctx, this.camera.x)
+    }
 
     // Damage flash
     if (this.damageTimer > 1.2) {
@@ -536,16 +558,18 @@ export class GameScene {
     this.dialogue.render(ctx)
     this.hud.render(ctx)
 
-    // Controls bar
-    ctx.fillStyle = '#1a1535'
-    ctx.font      = `8px Orbitron, sans-serif`
-    ctx.textAlign = 'center'
-    ctx.fillText(
-      '← → MOVE   ↑/SPACE JUMP   Z SHOOT/QUIZ-A   E TALK/QUIZ-B   F USE ITEM',
-      CONFIG.CANVAS_WIDTH / 2,
-      CONFIG.CANVAS_HEIGHT - 8
-    )
-    ctx.textAlign = 'left'
+    // Controls bar — desktop only (touch HUD uses on-screen controls)
+    if (!DeviceManager.shouldShowTouchOverlay()) {
+      ctx.fillStyle = '#1a1535'
+      ctx.font      = `8px Orbitron, sans-serif`
+      ctx.textAlign = 'center'
+      ctx.fillText(
+        '← → MOVE   ↑/SPACE JUMP   Z SHOOT/QUIZ-A   E TALK/QUIZ-B   F USE ITEM',
+        CONFIG.CANVAS_WIDTH / 2,
+        CONFIG.CANVAS_HEIGHT - 8
+      )
+      ctx.textAlign = 'left'
+    }
 
     ctx.restore()
   }

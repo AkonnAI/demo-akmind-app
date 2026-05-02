@@ -1,3 +1,4 @@
+import { DeviceManager }   from './engine/DeviceManager'
 import { Canvas }          from './engine/Canvas'
 import { GameLoop }        from './engine/GameLoop'
 import { InputManager }    from './engine/InputManager'
@@ -13,6 +14,8 @@ import { GameScene7 }      from './scenes/GameScene7'
 import { GameScene8 }      from './scenes/GameScene8'
 import { TouchControls }   from './ui/TouchControls'
 
+DeviceManager.init()
+
 const gameContainer = document.getElementById('game-container')
 if (!(gameContainer instanceof HTMLElement)) {
   throw new Error('NEUROPOLIS: missing #game-container (see index.html)')
@@ -22,7 +25,7 @@ const canvas = new Canvas()
 const ctx    = canvas.getContext()
 const input  = new InputManager()
 const loop   = new GameLoop()
-const touchControls = new TouchControls(gameContainer)
+const touchControls = new TouchControls(gameContainer, input)
 touchControls.hide()
 
 type AppScene =
@@ -120,7 +123,7 @@ loop.onUpdate((dt) => {
                 console.log('[Main] Level 3 starts.')
               }, touchControls)
               console.log('[Main] Level 2 starts.')
-            })
+            }, { touchControls })
             console.log('[Main] Cinematic done. Game starts.')
           }
         )

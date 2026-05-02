@@ -3,6 +3,7 @@ import { GameLoop } from '../engine/GameLoop'
 import { Camera } from '../engine/Camera'
 import { Player } from '../entities/Player'
 import { Projectile } from '../entities/Projectile'
+import { Haptics } from '../engine/Haptics'
 import { Level7, LEVEL7_WORLD_WIDTH, type L7Gate } from '../world/Level7'
 import { HUD } from '../ui/HUD'
 import { DialogueBox } from '../ui/DialogueBox'
@@ -190,6 +191,7 @@ export class GameScene7 {
 
   private applyDamage(n: number): void {
     this.hp -= n
+    Haptics.fire('playerDamage')
     this.hud.setHP(this.hp)
     this.damageTimer = DAMAGE_IFRAMES
     this.damageFlashTimer = 0.35
@@ -597,6 +599,7 @@ export class GameScene7 {
     for (const d of this.level.drones) {
       if (!d.active && !d.exploded) {
         d.exploded = true
+        Haptics.fire('enemyDestroyed')
         this.hud.addScore(DRONE_XP)
         this.score += DRONE_XP
       }

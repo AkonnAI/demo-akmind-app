@@ -3,6 +3,7 @@ import { InputManager } from '../engine/InputManager'
 import { GameLoop } from '../engine/GameLoop'
 import { DialogueBox } from '../ui/DialogueBox'
 import { NovaOrb } from '../ui/NovaOrb'
+import { attachDialoguePointerAdvance } from '../ui/dialoguePointerAdvance'
 import { ParallaxBackground } from '../world/ParallaxBackground'
 
 type NovaExpr = 'idle' | 'happy' | 'warning' | 'urgent' | 'explaining'
@@ -31,6 +32,8 @@ export class CinematicScene {
   private axSprite!: HTMLImageElement
   private axLoaded = false
 
+  private readonly pointerDetach: () => void
+
   private readonly scenes: Scene[]
 
   constructor(
@@ -47,6 +50,14 @@ export class CinematicScene {
     this.axSprite = new Image()
     this.axSprite.onload = () => { this.axLoaded = true }
     this.axSprite.src = '/sprites/AX.png'
+
+    this.pointerDetach = attachDialoguePointerAdvance(() => {
+      if (!this.started || this.transitioning) return
+      if (!this.dialogue.isVisible()) return
+      this.dialogue.advance()
+      const expr = this.dialogue.getCurrentExpression()
+      this.nova.setExpression(expr as NovaExpr)
+    })
 
     // Define all scenes here
     this.scenes = [
@@ -97,6 +108,11 @@ export class CinematicScene {
         ]
       },
     ]
+  }
+
+  /** Stop DOM listeners (call before discarding the scene). */
+  destroy(): void {
+    this.pointerDetach()
   }
 
   // ── SCENE RENDERERS ──────────────────

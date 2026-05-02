@@ -4,7 +4,8 @@ import {
   bootstrapNeuropolisDemo,
   type NeuropolisDemoLevel,
 } from "@/neuropolis/bootstrapDemoLevel";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 type Props = {
   level: NeuropolisDemoLevel;
@@ -17,8 +18,15 @@ export default function NeuropolisShell({ level, onComplete, onExit }: Props) {
   const teardownRef = useRef<(() => void) | null>(null);
   const onCompleteRef = useRef(onComplete);
   const onExitRef = useRef(onExit);
+  const [exitPortalHost, setExitPortalHost] = useState<HTMLElement | null>(
+    null,
+  );
   onCompleteRef.current = onComplete;
   onExitRef.current = onExit;
+
+  useEffect(() => {
+    setExitPortalHost(document.body);
+  }, []);
 
   useEffect(() => {
     const el = mountRef.current;
@@ -41,45 +49,52 @@ export default function NeuropolisShell({ level, onComplete, onExit }: Props) {
     void onExitRef.current();
   };
 
-  return (
-    <div
+  const exitButton = (
+    <button
+      type="button"
+      data-neuropolis-exit="true"
+      onClick={handleExit}
+      aria-label="Exit game"
       style={{
         position: "fixed",
-        inset: 0,
-        background: "#0a0a1a",
-        zIndex: 1,
+        top: 12,
+        right: 12,
+        zIndex: 1100,
+        background: "rgba(239,68,68,0.12)",
+        border: "1px solid rgba(239,68,68,0.55)",
+        borderRadius: 8,
+        color: "#f87171",
+        fontSize: 13,
+        padding: "8px 14px",
+        cursor: "pointer",
+        fontWeight: 700,
       }}
     >
-      <button
-        type="button"
-        onClick={handleExit}
-        aria-label="Exit game"
+      Exit
+    </button>
+  );
+
+  return (
+    <>
+      {exitPortalHost ? createPortal(exitButton, exitPortalHost) : null}
+      <div
         style={{
-          position: "absolute",
-          top: 12,
-          right: 12,
-          zIndex: 10,
-          background: "rgba(239,68,68,0.12)",
-          border: "1px solid rgba(239,68,68,0.55)",
-          borderRadius: 8,
-          color: "#f87171",
-          fontSize: 13,
-          padding: "8px 14px",
-          cursor: "pointer",
-          fontWeight: 700,
+          position: "fixed",
+          inset: 0,
+          background: "#0a0a1a",
+          zIndex: 1,
         }}
       >
-        Exit
-      </button>
-      <div
-        ref={mountRef}
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-        }}
-      />
-    </div>
+        <div
+          ref={mountRef}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+          }}
+        />
+      </div>
+    </>
   );
 }

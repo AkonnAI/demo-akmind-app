@@ -1,14 +1,17 @@
 import { InputManager } from '../engine/InputManager'
+import { DeviceManager } from '../engine/DeviceManager'
 import { GameLoop } from '../engine/GameLoop'
 import { Camera } from '../engine/Camera'
 import { Player } from '../entities/Player'
 import { Projectile, type GravityField } from '../entities/Projectile'
+import { Haptics } from '../engine/Haptics'
 import { Level4, LEVEL4_WORLD_WIDTH } from '../world/Level4'
 import { HUD } from '../ui/HUD'
 import { DialogueBox } from '../ui/DialogueBox'
 import { NovaOrb } from '../ui/NovaOrb'
 import { CONFIG } from '../constants/config'
 import { TouchControls } from '../ui/TouchControls'
+import { attachDialoguePointerAdvance } from '../ui/dialoguePointerAdvance'
 import {
   createGateHack,
   updateGateHack,
@@ -81,6 +84,9 @@ export class GameScene4 {
   private dialogue: DialogueBox
   private nova: NovaOrb
 
+  private touchControls?: TouchControls
+  private dialoguePointerDetach: (() => void) | null = null
+
   private hp = 3
   private score = 0
   private time = 0
@@ -142,7 +148,7 @@ export class GameScene4 {
   ) {
     void _loop
     const opts = parseOpts(fourth)
-    void opts.touchControls
+    this.touchControls = opts.touchControls
     this.input = input
     this.camera = new Camera()
     this.level = new Level4(this.groundY)
@@ -163,7 +169,6 @@ export class GameScene4 {
     this.hud.setHP(3)
     this.hud.setLevel('LEVEL 4 — THE BIAS ENGINE')
     this.syncL4Objective()
-    this.nova.show(260, this.groundY - 100)
     this.onLevelComplete = onLevelComplete
 
     if (opts.startX != null) {
@@ -243,8 +248,18 @@ export class GameScene4 {
 
   private talk(lines: DialogueLine[], onDone?: () => void): void {
     this.scene = 'dialogue'
+    this.nova.show(this.player.x + 70, this.player.y - 30)
+    this.touchControls?.hide()
+    this.dialoguePointerDetach?.()
+    this.dialoguePointerDetach = attachDialoguePointerAdvance(() => {
+      this.dialogue.advance()
+    })
     this.dialogue.show(lines as Parameters<DialogueBox['show']>[0], () => {
+      this.dialoguePointerDetach?.()
+      this.dialoguePointerDetach = null
+      this.touchControls?.show()
       this.scene = 'play'
+      this.nova.hide()
       onDone?.()
     })
   }
@@ -522,6 +537,7 @@ export class GameScene4 {
 
   private applyDamage(amount: number): void {
     this.hp -= amount
+    Haptics.fire('playerDamage')
     this.hud.setHP(this.hp)
     this.damageTimer = DAMAGE_IFRAMES
     this.damageFlashTimer = 0.4
@@ -600,6 +616,7 @@ export class GameScene4 {
         dt,
         this.input,
         () => {
+          Haptics.fire('puzzleSolved')
           this.level.openGate(2)
           this.hud.showMessage('SECTOR B UNLOCKED', 2)
           this.syncL4Objective()
@@ -794,6 +811,7 @@ export class GameScene4 {
       !this.level.weaponCrate.data.collected
     ) {
       this.level.weaponCrate.data.collected = true
+      Haptics.fire('pickup')
       this.player.unlockWeapon(3)
       this.player.weaponSlot = 3
       this.hud.showMessage('GRAVITY BOLT — Z TO FIRE (COOLDOWN)', 2.8)
@@ -851,6 +869,7 @@ export class GameScene4 {
     for (const d of this.level.drones) {
       if (!d.active && !d.exploded) {
         d.exploded = true
+        Haptics.fire('enemyDestroyed')
         this.hud.addScore(DRONE_XP)
         this.score += DRONE_XP
         this.spawnFireDeath(d.x, d.y + 20)
@@ -859,6 +878,7 @@ export class GameScene4 {
     for (const a of this.level.auditBots) {
       if (!a.active && !a.scoreEmitted) {
         a.scoreEmitted = true
+        Haptics.fire('enemyDestroyed')
         this.hud.addScore(AUDIT_XP)
         this.score += AUDIT_XP
         this.spawnFireDeath(a.x, a.y)
@@ -959,6 +979,7 @@ export class GameScene4 {
       const nowBalanced = sc.isBalanced()
       if (nowBalanced && !this.balancedFlags[i]) {
         this.balancedFlags[i] = true
+        Haptics.fire('puzzleSolved')
         this.triggerShake(4, 0.4)
         this.hud.showMessage('SCALE BALANCED — GATE OPEN', 3, '#00ff88')
         for (let k = 0; k < 8; k++) {
@@ -1042,7 +1063,9 @@ export class GameScene4 {
     renderGravityFieldsVfx(ctx, this.gravityFields, this.camera.x, this.time)
     this.renderParticles(ctx, this.camera.x)
     this.player.render(ctx, this.camera.x)
-    this.nova.render(ctx, this.camera.x)
+    if (this.scene === 'dialogue') {
+      this.nova.render(ctx, this.camera.x)
+    }
 
     if (this.damageFlashTimer > 0) {
       const alpha = (this.damageFlashTimer / 0.4) * 0.2
@@ -1087,11 +1110,13 @@ export class GameScene4 {
     ctx.imageSmoothingEnabled = false
     ctx.font = 'bold 11px Orbitron, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText(
-      'ARROWS MOVE  ·  SPACE JUMP  ·  Z  ·  X  ·  Q  ·  E (CARRY/DROP)',
-      640,
-      706,
-    )
+    if (!DeviceManager.shouldShowTouchOverlay()) {
+      ctx.fillText(
+        'ARROWS MOVE  ·  SPACE JUMP  ·  Z  ·  X  ·  Q  ·  E (CARRY/DROP)',
+        640,
+        706,
+      )
+    }
     ctx.textAlign = 'left'
 
     if (this.respawnFlashTimer > 0) {

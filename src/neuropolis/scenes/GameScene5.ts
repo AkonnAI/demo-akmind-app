@@ -9,6 +9,7 @@ import { DialogueBox } from '../ui/DialogueBox'
 import { NovaOrb } from '../ui/NovaOrb'
 import { CONFIG } from '../constants/config'
 import { TouchControls } from '../ui/TouchControls'
+import { Haptics } from '../engine/Haptics'
 import {
   createGateHack,
   updateGateHack,
@@ -389,6 +390,7 @@ export class GameScene5 {
 
   private applyDamage(n: number): void {
     this.hp -= n
+    Haptics.fire('playerDamage')
     this.hud.setHP(this.hp)
     this.damageTimer = DAMAGE_IFRAMES
     this.damageFlashTimer = 0.35
@@ -439,6 +441,7 @@ export class GameScene5 {
         dt,
         this.input,
         () => {
+          Haptics.fire('puzzleSolved')
           this.level.openGate(1)
           this.hud.showMessage('SECTOR UNLOCKED', 2)
           this.syncObjective()
@@ -619,6 +622,7 @@ export class GameScene5 {
     for (const d of this.level.drones) {
       if (!d.active && !d.exploded) {
         d.exploded = true
+        Haptics.fire('enemyDestroyed')
         this.hud.addScore(DRONE_XP)
         this.score += DRONE_XP
         this.spawnBurst(d.x, d.y + 18, '#00e5ff')
@@ -627,6 +631,7 @@ export class GameScene5 {
     for (const s of this.level.shields) {
       if (!s.active && !s.scoreEmitted) {
         s.scoreEmitted = true
+        Haptics.fire('enemyDestroyed')
         this.hud.addScore(SHIELD_XP)
         this.score += SHIELD_XP
         this.spawnBurst(s.x + 16, s.y + 20, '#e2e8f0')
@@ -635,6 +640,7 @@ export class GameScene5 {
     for (const mb of this.level.mirrors) {
       if (!mb.active && !mb.scoreEmitted) {
         mb.scoreEmitted = true
+        Haptics.fire('enemyDestroyed')
         this.hud.addScore(MIRROR_BOT_XP)
         this.score += MIRROR_BOT_XP
         this.spawnBurst(mb.x, mb.y, '#ffffff')
@@ -643,6 +649,7 @@ export class GameScene5 {
     for (const ph of this.level.phantoms) {
       if (!ph.active && !ph.scoreEmitted) {
         ph.scoreEmitted = true
+        Haptics.fire('enemyDestroyed')
         this.hud.addScore(PHANTOM_XP)
         this.score += PHANTOM_XP
         this.spawnBurst(ph.x, ph.y, '#9b59b6')

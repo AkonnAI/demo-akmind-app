@@ -1,8 +1,10 @@
 import { InputManager } from '../engine/InputManager'
+import { DeviceManager } from '../engine/DeviceManager'
 import { GameLoop } from '../engine/GameLoop'
 import { Camera } from '../engine/Camera'
 import { Player } from '../entities/Player'
 import { Projectile } from '../entities/Projectile'
+import { Haptics } from '../engine/Haptics'
 import { Level3, LEVEL3_WORLD_WIDTH } from '../world/Level3'
 import { ParallaxBackground } from '../world/ParallaxBackground'
 import {
@@ -16,6 +18,7 @@ import { NovaOrb } from '../ui/NovaOrb'
 import { UpgradeShop } from '../ui/UpgradeShop'
 import { CONFIG } from '../constants/config'
 import { TouchControls } from '../ui/TouchControls'
+import { attachDialoguePointerAdvance } from '../ui/dialoguePointerAdvance'
 import { MarketEnforcer } from '../entities/MarketEnforcer'
 import { Drone } from '../entities/Drone'
 import type { LockTarget } from '../entities/Projectile'
@@ -85,6 +88,9 @@ export class GameScene3 {
   private nova: NovaOrb
   private shop: UpgradeShop
 
+  private touchControls?: TouchControls
+  private dialoguePointerDetach: (() => void) | null = null
+
   private hp = 3
   private score = 0
   private time = 0
@@ -137,7 +143,7 @@ export class GameScene3 {
   ) {
     void _loop
     const opts = parseOpts(fourth)
-    void opts.touchControls
+    this.touchControls = opts.touchControls
     this.arenaFadeAlpha = opts.startX == null ? 1 : 0
     this.input = input
     this.camera = new Camera()
@@ -161,7 +167,6 @@ export class GameScene3 {
     this.hud.setHP(3)
     this.hud.setLevel('LEVEL 3 — THE DATA MARKET')
     this.syncL3Objective()
-    this.nova.show(260, this.groundY - 100)
     this.onLevelComplete = onLevelComplete
 
     if (opts.startX != null) {
@@ -345,8 +350,18 @@ export class GameScene3 {
 
   private talk(lines: DialogueLine[], onDone?: () => void): void {
     this.scene = 'dialogue'
+    this.nova.show(this.player.x + 70, this.player.y - 30)
+    this.touchControls?.hide()
+    this.dialoguePointerDetach?.()
+    this.dialoguePointerDetach = attachDialoguePointerAdvance(() => {
+      this.dialogue.advance()
+    })
     this.dialogue.show(lines as Parameters<DialogueBox['show']>[0], () => {
+      this.dialoguePointerDetach?.()
+      this.dialoguePointerDetach = null
+      this.touchControls?.show()
       this.scene = 'play'
+      this.nova.hide()
       onDone?.()
     })
   }
@@ -875,6 +890,7 @@ export class GameScene3 {
       dt,
     )
     if (pgEv?.type === 'solved') {
+      Haptics.fire('puzzleSolved')
       this.level.openGate(pgEv.gateId)
       this.hud.addScore(100)
       this.score += 100
@@ -900,6 +916,7 @@ export class GameScene3 {
     ) {
       if (!this.level.weaponCrate.data.collected) {
         this.level.weaponCrate.data.collected = true
+        Haptics.fire('pickup')
         this.player.unlockWeapon(2)
         this.player.weaponSlot = 2
         this.hud.showMessage('PRISM SHOT UNLOCKED — Z TO FIRE, X TO SWITCH', 2.5)
@@ -939,6 +956,7 @@ export class GameScene3 {
     for (const d of this.level.drones) {
       if (!d.active && !d.exploded) {
         d.exploded = true
+        Haptics.fire('enemyDestroyed')
         this.level.onEnemyKilledAt(d.x)
         this.hud.addScore(DRONE_XP)
         this.score += DRONE_XP
@@ -948,6 +966,7 @@ export class GameScene3 {
     for (const e of this.level.enforcers) {
       if (!e.active && !e.scoreEmitted) {
         e.scoreEmitted = true
+        Haptics.fire('enemyDestroyed')
         this.level.onEnemyKilledAt(e.x)
         this.hud.addScore(ENFORCER_XP)
         this.score += ENFORCER_XP
@@ -957,6 +976,7 @@ export class GameScene3 {
     for (const w of this.level.wraiths) {
       if (!w.active && !w.scoreEmitted) {
         w.scoreEmitted = true
+        Haptics.fire('enemyDestroyed')
         this.level.onEnemyKilledAt(w.x)
         this.hud.addScore(WRAITH_XP)
         this.score += WRAITH_XP
@@ -1174,6 +1194,7 @@ export class GameScene3 {
       return
     }
     this.hp -= amount
+    Haptics.fire('playerDamage')
     this.hud.setHP(this.hp)
     this.damageTimer = DAMAGE_IFRAMES
     this.damageFlashTimer = 0.4
@@ -1210,7 +1231,9 @@ export class GameScene3 {
     this.level.renderProjectiles(ctx, this.camera.x)
     this.renderParticles(ctx, this.camera.x)
     this.player.render(ctx, this.camera.x)
-    this.nova.render(ctx, this.camera.x)
+    if (this.scene === 'dialogue') {
+      this.nova.render(ctx, this.camera.x)
+    }
     renderPatternGridFloorTiles(
       ctx,
       this.level.patternGrids,
@@ -1292,15 +1315,18 @@ export class GameScene3 {
     ctx.fillStyle = '#1a1535'
     ctx.font = '8px Orbitron, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText(
-      this.shop.isOpen()
-        ? '↑↓ SELECT   E / SPACE CONFIRM   F CLOSE   (Z CONFIRMS BUY)'
-        : this.showLevelCompleteCard
-          ? '[SPACE] CONTINUE'
-          : '← → / A D MOVE  ↑ / W / SPACE JUMP  Z SHOOT  X WEAPON  Q TARGET  E INTERACT',
-      640,
-      712,
-    )
+    const bottomHint = this.shop.isOpen()
+      ? '↑↓ SELECT   E / SPACE CONFIRM   F CLOSE   (Z CONFIRMS BUY)'
+      : this.showLevelCompleteCard
+        ? '[SPACE] CONTINUE'
+        : '← → / A D MOVE  ↑ / W / SPACE JUMP  Z SHOOT  X WEAPON  Q TARGET  E INTERACT'
+    const hideGameplayHint =
+      !this.shop.isOpen() &&
+      !this.showLevelCompleteCard &&
+      DeviceManager.shouldShowTouchOverlay()
+    if (!hideGameplayHint) {
+      ctx.fillText(bottomHint, 640, 712)
+    }
     ctx.textAlign = 'left'
 
     if (this.respawnFlashTimer > 0) {

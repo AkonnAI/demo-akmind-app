@@ -10,7 +10,6 @@ export class Canvas {
   private readonly onResize = (): void => {
     this.resize()
   }
-
   private readonly onOrientationChange = (): void => {
     setTimeout(() => this.resize(), 100)
   }

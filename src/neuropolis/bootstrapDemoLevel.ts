@@ -1,4 +1,5 @@
 import { Canvas } from "./engine/Canvas";
+import { DeviceManager } from "./engine/DeviceManager";
 import { GameLoop } from "./engine/GameLoop";
 import { InputManager } from "./engine/InputManager";
 import { BootScene } from "./scenes/BootScene";
@@ -23,6 +24,7 @@ export function bootstrapNeuropolisDemo(
   level: NeuropolisDemoLevel,
   onLevelComplete: () => void
 ): () => void {
+  DeviceManager.init();
   root.replaceChildren();
 
   const gameContainer = document.createElement("div");
@@ -45,7 +47,9 @@ export function bootstrapNeuropolisDemo(
   const ctx = canvas.getContext();
   const input = new InputManager();
   const loop = new GameLoop();
-  const touchControls = new TouchControls(gameContainer);
+  const touchControls = new TouchControls(gameContainer, input, {
+    bypassDeviceGate: true,
+  });
   touchControls.hide();
 
   let disposed = false;
@@ -53,6 +57,8 @@ export function bootstrapNeuropolisDemo(
   const teardown = (): void => {
     if (disposed) return;
     disposed = true;
+    cinematic?.destroy();
+    cinematic = null;
     loop.stop();
     touchControls.destroy();
     input.destroy();
@@ -76,7 +82,7 @@ export function bootstrapNeuropolisDemo(
   const beginLevel1Gameplay = (): void => {
     if (disposed) return;
     touchControls.show();
-    scene = new GameScene(input, loop, handleComplete);
+    scene = new GameScene(input, loop, handleComplete, { touchControls });
   };
 
   if (level !== 1) {
@@ -115,7 +121,7 @@ export function bootstrapNeuropolisDemo(
     }
 
     if (level === 1 && introPhase === "cinematic") {
-      touchControls.hide();
+      touchControls.show();
       cinematic?.update(dt);
       input.update();
       return;

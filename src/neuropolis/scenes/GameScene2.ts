@@ -3,6 +3,7 @@ import { GameLoop }           from '../engine/GameLoop'
 import { Camera }             from '../engine/Camera'
 import { Player }             from '../entities/Player'
 import { Projectile }         from '../entities/Projectile'
+import { Haptics }            from '../engine/Haptics'
 import { ParallaxBackground } from '../world/ParallaxBackground'
 import {
   Level2,
@@ -15,6 +16,7 @@ import { DialogueBox }        from '../ui/DialogueBox'
 import { NovaOrb }            from '../ui/NovaOrb'
 import { CONFIG }             from '../constants/config'
 import { TouchControls } from '../ui/TouchControls'
+import { attachDialoguePointerAdvance } from '../ui/dialoguePointerAdvance'
 import {
   GlitchTwinBoss,
   ARENA_GROUND_Y,
@@ -188,6 +190,7 @@ export class GameScene2 {
   private touchControls?: TouchControls
   /** Tracks `TouchControls.setHackMode` vs overlay visibility. */
   private hackOverlayPrev = false
+  private dialoguePointerDetach: (() => void) | null = null
 
   private inBossArena         = false
   private bossArena: GlitchTwinBoss | null = null
@@ -215,8 +218,6 @@ export class GameScene2 {
     void _loop
     const opts = parseGameScene2Fourth(fourth)
     this.touchControls = opts.touchControls
-    // Fade in from black at vault entry — must use arenaFadePhase 'in' so updateArenaFade
-    // runs; alpha=1 + phase 'none' leaves a permanent black overlay if decay never applies.
     if (opts.startX == null && !opts.bossArena) {
       this.arenaFadeAlpha = 1
       this.arenaFadePhase = 'in'
@@ -246,7 +247,6 @@ export class GameScene2 {
         ? 'DEFEAT THE GLITCH TWIN — IDENTIFY THE PATTERN'
         : 'NAVIGATE THE UNDERGROUND VAULT',
     )
-    this.nova.show(260, this.bg.getGroundY() - 100)
     this.onLevelComplete = onLevelComplete
 
     if (opts.bossArena) {
@@ -301,8 +301,18 @@ export class GameScene2 {
 
   private talk(lines: DialogueLine[], onDone?: () => void): void {
     this.scene = 'dialogue'
+    this.nova.show(this.player.x + 70, this.player.y - 30)
+    this.touchControls?.hide()
+    this.dialoguePointerDetach?.()
+    this.dialoguePointerDetach = attachDialoguePointerAdvance(() => {
+      this.dialogue.advance()
+    })
     this.dialogue.show(lines, () => {
+      this.dialoguePointerDetach?.()
+      this.dialoguePointerDetach = null
+      this.touchControls?.show()
       this.scene = 'play'
+      this.nova.hide()
       onDone?.()
     })
   }
@@ -443,6 +453,7 @@ export class GameScene2 {
         // then the body is still tumbling through the air.
         if (c.isLanded()) {
           c.exploded = true
+          Haptics.fire('enemyDestroyed')
           this.triggerShake(SHAKE_CRAWLER_DEAD_MAG, SHAKE_CRAWLER_DEAD_DUR)
           this.explosions.push({
             x: c.x, y: this.bg.getGroundY() - 10,
@@ -466,6 +477,7 @@ export class GameScene2 {
     for (const m of this.level.sentryMines) {
       if (!m.active && !m.exploded) {
         m.exploded = true
+        Haptics.fire('enemyDestroyed')
         this.triggerShake(4, 0.25)
         this.explosions.push({
           x: m.x, y: m.y, t: 0.5, maxT: 0.5,
@@ -481,6 +493,7 @@ export class GameScene2 {
     for (const w of this.level.wallHuggers) {
       if (!w.active && !w.exploded) {
         w.exploded = true
+        Haptics.fire('enemyDestroyed')
         this.triggerShake(4, 0.25)
         this.explosions.push({
           x: w.x, y: w.y, t: 0.5, maxT: 0.5,
@@ -763,6 +776,7 @@ export class GameScene2 {
     ) : null
     if (crawlerEv === 'hit' && this.damageTimer <= 0) {
       this.hp--
+      Haptics.fire('playerDamage')
       this.hud.setHP(this.hp)
       this.triggerShake(SHAKE_CRAWLER_HIT_MAG, SHAKE_CRAWLER_HIT_DUR)
       this.acidFlashTimer = ACID_FLASH_DURATION
@@ -787,6 +801,7 @@ export class GameScene2 {
     ) : null
     if (mineEv === 'hit' && this.damageTimer <= 0) {
       this.hp--
+      Haptics.fire('playerDamage')
       this.hud.setHP(this.hp)
       this.triggerShake(6, 0.35)
       this.damageTimer   = DAMAGE_IFRAMES
@@ -802,6 +817,7 @@ export class GameScene2 {
     ) : null
     if (huggerEv === 'hit' && this.damageTimer <= 0) {
       this.hp--
+      Haptics.fire('playerDamage')
       this.hud.setHP(this.hp)
       this.triggerShake(5, 0.3)
       this.damageTimer   = DAMAGE_IFRAMES
@@ -1209,11 +1225,11 @@ export class GameScene2 {
         p.render(ctx, 0)
       }
       this.player.render(ctx, 0)
-      this.nova.render(ctx, 0)
+      if (this.scene === 'dialogue') this.nova.render(ctx, 0)
     } else {
       this.level.render(ctx, this.camera.x)
       this.player.render(ctx, this.camera.x)
-      this.nova.render(ctx, this.camera.x)
+      if (this.scene === 'dialogue') this.nova.render(ctx, this.camera.x)
     }
 
     this.bg.renderParticles(ctx, cam)

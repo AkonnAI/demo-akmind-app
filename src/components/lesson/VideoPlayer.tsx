@@ -9,18 +9,40 @@ import {
   LESSON_VIDEOS,
 } from "@/lib/lesson-videos";
 
+/** Fraction of the timeline that must have been played (not merely seeked past) for learners. */
+const WATCH_PLAYED_THRESHOLD = 0.92;
+
+function playedWatchFraction(video: HTMLVideoElement): number {
+  const d = video.duration;
+  if (!d || !Number.isFinite(d) || d <= 0) return 0;
+  let played = 0;
+  for (let i = 0; i < video.played.length; i++) {
+    played += video.played.end(i) - video.played.start(i);
+  }
+  return Math.min(1, played / d);
+}
+
 interface VideoPlayerProps {
   lessonId: number;
   onEnded?: () => void;
   onProgress?: (pct: number) => void;
+  /**
+   * When true, `onWatchSatisfied` fires only after enough of the file has actually been played.
+   * Seeking to the end alone does not count until playback covers most of the timeline.
+   */
+  enforceWatchThrough?: boolean;
+  onWatchSatisfied?: () => void;
 }
 
 export default function VideoPlayer({
   lessonId,
   onEnded,
   onProgress,
+  enforceWatchThrough = false,
+  onWatchSatisfied,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const satisfiedSent = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
@@ -37,8 +59,19 @@ export default function VideoPlayer({
   const captionsUrl = meta?.hasCaptions ? getCaptionsUrl(lessonId) : undefined;
 
   useEffect(() => {
+    satisfiedSent.current = false;
+  }, [lessonId, retryKey, enforceWatchThrough]);
+
+  useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+
+    const tryWatchSatisfied = () => {
+      if (!enforceWatchThrough || satisfiedSent.current) return;
+      if (playedWatchFraction(v) < WATCH_PLAYED_THRESHOLD) return;
+      satisfiedSent.current = true;
+      onWatchSatisfied?.();
+    };
 
     const handleLoaded = () => setLoading(false);
     const handleError = () => {
@@ -47,10 +80,15 @@ export default function VideoPlayer({
         "Video failed to load. Please check your connection and try again."
       );
     };
-    const handleEnded = () => onEnded?.();
+    const handleEnded = () => {
+      onEnded?.();
+      tryWatchSatisfied();
+    };
     const handleTimeUpdate = () => {
-      if (!onProgress || !v.duration) return;
-      onProgress((v.currentTime / v.duration) * 100);
+      if (onProgress && v.duration) {
+        onProgress((v.currentTime / v.duration) * 100);
+      }
+      tryWatchSatisfied();
     };
 
     v.addEventListener("loadedmetadata", handleLoaded);
@@ -64,7 +102,14 @@ export default function VideoPlayer({
       v.removeEventListener("ended", handleEnded);
       v.removeEventListener("timeupdate", handleTimeUpdate);
     };
-  }, [onEnded, onProgress, retryKey]);
+  }, [
+    onEnded,
+    onProgress,
+    onWatchSatisfied,
+    enforceWatchThrough,
+    retryKey,
+    lessonId,
+  ]);
 
   const handleRetry = () => {
     setLoading(true);
@@ -114,7 +159,7 @@ export default function VideoPlayer({
       )}
 
       <video
-        key={retryKey}
+        key={`${lessonId}-${retryKey}`}
         ref={videoRef}
         className="h-full w-full"
         controls
