@@ -604,9 +604,9 @@ function LessonPageInner() {
   const q = lesson.quiz[currentQuestion];
   const durationMin = Math.round(lesson.duration / 60);
   const typeLabel =
-    lesson.type === "live"
-      ? "Live instructor after purchase · Demo: recording + game"
-      : "Self-paced + game";
+    lessonId === 1
+      ? "Paid course: live class · Demo: recording + full game (free)"
+      : "Self-paced lesson video + game";
 
   return (
     <div className="min-h-screen overflow-x-hidden">
@@ -725,10 +725,14 @@ function LessonPageInner() {
                 }}
               >
                 <p className="font-semibold text-indigo-200">
-                  About the live track
+                  Lesson 1 — Live class in the full course
                 </p>
                 <p className="mt-1 text-slate-400">
-                  Scheduled live lessons with an instructor unlock after you purchase the full course. This demo still includes the recorded lesson and the Neuropolis game so you can try the full flow.
+                  After purchase, students attend scheduled live sessions with an instructor. Here in the demo you get the same lesson as a recording—then use{" "}
+                  <span className="font-medium text-slate-300">
+                    Continue to Game
+                  </span>{" "}
+                  to play Neuropolis and complete the quiz. No purchase is required for this preview.
                 </p>
               </div>
             )}
@@ -746,8 +750,9 @@ function LessonPageInner() {
               </div>
               {!canContinueFromVideo && !adminMode && (
                 <p className="mt-4 text-xs text-slate-500">
-                  Watch the lesson video until you&apos;ve played through it (about
-                  the full length). Continue unlocks when you&apos;re done.
+                  {lessonId === 1
+                    ? "Watch the recording above until it counts as complete. Then Continue to Game unlocks Neuropolis for this demo (live sessions are only in the paid course)."
+                    : "Watch the lesson video until you&apos;ve played through it (about the full length). Continue unlocks when you&apos;re done."}
                 </p>
               )}
               {adminMode && (
