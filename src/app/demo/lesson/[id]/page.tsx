@@ -34,6 +34,9 @@ type LessonContent = {
   quiz: QuizItem[];
 };
 
+/** Lessons 2–4: minimum seconds of actual video playback before continue unlocks. */
+const MIN_LESSON_VIDEO_PLAY_SECONDS = 180;
+
 const LESSONS: Record<number, LessonContent> = {
   1: {
     title: "Welcome to Artificial Intelligence",
@@ -575,7 +578,11 @@ function LessonPageInner() {
   }
 
   const adminMode = isAdminTester(user);
-  const canContinueFromVideo = adminMode || videoWatchSatisfied;
+  const minVideoRequired = !adminMode && lessonId >= 2 && lessonId <= 4;
+  const showLaunchCard = minVideoRequired && videoWatchSatisfied;
+  const showStandardContinue = !minVideoRequired || adminMode;
+  const canContinueFromVideo =
+    adminMode || lessonId === 1 || videoWatchSatisfied;
 
   if (user && !lessonUnlocked(lessonId, user.lessonsComplete)) {
     if (!adminMode) {
@@ -711,7 +718,10 @@ function LessonPageInner() {
           >
             <VideoPlayer
               lessonId={lessonId}
-              enforceWatchThrough={!adminMode}
+              enforceWatchThrough={minVideoRequired}
+              minPlayedSeconds={
+                minVideoRequired ? MIN_LESSON_VIDEO_PLAY_SECONDS : undefined
+              }
               onWatchSatisfied={() => setVideoWatchSatisfied(true)}
             />
 
@@ -748,36 +758,69 @@ function LessonPageInner() {
                   {typeLabel}
                 </span>
               </div>
-              {!canContinueFromVideo && !adminMode && (
+              {minVideoRequired && !videoWatchSatisfied && (
                 <p className="mt-4 text-xs text-slate-500">
-                  {lessonId === 1
-                    ? "Watch the recording above until it counts as complete. Then Continue to Game unlocks Neuropolis for this demo (live sessions are only in the paid course)."
-                    : "Watch the lesson video until you&apos;ve played through it (about the full length). Continue unlocks when you&apos;re done."}
+                  Watch at least three minutes of the lesson video (real playback,
+                  not just skipping ahead). Then you&apos;ll see what&apos;s next for
+                  the full course and can continue to the game.
                 </p>
               )}
               {adminMode && (
                 <p className="mt-4 text-xs text-amber-200/80">
-                  Admin / tester: you can continue without watching the full video.
+                  Admin / tester: lesson video gates are bypassed.
                 </p>
               )}
-              <button
-                type="button"
-                disabled={!canContinueFromVideo}
-                className={`mt-6 rounded-xl px-7 py-3 font-semibold text-white transition-all duration-200 ${
-                  canContinueFromVideo
-                    ? "hover:-translate-y-0.5"
-                    : "cursor-not-allowed opacity-45"
-                }`}
-                style={{
-                  background: "linear-gradient(135deg, #6366F1, #4F46E5)",
-                  boxShadow: "var(--glow-indigo)",
-                }}
-                onClick={() =>
-                  lesson.hasGame ? setPhase("game") : setPhase("quiz")
-                }
-              >
-                {lesson.hasGame ? "Continue to Game →" : "Continue to Quiz →"}
-              </button>
+              {showLaunchCard && (
+                <div
+                  className="mt-6 rounded-xl border px-5 py-5 sm:px-6 sm:py-6"
+                  style={{
+                    background: "rgba(99,102,241,0.08)",
+                    borderColor: "rgba(99,102,241,0.28)",
+                    backdropFilter: "blur(12px)",
+                  }}
+                >
+                  <p className="font-semibold text-indigo-200">
+                    Full lesson experience
+                  </p>
+                  <p className="mt-2 text-sm text-slate-400">
+                    Full lesson launching June 2026 — stay tuned. You can still
+                    continue to the demo game below.
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-5 rounded-xl px-7 py-3 font-semibold text-white transition-all duration-200 hover:-translate-y-0.5"
+                    style={{
+                      background: "linear-gradient(135deg, #6366F1, #4F46E5)",
+                      boxShadow: "var(--glow-indigo)",
+                    }}
+                    onClick={() =>
+                      lesson.hasGame ? setPhase("game") : setPhase("quiz")
+                    }
+                  >
+                    {lesson.hasGame ? "Continue to Game →" : "Continue to Quiz →"}
+                  </button>
+                </div>
+              )}
+              {showStandardContinue && (
+                <button
+                  type="button"
+                  disabled={!canContinueFromVideo}
+                  className={`mt-6 rounded-xl px-7 py-3 font-semibold text-white transition-all duration-200 ${
+                    canContinueFromVideo
+                      ? "hover:-translate-y-0.5"
+                      : "cursor-not-allowed opacity-45"
+                  }`}
+                  style={{
+                    background: "linear-gradient(135deg, #6366F1, #4F46E5)",
+                    boxShadow: "var(--glow-indigo)",
+                  }}
+                  onClick={() =>
+                    lesson.hasGame ? setPhase("game") : setPhase("quiz")
+                  }
+                >
+                  {lesson.hasGame ? "Continue to Game →" : "Continue to Quiz →"}
+                </button>
+              )}
             </div>
           </div>
         )}

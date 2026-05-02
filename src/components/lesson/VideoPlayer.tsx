@@ -22,6 +22,25 @@ function playedWatchFraction(video: HTMLVideoElement): number {
   return Math.min(1, played / d);
 }
 
+/** Sum of `played` TimeRanges — actual playback seconds, not scrub-only. */
+function playedSecondsTotal(video: HTMLVideoElement): number {
+  let played = 0;
+  for (let i = 0; i < video.played.length; i++) {
+    played += video.played.end(i) - video.played.start(i);
+  }
+  return played;
+}
+
+/** Require `minSec` unless the file is shorter — then require full duration. */
+function requiredPlayedSeconds(
+  video: HTMLVideoElement,
+  minSec: number,
+): number {
+  const d = video.duration;
+  if (!Number.isFinite(d) || d <= 0) return minSec;
+  return Math.min(minSec, d);
+}
+
 interface VideoPlayerProps {
   lessonId: number;
   onEnded?: () => void;
@@ -31,6 +50,8 @@ interface VideoPlayerProps {
    * Seeking to the end alone does not count until playback covers most of the timeline.
    */
   enforceWatchThrough?: boolean;
+  /** If set with `enforceWatchThrough`, satisfaction uses this many seconds of real playback (capped by video duration). */
+  minPlayedSeconds?: number;
   onWatchSatisfied?: () => void;
 }
 
@@ -39,6 +60,7 @@ export default function VideoPlayer({
   onEnded,
   onProgress,
   enforceWatchThrough = false,
+  minPlayedSeconds,
   onWatchSatisfied,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -60,7 +82,7 @@ export default function VideoPlayer({
 
   useEffect(() => {
     satisfiedSent.current = false;
-  }, [lessonId, retryKey, enforceWatchThrough]);
+  }, [lessonId, retryKey, enforceWatchThrough, minPlayedSeconds]);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -68,7 +90,13 @@ export default function VideoPlayer({
 
     const tryWatchSatisfied = () => {
       if (!enforceWatchThrough || satisfiedSent.current) return;
-      if (playedWatchFraction(v) < WATCH_PLAYED_THRESHOLD) return;
+      const minS = minPlayedSeconds;
+      if (minS != null && minS > 0) {
+        const need = requiredPlayedSeconds(v, minS);
+        if (playedSecondsTotal(v) < need) return;
+      } else if (playedWatchFraction(v) < WATCH_PLAYED_THRESHOLD) {
+        return;
+      }
       satisfiedSent.current = true;
       onWatchSatisfied?.();
     };
@@ -107,6 +135,7 @@ export default function VideoPlayer({
     onProgress,
     onWatchSatisfied,
     enforceWatchThrough,
+    minPlayedSeconds,
     retryKey,
     lessonId,
   ]);
