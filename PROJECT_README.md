@@ -4,14 +4,41 @@ This document is the **single source of truth** for **demo-akmind-app**: what it
 
 ---
 
-## 0. Latest Updates (Apr 2026)
+## 0. Latest Updates (Apr–May 2026)
 
 Recent production-facing changes implemented in this repository:
 
+- **Lesson video gates & “full lesson” card**
+  - **`VideoPlayer`** (`src/components/lesson/VideoPlayer.tsx`) still streams from **`NEXT_PUBLIC_CDN_URL`** (`lesson-videos.ts`). It can enforce **real playback** via `video.played` TimeRanges (not scrub-only).
+  - **Lesson 1:** learners can tap **Continue to Game** immediately — **no** `enforceWatchThrough`.
+  - **Lessons 2–4:** learners need **≥ 180 seconds** of actual playback (`MIN_LESSON_VIDEO_PLAY_SECONDS`), capped at **video duration** if the file is shorter than 3 minutes. Then a **“Full lesson experience”** card appears: copy includes **“Full lesson launching June 2026 — stay tuned”** and the only **Continue to Game** CTA for that path lives **on the card** (the standard gradient button is hidden until admins/L1 use the standard path).
+  - **Admin testers** (`admin@akmind.com` or display name `Admin`): all video gates bypassed; they always see the standard Continue button.
+  - Optional **`minPlayedSeconds`** + **`enforceWatchThrough`**; if `minPlayedSeconds` is omitted but `enforceWatchThrough` is true, legacy behavior uses **~92%** of the timeline played (`WATCH_PLAYED_THRESHOLD`).
+
+- **Demo session cookie & user API rate limit** (`src/lib/demo-session.ts`)
+
+```typescript
+/**
+ * Demo access cookie — refreshed when users hit any `/demo/*` route (see middleware).
+ * Tokens themselves do not expire in the database; persistence is mainly this cookie + URL.
+ */
+export const DEMO_TOKEN_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365; // 1 year
+
+/** GET /api/demo/user — generous limit so dashboards / lessons / DevTools do not false-expire sessions */
+export const DEMO_USER_API_RATE_LIMIT_PER_MINUTE = 240;
+```
+
+  - **`middleware.ts`** sets `demo_token` with **`DEMO_TOKEN_COOKIE_MAX_AGE_SECONDS`** (365 days in production usage).
+  - **`GET /api/demo/user`** imports **`DEMO_USER_API_RATE_LIMIT_PER_MINUTE`** for throttling.
+
+- **Neuropolis as the lesson game (lessons 1–4)**
+  - **`src/app/demo/lesson/[id]/page.tsx`** loads **`NeuropolisShell`** via `dynamic(..., { ssr: false })` inside **`LandscapeWrapper`** when `phase === "game"` and `lessonId` is 1–4.
+  - **`bootstrapNeuropolisDemo`** (`src/neuropolis/bootstrapDemoLevel.ts`) mounts canvas, **`DeviceManager.init`**, **`InputManager`**, **`TouchControls`** (`bypassDeviceGate: true` for demo), and the correct **`GameScene` / `GameScene2`–`GameScene4`** for the level. Returns a **teardown** on unmount or **Exit**.
+  - **`NOVAChat`** floating FAB is **suppressed** while the game is active (`suppressNovaChatFab = phase === "game" && gameActive`) so taps go to the canvas / dialogue.
+
 - **Lesson video playback (S3 CDN)**
-  - **`src/components/lesson/VideoPlayer.tsx`** streams MP4 from **`NEXT_PUBLIC_CDN_URL`** using paths `videos/lesson-{n}/1080p.mp4` and optional **`poster.jpg`** / **`captions.vtt`** (when captions are enabled in **`src/lib/lesson-videos.ts`**).
-  - The animated **"Video Uploading Soon"** placeholder has been removed from the lesson video step; if the CDN URL is missing, the UI shows a clear configuration message instead of crashing.
-  - **No forced watch timer** — the existing **Continue** control still advances immediately.
+  - Streams MP4 from **`NEXT_PUBLIC_CDN_URL`** using paths `videos/lesson-{n}/1080p.mp4` and optional **`poster.jpg`** / **`captions.vtt`** (when captions are enabled in **`src/lib/lesson-videos.ts`**).
+  - If the CDN URL is missing, the UI shows a clear configuration message instead of crashing.
 
 - **NOVA AI companion (Groq) + voice**
   - **`POST /api/nova`** (`src/app/api/nova/route.ts`): Groq **`llama-3.3-70b-versatile`**, short warm replies (1–2 sentences), in-memory conversation **`demoMemory`** keyed by `userId` / `userName` for continuity within a server instance.
@@ -35,7 +62,7 @@ Recent production-facing changes implemented in this repository:
   - Shared touch overlay in `src/components/games/shared/GameTouchControls.tsx`; wired into `GameShell2`–`GameShell4`.
 
 - **Lesson content flow**
-  - Lesson videos use **`VideoPlayer`** + **`lesson-videos.ts`** (S3 URLs); **no forced watch timer** — immediate continue to game/quiz where applicable.
+  - Lesson videos use **`VideoPlayer`** + **`lesson-videos.ts`** (S3 URLs); gating rules above apply per lesson id.
 
 - **Admin QA**
   - Tester identity (`admin@akmind.com` / name `Admin`) can unlock any lesson for testing; admin panel password/session gated.
@@ -100,7 +127,7 @@ demo-akmind-app/
 │   │   │   ├── complete/
 │   │   │   │   └── page.tsx     # Post-program: badge PDF, payment UI (mock flow)
 │   │   │   └── lesson/[id]/
-│   │   │       └── page.tsx     # Per-lesson: VideoPlayer (S3) → game? → quiz → results
+│   │   │       └── page.tsx     # Per-lesson: VideoPlayer → NeuropolisShell (L1–4) → quiz → results
 │   │   └── api/
 │   │       ├── nova/route.ts    # NOVA: Groq chat + server-side memory slice
 │   │       └── demo/
@@ -114,15 +141,21 @@ demo-akmind-app/
 │   │   ├── NOVACharacter.tsx    # Chat/dashboard avatar (distinct from games/shared)
 │   │   ├── NOVAVoiceButton.tsx
 │   │   ├── lesson/
-│   │   │   └── VideoPlayer.tsx  # S3-streamed lesson MP4 + poster
+│   │   │   └── VideoPlayer.tsx  # S3 MP4; optional enforceWatchThrough + minPlayedSeconds
 │   │   └── games/
-│   │       ├── shared/          # AXCharacter, NovaCharacter, GameTouchControls, …
-│   │       ├── lesson2/
+│   │       ├── neuropolis/
+│   │       │   └── NeuropolisShell.tsx  # bootstrapNeuropolisDemo mount + Exit portal
+│   │       ├── shared/          # LandscapeWrapper, AXCharacter, NovaCharacter, …
+│   │       ├── lesson2/         # GameShell2… — legacy/alternate; live flow uses Neuropolis
 │   │       ├── lesson3/
 │   │       └── lesson4/
+│   ├── neuropolis/              # Canvas demo engine (scenes, entities, TouchControls)
+│   │   ├── bootstrapDemoLevel.ts
+│   │   └── …
 │   ├── hooks/
 │   │   └── useNOVAVoice.ts      # SpeechRecognition + speechSynthesis
 │   ├── lib/
+│   │   ├── demo-session.ts      # Cookie max-age + GET /api/demo/user rate limit constants
 │   │   ├── demo-db.ts           # JSON or DynamoDB persistence
 │   │   ├── demo-nova-stats.ts   # Live XP/streak/badge stats for NOVA prompt
 │   │   ├── lesson-content.ts    # Module/lesson summaries for NOVA context
@@ -174,9 +207,24 @@ There is **no** session/JWT stack. Access is:
 4. **`middleware.ts`** matches **`/demo/:path*`**:
    - Requires `token` query **or** `demo_token` cookie.
    - If missing → redirect **`/?error=no-token`**.
-   - If token present but no cookie → sets **`demo_token`** cookie (7 days, path `/`).
+   - If token present but no cookie → sets **`demo_token`** cookie (**365 days** via `DEMO_TOKEN_COOKIE_MAX_AGE_SECONDS` in `src/lib/demo-session.ts`, path `/`).
 
 **Lesson unlock rule:** Lesson `n > 1` requires **`lessonsComplete` includes `n - 1`** (previous lesson id completed via progress API).
+
+**Middleware cookie refresh** (`src/middleware.ts`): every `/demo/*` hit extends `demo_token` using **`DEMO_TOKEN_COOKIE_MAX_AGE_SECONDS`** from **`src/lib/demo-session.ts`**.
+
+```typescript
+import { DEMO_TOKEN_COOKIE_MAX_AGE_SECONDS } from "@/lib/demo-session";
+
+const res = NextResponse.next();
+res.cookies.set("demo_token", token, {
+  maxAge: DEMO_TOKEN_COOKIE_MAX_AGE_SECONDS,
+  path: "/",
+  sameSite: "lax",
+  secure: process.env.NODE_ENV === "production",
+});
+return res;
+```
 
 ---
 
@@ -266,7 +314,7 @@ Returns full user list (all fields) for the admin dashboard. Protected by admin 
 |-------|------|
 | `/` | Landing: starfield, registration context, manual token entry, validates token |
 | `/demo` | Dashboard: lesson cards, XP, locks, **NOVAChat** launcher |
-| `/demo/lesson/[id]` | Lesson flow: **VideoPlayer** (S3) → game (if any) → quiz → results; **NOVAChat** with lesson context |
+| `/demo/lesson/[id]` | Lesson flow: **VideoPlayer** → (optional **June 2026** card for L2–4) → **NeuropolisShell** (L1–4) → quiz → results; **NOVAChat** suppressed during fullscreen game |
 | `/demo/complete` | Requires **`demoCompleted`**; confetti, badge PDF download, payment UI stub; redirects incomplete users to `/demo` |
 | `/admin` | Admin panel: user list, lesson progress, XP, quiz scores |
 
@@ -278,38 +326,652 @@ Returns full user list (all fields) for the admin dashboard. Protected by admin 
 
 Content is primarily defined in **`src/app/demo/lesson/[id]/page.tsx`** (`LESSONS` constant). Dashboard copy is duplicated per lesson in **`src/app/demo/page.tsx`** (`LESSONS` array for UI metadata).
 
+### Shared mechanics
+
+- Lessons **1–4** set **`hasGame: true`**; each opens **`NeuropolisShell`** with `level={lessonId}` (see **§10c**).
+- **`GAME_BONUS_XP`:** `200` — included when posting XP after quiz if the embedded game was completed (`page.tsx`).
+- **`GAME_MECHANICS`:** Neuropolis district blurbs keyed by lesson id.
+
+### 10a. Video gates & Continue UX (authoritative excerpts)
+
+Constants and derived flags from **`src/app/demo/lesson/[id]/page.tsx`**:
+
+```typescript
+import type { DemoUser } from "@/types/demo"; // top of page.tsx
+
+/** Lessons 2–4: minimum seconds of actual video playback before continue unlocks. */
+const MIN_LESSON_VIDEO_PLAY_SECONDS = 180;
+
+function isAdminTester(user: DemoUser | null): boolean {
+  if (!user) return false;
+  return (
+    user.email?.toLowerCase() === "admin@akmind.com" || user.name === "Admin"
+  );
+}
+
+const adminMode = isAdminTester(user);
+const minVideoRequired = !adminMode && lessonId >= 2 && lessonId <= 4;
+const showLaunchCard = minVideoRequired && videoWatchSatisfied;
+const showStandardContinue = !minVideoRequired || adminMode;
+const canContinueFromVideo =
+  adminMode || lessonId === 1 || videoWatchSatisfied;
+```
+
+`<VideoPlayer>` wiring:
+
+```tsx
+<VideoPlayer
+  lessonId={lessonId}
+  enforceWatchThrough={minVideoRequired}
+  minPlayedSeconds={
+    minVideoRequired ? MIN_LESSON_VIDEO_PLAY_SECONDS : undefined
+  }
+  onWatchSatisfied={() => setVideoWatchSatisfied(true)}
+/>
+```
+
+After the **3-minute** gate, learners see the **full lesson** card; **Continue to Game** on that card enters the game phase. The standard gradient button is shown only when **`showStandardContinue`** (lesson 1, or admin bypass):
+
+```tsx
+{showLaunchCard && (
+  <div
+    className="mt-6 rounded-xl border px-5 py-5 sm:px-6 sm:py-6"
+    style={{
+      background: "rgba(99,102,241,0.08)",
+      borderColor: "rgba(99,102,241,0.28)",
+      backdropFilter: "blur(12px)",
+    }}
+  >
+    <p className="font-semibold text-indigo-200">Full lesson experience</p>
+    <p className="mt-2 text-sm text-slate-400">
+      Full lesson launching June 2026 — stay tuned. You can still continue to the
+      demo game below.
+    </p>
+    <button
+      type="button"
+      className="mt-5 rounded-xl px-7 py-3 font-semibold text-white transition-all duration-200 hover:-translate-y-0.5"
+      style={{
+        background: "linear-gradient(135deg, #6366F1, #4F46E5)",
+        boxShadow: "var(--glow-indigo)",
+      }}
+      onClick={() =>
+        lesson.hasGame ? setPhase("game") : setPhase("quiz")
+      }
+    >
+      {lesson.hasGame ? "Continue to Game →" : "Continue to Quiz →"}
+    </button>
+  </div>
+)}
+{showStandardContinue && (
+  <button
+    type="button"
+    disabled={!canContinueFromVideo}
+    className={`mt-6 rounded-xl px-7 py-3 font-semibold text-white transition-all duration-200 ${
+      canContinueFromVideo
+        ? "hover:-translate-y-0.5"
+        : "cursor-not-allowed opacity-45"
+    }`}
+    style={{
+      background: "linear-gradient(135deg, #6366F1, #4F46E5)",
+      boxShadow: "var(--glow-indigo)",
+    }}
+    onClick={() =>
+      lesson.hasGame ? setPhase("game") : setPhase("quiz")
+    }
+  >
+    {lesson.hasGame ? "Continue to Game →" : "Continue to Quiz →"}
+  </button>
+)}
+```
+
+While **`phase === "game"`** and **`gameActive`**, **`suppressNovaChatFab`** hides **`NOVAChat`** so taps reach the canvas.
+
+### 10b. `VideoPlayer.tsx` (full source — `src/components/lesson/VideoPlayer.tsx`)
+
+Satisfaction is evaluated on **`timeupdate`** and **`ended`**. Props: **`enforceWatchThrough`**, optional **`minPlayedSeconds`** (uses **`video.played`** summed seconds, capped by duration), optional **`onWatchSatisfied`**.
+
+```tsx
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { AlertCircle, Loader2 } from "lucide-react";
+import {
+  getVideoUrl,
+  getPosterUrl,
+  getCaptionsUrl,
+  LESSON_VIDEOS,
+} from "@/lib/lesson-videos";
+
+/** Fraction of the timeline that must have been played (not merely seeked past) for learners. */
+const WATCH_PLAYED_THRESHOLD = 0.92;
+
+function playedWatchFraction(video: HTMLVideoElement): number {
+  const d = video.duration;
+  if (!d || !Number.isFinite(d) || d <= 0) return 0;
+  let played = 0;
+  for (let i = 0; i < video.played.length; i++) {
+    played += video.played.end(i) - video.played.start(i);
+  }
+  return Math.min(1, played / d);
+}
+
+/** Sum of `played` TimeRanges — actual playback seconds, not scrub-only. */
+function playedSecondsTotal(video: HTMLVideoElement): number {
+  let played = 0;
+  for (let i = 0; i < video.played.length; i++) {
+    played += video.played.end(i) - video.played.start(i);
+  }
+  return played;
+}
+
+/** Require `minSec` unless the file is shorter — then require full duration. */
+function requiredPlayedSeconds(
+  video: HTMLVideoElement,
+  minSec: number,
+): number {
+  const d = video.duration;
+  if (!Number.isFinite(d) || d <= 0) return minSec;
+  return Math.min(minSec, d);
+}
+
+interface VideoPlayerProps {
+  lessonId: number;
+  onEnded?: () => void;
+  onProgress?: (pct: number) => void;
+  /**
+   * When true, `onWatchSatisfied` fires only after enough of the file has actually been played.
+   * Seeking to the end alone does not count until playback covers most of the timeline.
+   */
+  enforceWatchThrough?: boolean;
+  /** If set with `enforceWatchThrough`, satisfaction uses this many seconds of real playback (capped by video duration). */
+  minPlayedSeconds?: number;
+  onWatchSatisfied?: () => void;
+}
+
+export default function VideoPlayer({
+  lessonId,
+  onEnded,
+  onProgress,
+  enforceWatchThrough = false,
+  minPlayedSeconds,
+  onWatchSatisfied,
+}: VideoPlayerProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const satisfiedSent = useRef(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+
+  const meta = LESSON_VIDEOS[lessonId];
+  const videoUrl = (() => {
+    try {
+      return getVideoUrl(lessonId);
+    } catch {
+      return null;
+    }
+  })();
+  const posterUrl = getPosterUrl(lessonId);
+  const captionsUrl = meta?.hasCaptions ? getCaptionsUrl(lessonId) : undefined;
+
+  useEffect(() => {
+    satisfiedSent.current = false;
+  }, [lessonId, retryKey, enforceWatchThrough, minPlayedSeconds]);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+
+    const tryWatchSatisfied = () => {
+      if (!enforceWatchThrough || satisfiedSent.current) return;
+      const minS = minPlayedSeconds;
+      if (minS != null && minS > 0) {
+        const need = requiredPlayedSeconds(v, minS);
+        if (playedSecondsTotal(v) < need) return;
+      } else if (playedWatchFraction(v) < WATCH_PLAYED_THRESHOLD) {
+        return;
+      }
+      satisfiedSent.current = true;
+      onWatchSatisfied?.();
+    };
+
+    const handleLoaded = () => setLoading(false);
+    const handleError = () => {
+      setLoading(false);
+      setError(
+        "Video failed to load. Please check your connection and try again."
+      );
+    };
+    const handleEnded = () => {
+      onEnded?.();
+      tryWatchSatisfied();
+    };
+    const handleTimeUpdate = () => {
+      if (onProgress && v.duration) {
+        onProgress((v.currentTime / v.duration) * 100);
+      }
+      tryWatchSatisfied();
+    };
+
+    v.addEventListener("loadedmetadata", handleLoaded);
+    v.addEventListener("error", handleError);
+    v.addEventListener("ended", handleEnded);
+    v.addEventListener("timeupdate", handleTimeUpdate);
+
+    return () => {
+      v.removeEventListener("loadedmetadata", handleLoaded);
+      v.removeEventListener("error", handleError);
+      v.removeEventListener("ended", handleEnded);
+      v.removeEventListener("timeupdate", handleTimeUpdate);
+    };
+  }, [
+    onEnded,
+    onProgress,
+    onWatchSatisfied,
+    enforceWatchThrough,
+    minPlayedSeconds,
+    retryKey,
+    lessonId,
+  ]);
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError(null);
+    setRetryKey((k) => k + 1);
+  };
+
+  if (!videoUrl) {
+    return (
+      <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-red-500/40 bg-slate-950">
+        <div className="px-4 text-center text-red-300">
+          <AlertCircle className="mx-auto mb-2 h-8 w-8" />
+          <p className="text-sm">Video CDN not configured.</p>
+          <p className="mt-1 text-xs text-red-400/70">
+            NEXT_PUBLIC_CDN_URL missing.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-cyan-500/30 bg-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.15)]">
+      {loading && !error && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+          <div className="text-center text-cyan-300">
+            <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin" />
+            <p className="text-sm">Loading video…</p>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm">
+          <div className="px-4 text-center text-red-300">
+            <AlertCircle className="mx-auto mb-2 h-8 w-8" />
+            <p className="mb-3 text-sm">{error}</p>
+            <button
+              type="button"
+              onClick={handleRetry}
+              className="rounded border border-cyan-500/40 bg-cyan-500/20 px-4 py-2 text-xs text-cyan-300 transition hover:bg-cyan-500/30"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
+      <video
+        key={`${lessonId}-${retryKey}`}
+        ref={videoRef}
+        className="h-full w-full"
+        controls
+        preload="metadata"
+        playsInline
+        poster={posterUrl}
+        crossOrigin="anonymous"
+      >
+        <source src={videoUrl} type="video/mp4" />
+        {captionsUrl && (
+          <track
+            kind="captions"
+            src={captionsUrl}
+            srcLang="en"
+            label="English"
+            default
+          />
+        )}
+        Your browser does not support HTML5 video.
+      </video>
+    </div>
+  );
+}
+```
+
+### 10c. Neuropolis shell wiring (`page.tsx`)
+
+```typescript
+const NeuropolisShell = dynamic(
+  () => import("@/components/games/neuropolis/NeuropolisShell"),
+  { ssr: false }
+);
+const LandscapeWrapper = dynamic(
+  () => import("@/components/games/shared/LandscapeWrapper"),
+  { ssr: false }
+);
+```
+
+```tsx
+{phase === "game" && lesson.hasGame && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 50,
+      overflow: "hidden",
+      maxWidth: "100vw",
+      maxHeight: "100vh",
+    }}
+  >
+    {gameActive && lessonId >= 1 && lessonId <= 4 && (
+      <LandscapeWrapper>
+        <NeuropolisShell
+          level={lessonId as 1 | 2 | 3 | 4}
+          onComplete={async () => {
+            await exitGame();
+            setGameComplete(true);
+            setPhase("quiz");
+          }}
+          onExit={exitGame}
+        />
+      </LandscapeWrapper>
+    )}
+    {/* … placeholders for lessonId outside 1–4 or post-game UI … */}
+  </div>
+)}
+```
+
+**Bootstrap:** `NeuropolisShell` calls **`bootstrapNeuropolisDemo(mountEl, level, onComplete)`** (`src/neuropolis/bootstrapDemoLevel.ts`): **`DeviceManager.init`**, **`Canvas`**, **`InputManager`**, **`TouchControls`** (`bypassDeviceGate: true`), **`GameLoop`**, then **`BootScene`** (lesson 1 only) → **`CinematicScene`** or straight to **`GameScene` / `GameScene2`–`GameScene4`**. Teardown on unmount or **Exit** clears listeners and DOM.
+
+### 10d. `NeuropolisShell.tsx` (full source)
+
+```tsx
+"use client";
+
+import {
+  bootstrapNeuropolisDemo,
+  type NeuropolisDemoLevel,
+} from "@/neuropolis/bootstrapDemoLevel";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+
+type Props = {
+  level: NeuropolisDemoLevel;
+  onComplete: () => void;
+  onExit: () => void | Promise<void>;
+};
+
+export default function NeuropolisShell({ level, onComplete, onExit }: Props) {
+  const mountRef = useRef<HTMLDivElement>(null);
+  const teardownRef = useRef<(() => void) | null>(null);
+  const onCompleteRef = useRef(onComplete);
+  const onExitRef = useRef(onExit);
+  const [exitPortalHost, setExitPortalHost] = useState<HTMLElement | null>(
+    null,
+  );
+  onCompleteRef.current = onComplete;
+  onExitRef.current = onExit;
+
+  useEffect(() => {
+    setExitPortalHost(document.body);
+  }, []);
+
+  useEffect(() => {
+    const el = mountRef.current;
+    if (!el) return;
+
+    const teardown = bootstrapNeuropolisDemo(el, level, () => {
+      onCompleteRef.current();
+    });
+    teardownRef.current = teardown;
+
+    return () => {
+      teardownRef.current = null;
+      teardown();
+    };
+  }, [level]);
+
+  const handleExit = () => {
+    teardownRef.current?.();
+    teardownRef.current = null;
+    void onExitRef.current();
+  };
+
+  const exitButton = (
+    <button
+      type="button"
+      data-neuropolis-exit="true"
+      onClick={handleExit}
+      aria-label="Exit game"
+      style={{
+        position: "fixed",
+        top: 12,
+        right: 12,
+        zIndex: 1100,
+        background: "rgba(239,68,68,0.12)",
+        border: "1px solid rgba(239,68,68,0.55)",
+        borderRadius: 8,
+        color: "#f87171",
+        fontSize: 13,
+        padding: "8px 14px",
+        cursor: "pointer",
+        fontWeight: 700,
+      }}
+    >
+      Exit
+    </button>
+  );
+
+  return (
+    <>
+      {exitPortalHost ? createPortal(exitButton, exitPortalHost) : null}
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "#0a0a1a",
+          zIndex: 1,
+        }}
+      >
+        <div
+          ref={mountRef}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+          }}
+        />
+      </div>
+    </>
+  );
+}
+```
+
+### 10e. `bootstrapDemoLevel.ts` (full source)
+
+```typescript
+import { Canvas } from "./engine/Canvas";
+import { DeviceManager } from "./engine/DeviceManager";
+import { GameLoop } from "./engine/GameLoop";
+import { InputManager } from "./engine/InputManager";
+import { BootScene } from "./scenes/BootScene";
+import { CinematicScene } from "./scenes/CinematicScene";
+import { GameScene } from "./scenes/GameScene";
+import { GameScene2 } from "./scenes/GameScene2";
+import { GameScene3 } from "./scenes/GameScene3";
+import { GameScene4 } from "./scenes/GameScene4";
+import { TouchControls } from "./ui/TouchControls";
+
+export type NeuropolisDemoLevel = 1 | 2 | 3 | 4;
+
+type IntroPhase = "boot" | "cinematic" | "game";
+
+/**
+ * Mount Neuropolis into `root` (cleared first). Runs one demo level (maps to demo lessons 1–4).
+ * Lesson 1 matches standalone `main.ts`: BootScene (~3s) → CinematicScene → GameScene.
+ * Returns idempotent teardown (stop loop, remove listeners, clear root).
+ */
+export function bootstrapNeuropolisDemo(
+  root: HTMLElement,
+  level: NeuropolisDemoLevel,
+  onLevelComplete: () => void
+): () => void {
+  DeviceManager.init();
+  root.replaceChildren();
+
+  const gameContainer = document.createElement("div");
+  gameContainer.id = "game-container";
+  Object.assign(gameContainer.style, {
+    position: "relative",
+    width: "100%",
+    height: "100%",
+    overflow: "hidden",
+    background: "#0a0a1a",
+  });
+
+  const canvasEl = document.createElement("canvas");
+  canvasEl.id = "game-canvas";
+
+  gameContainer.appendChild(canvasEl);
+  root.appendChild(gameContainer);
+
+  const canvas = new Canvas("game-canvas");
+  const ctx = canvas.getContext();
+  const input = new InputManager();
+  const loop = new GameLoop();
+  const touchControls = new TouchControls(gameContainer, input, {
+    bypassDeviceGate: true,
+  });
+  touchControls.hide();
+
+  let disposed = false;
+
+  const teardown = (): void => {
+    if (disposed) return;
+    disposed = true;
+    cinematic?.destroy();
+    cinematic = null;
+    loop.stop();
+    touchControls.destroy();
+    input.destroy();
+    canvas.destroy();
+    root.replaceChildren();
+  };
+
+  const handleComplete = (): void => {
+    teardown();
+    onLevelComplete();
+  };
+
+  let introPhase: IntroPhase = level === 1 ? "boot" : "game";
+  let bootTimer = 0;
+  const bootScene: BootScene | null =
+    level === 1 ? new BootScene(input, loop) : null;
+  let cinematic: CinematicScene | null = null;
+
+  let scene: GameScene | GameScene2 | GameScene3 | GameScene4 | null = null;
+
+  const beginLevel1Gameplay = (): void => {
+    if (disposed) return;
+    touchControls.show();
+    scene = new GameScene(input, loop, handleComplete, { touchControls });
+  };
+
+  if (level !== 1) {
+    touchControls.show();
+    switch (level) {
+      case 2:
+        scene = new GameScene2(input, loop, handleComplete, touchControls);
+        break;
+      case 3:
+        scene = new GameScene3(input, loop, handleComplete, touchControls);
+        break;
+      case 4:
+        scene = new GameScene4(input, loop, handleComplete, touchControls);
+        break;
+      default:
+        teardown();
+        throw new Error(`Invalid Neuropolis demo level: ${level}`);
+    }
+  }
+
+  loop.onUpdate((dt) => {
+    if (level === 1 && introPhase === "boot") {
+      touchControls.hide();
+      bootTimer += dt;
+      bootScene?.update(dt);
+      if (bootTimer >= 3) {
+        introPhase = "cinematic";
+        cinematic = new CinematicScene(input, loop, () => {
+          if (disposed) return;
+          introPhase = "game";
+          beginLevel1Gameplay();
+        });
+      }
+      input.update();
+      return;
+    }
+
+    if (level === 1 && introPhase === "cinematic") {
+      touchControls.show();
+      cinematic?.update(dt);
+      input.update();
+      return;
+    }
+
+    scene?.update(dt);
+    input.update();
+  });
+
+  loop.onRender(ctx, (c) => {
+    if (level === 1 && introPhase === "boot") {
+      bootScene?.render(c);
+      return;
+    }
+    if (level === 1 && introPhase === "cinematic") {
+      cinematic?.render(c);
+      return;
+    }
+    scene?.render(c);
+  });
+
+  loop.start();
+
+  return teardown;
+}
+```
+
 ### Lesson 1 — Welcome to Artificial Intelligence
 
-- **Type:** Live recording (~15 min in UI).
-- **Video:** Streamed via `<VideoPlayer>` (`src/components/lesson/VideoPlayer.tsx`) from the S3 CDN. User can continue immediately — no forced watch timer.
-- **`hasGame`:** `false`.
-- **`xpReward` (quiz base):** 100 (scaled by quiz accuracy in results).
-- **Flow:** Video step → user can continue **immediately** → Quiz → Results → marks lesson done on progress post.
-- **Quiz:** 3 questions (AI definition, examples, learning from data).
+- **Type:** `live`; info panel contrasts **paid live class** vs **demo** (recording + full Neuropolis + quiz, no purchase).
+- **Video:** S3 **`VideoPlayer`** — learners **skip** the watch gate (**Continue** always enabled via **`lessonId === 1`**).
+- **`hasGame`:** `true` → **Neuropolis level 1**.
+- **`xpReward`:** 100 (scaled by **`quizXpFromAccuracy`**).
+- **Quiz:** **3** questions (see `LESSONS[1].quiz` in `page.tsx`).
+- **Flow:** Video → Continue → Neuropolis → Quiz → Results → **`POST /api/demo/progress`**.
 
 ### Lesson 2 — History of AI — From Dreams to Machines
 
-- **Type:** Self-paced + game.
-- **Video:** Streamed via `<VideoPlayer>` (`src/components/lesson/VideoPlayer.tsx`) from the S3 CDN. User can continue immediately — no forced watch timer.
-- **`xpReward`:** 300 (quiz portion).
-- **`hasGame`:** `true` → **`GameShell2`** (`dynamic`, `ssr: false`).
-- **`GAME_BONUS_XP`:** +200 XP if game finished before quiz (see lesson page logic).
-- **Game tagline (`GAME_MECHANICS[2]`):** Timeline / Time Corruptor.
-- **Quiz:** 5 questions (Turing, Deep Blue, AlphaGo, ChatGPT, Turing Test).
+- **Video:** learners need **≥ `MIN_LESSON_VIDEO_PLAY_SECONDS`** real playback → **June 2026** card → Continue → **Neuropolis level 2**.
+- **`xpReward`:** 300; **5** quiz questions (milestones / Turing / ChatGPT, etc. — see `LESSONS[2].quiz` in `page.tsx`).
 
 ### Lesson 3 — AI vs Humans: What Can AI Do?
 
-- **Video:** Streamed via `<VideoPlayer>` (`src/components/lesson/VideoPlayer.tsx`) from the S3 CDN. User can continue immediately — no forced watch timer.
-- **`hasGame`:** `true` → **`GameShell3`**.
-- **`GAME_MECHANICS[3]`:** Human/AI modes, The Divide.
-- **Quiz:** 5 questions (strengths, empathy, bias, sarcasm, collaboration).
+- Same learner video gate as lesson 2 → **Neuropolis level 3**; **`xpReward`:** 300; **5** quiz questions.
 
 ### Lesson 4 — Types of AI: Narrow, General & Super
 
-- **Video:** Streamed via `<VideoPlayer>` (`src/components/lesson/VideoPlayer.tsx`) from the S3 CDN. User can continue immediately — no forced watch timer.
-- **`hasGame`:** `true` → **`GameShell4`**.
-- **`GAME_MECHANICS[4]`:** Classify Narrow/General/Super.
-- **Quiz:** 5 questions (assistants, AGI, AGI definition, today's AI, super AI).
+- Same learner video gate → **Neuropolis level 4**; **`xpReward`:** 300; **5** quiz questions.
 
 ### Quiz UX
 
@@ -326,9 +988,11 @@ Content is primarily defined in **`src/app/demo/lesson/[id]/page.tsx`** (`LESSON
 
 ## 11. Shared Character Components
 
+> **Routing note:** The live lesson player mounts **`NeuropolisShell`** (canvas engine under `src/neuropolis/`). The **`GameShell2`–`GameShell4`** trees in **§§11a–13** are **legacy / alternate** React implementations kept in-repo; they are **not** imported by **`lesson/[id]/page.tsx`** today.
+
 ### AXCharacter (`src/components/games/shared/AXCharacter.tsx`)
 
-Master player avatar used by all three game lessons (lesson2, lesson3, lesson4). All lesson-specific copies have been deleted.
+Master player avatar for the **legacy** lesson 2–4 React shells and reference layouts. **Neuropolis** renders AX-style gameplay on canvas via its own entities/sprites — keep this component docs when working with `DivideStage`, `TypeHunterStage`, etc.
 
 **Visual spec:**
 - Container: **44×68px** base, `overflow: visible` (legs extend ~20px below).
@@ -352,7 +1016,7 @@ Master player avatar used by all three game lessons (lesson2, lesson3, lesson4).
 
 ### NovaCharacter (`src/components/games/shared/NovaCharacter.tsx`)
 
-Master guide/narrator character used by **in-game** lesson 2–4 shells. Distinct from **`src/components/NOVACharacter.tsx`**, which is the **dashboard/chat** NOVA avatar paired with **`NOVAChat`**.
+Master guide/narrator character used by **legacy** in-game lesson shells (**`GameShell2`–`GameShell4`**). Distinct from **`src/components/NOVACharacter.tsx`**, which is the **dashboard/chat** NOVA avatar paired with **`NOVAChat`**. Neuropolis uses **`src/neuropolis/ui/DialogueBox.ts`** (and related UI) for in-engine dialogue.
 
 **Visual spec (holographic robot head):**
 - Antenna with gold tip + `nova-antenna-ping` pulse animation.
@@ -380,9 +1044,9 @@ Master guide/narrator character used by **in-game** lesson 2–4 shells. Distinc
 
 ---
 
-## 11a. Games — Lesson 2 (`GameShell2`)
+## 11a. Games — Lesson 2 (`GameShell2`) — legacy
 
-**Shell:** `src/components/games/lesson2/GameShell2.tsx`
+**Shell:** `src/components/games/lesson2/GameShell2.tsx` (**not** wired from `/demo/lesson/[id]`; see **§10c** Neuropolis.)
 
 **States (`gameTypes.ts`):**
 `LOADING` → `CINEMATIC_INTRO` → **`NPC_EXPLORE`** → `STAGE_1` → **`STAGE_CUTSCENE`** → `STAGE_2` → `BOSS_INTRO` → `BOSS_BATTLE` → `VICTORY` → `COMPLETE`.
@@ -526,9 +1190,9 @@ XP summary + continue to quiz via parent `onComplete(xpEarned)` from shell.
 
 ---
 
-## 12. Games — Lesson 3 (`GameShell3`)
+## 12. Games — Lesson 3 (`GameShell3`) — legacy
 
-**Shell:** `src/components/games/lesson3/GameShell3.tsx`
+**Shell:** `src/components/games/lesson3/GameShell3.tsx` (**not** wired from the live lesson page.)
 
 **States:** `LOADING` → `CINEMATIC_INTRO` → `STAGE_1` → `BOSS_INTRO` → `BOSS_BATTLE` → `VICTORY` → `COMPLETE`.
 
@@ -556,9 +1220,9 @@ Divide Keeper boss: split orange/teal sprite, HP bar, phased gameplay, projectil
 
 ---
 
-## 13. Games — Lesson 4 (`GameShell4`)
+## 13. Games — Lesson 4 (`GameShell4`) — legacy
 
-**Shell:** `src/components/games/lesson4/GameShell4.tsx`
+**Shell:** `src/components/games/lesson4/GameShell4.tsx` (**not** wired from the live lesson page.)
 
 **States:** `LOADING` → `CINEMATIC_INTRO` → `STAGE_1` → `BOSS_INTRO` → `BOSS_BATTLE` → `VICTORY` → `COMPLETE`.
 
@@ -603,10 +1267,10 @@ Missing files fail silently in try/catch. `useSoundEngine` exposes `playSound(ke
 
 | Lesson | Theme | Player fantasy |
 |--------|--------|----------------|
-| 1 | What is AI? | Watch + quiz only |
-| 2 | History timeline | Restore erased milestones; defeat Time Corruptor |
-| 3 | Human vs AI | Mode-switch polarity; unite The Divide |
-| 4 | AI taxonomy | Classify Narrow / General / Super; boss "Undefined" cycles types |
+| 1 | What is AI? | Neuropolis L1 + quiz |
+| 2 | History timeline | Neuropolis L2 (demo); legacy `GameShell2` in tree |
+| 3 | Human vs AI | Neuropolis L3 (demo); legacy `GameShell3` |
+| 4 | AI taxonomy | Neuropolis L4 (demo); legacy `GameShell4` |
 
 ---
 
@@ -664,7 +1328,7 @@ npm run dev
 ## 19. Conventions & extension points
 
 - **NOVA:** To teach NOVA new curriculum facts, extend **`src/lib/lesson-content.ts`** (summaries) and/or **`buildDemoLiveStats`** inputs in **`demo-nova-stats.ts`**. Wire additional props into **`NOVAChat`** from **`demo/page.tsx`** and **`lesson/[id]/page.tsx`** so `POST /api/nova` receives consistent `xp`, `lessonsComplete`, `quizScores`, `currentModule`, `lessonOrder`.
-- **New lesson:** Add to **`LESSONS`** in `lesson/[id]/page.tsx` + dashboard **`LESSONS`** in `demo/page.tsx`; wire `gameActive && lessonId === n` shell; bump progress logic if program length changes.
+- **New lesson:** Add to **`LESSONS`** in `lesson/[id]/page.tsx` + dashboard **`LESSONS`** in `demo/page.tsx`; wire `gameActive && lessonId === n` → **`NeuropolisShell`** (and extend **`bootstrapDemoLevel.ts`** / scenes if needed); align **`MIN_LESSON_VIDEO_PLAY_SECONDS`** / gate rules if the lesson should mimic L2–4.
 - **New game shell:** Mirror `GameShell3`/`4`; export `onComplete(xp)` and `onExit()`; dynamic import with **`ssr: false`** if using canvas/window keys.
 - **New character:** Add to `src/components/games/shared/`; import via `@/components/games/shared/CharacterName`.
 - **XP:** Lesson results should remain consistent with **additive** `POST /api/demo/progress` behavior.
@@ -681,11 +1345,12 @@ npm run dev
 - **Chaos Bot / Time Corruptor / Divide Keeper / The Undefined:** Antagonists per lesson.
 - **Token:** `demoToken` string; not a JWT.
 - **GAME_BONUS_XP:** Flat +200 for finishing embedded game before quiz (lessons with games).
-- **TauntBanner:** AnimatePresence overlay in BossBattleLesson2 that surfaces boss taunts at phase transitions.
+- **NeuropolisShell:** React wrapper that mounts **`bootstrapNeuropolisDemo`** and portals an **Exit** control to `document.body`.
+- **bootstrapNeuropolisDemo:** Function in **`src/neuropolis/bootstrapDemoLevel.ts`** that constructs canvas, loop, input, touch controls, and the active **`GameScene`** for lessons 1–4.
 - **Crumbling platform:** Platform that shakes then falls when AX stands on it, respawning after 150 frames.
 - **Time Bubble:** Floating enemy in TimelineStage showing a wrong year; contact freezes + destroys it.
 - **Moving platform:** Oscillating horizontal platform that carries AX when stood on.
 
 ---
 
-*Last updated: Apr 2026 — S3 **VideoPlayer** (`lesson-videos.ts`, `NEXT_PUBLIC_CDN_URL`); NOVA Groq + voice; mobile NOVA; cyberpunk UI; DynamoDB + admin token provisioning; lesson flow keeps immediate Continue (no watch gate).*
+*Last updated: May 2026 — **`demo-session`** (365-day `demo_token`, **`GET /api/demo/user`** rate limit 240/min); lesson **video gates** (L1 open; L2–4 ≥180s playback + June 2026 card); **`NeuropolisShell`** / **`bootstrapNeuropolisDemo`** as live lesson games; **`VideoPlayer`** `minPlayedSeconds` + `enforceWatchThrough`; legacy **`GameShell2`–`GameShell4`** documented separately.*
