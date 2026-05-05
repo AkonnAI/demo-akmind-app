@@ -67,14 +67,15 @@ function withEarnedBadgesDefault(u: DemoUser): DemoUser {
 
 export type CreateDemoUserInput = Omit<DemoUser, "id" | "createdAt">;
 /** DynamoDB table for demo users — env `DEMO_USERS_TABLE`, default `akmind-demo-users`. */
-const TABLE =
-  process.env.DEMO_USERS_TABLE?.trim() || "akmind-demo-users";
-const HAS_TABLE_CONFIG = Boolean(
-  process.env.DEMO_USERS_TABLE || process.env.DYNAMODB_DEMO_TABLE
-);
-const IS_DYNAMO =
-  process.env.USE_DYNAMODB === "true" ||
-  (process.env.USE_DYNAMODB !== "false" && HAS_TABLE_CONFIG);
+function getTable(): string {
+  return process.env.DEMO_USERS_TABLE?.trim() || "akmind-demo-users";
+}
+function isDynamo(): boolean {
+  const flag = process.env.USE_DYNAMODB;
+  if (flag === "true") return true;
+  if (flag === "false") return false;
+  return Boolean(process.env.DEMO_USERS_TABLE || process.env.DYNAMODB_DEMO_TABLE);
+}
 
 const getDb = () => {
   const client = new DynamoDBClient({
@@ -143,7 +144,7 @@ export async function createDemoUser(data: CreateDemoUserInput): Promise<DemoUse
     demoToken: data.demoToken.toLowerCase().trim(),
   };
 
-  if (!IS_DYNAMO) {
+  if (!isDynamo()) {
     const users = readUsers();
     users.push(user);
     writeUsers(users);
@@ -152,7 +153,7 @@ export async function createDemoUser(data: CreateDemoUserInput): Promise<DemoUse
 
   await getDb().send(
     new PutCommand({
-      TableName: TABLE,
+      TableName: getTable(),
       Item: {
         ...user,
         earnedBadges: JSON.stringify(user.earnedBadges ?? []),
@@ -164,14 +165,14 @@ export async function createDemoUser(data: CreateDemoUserInput): Promise<DemoUse
 
 export async function getDemoUserByEmail(email: string): Promise<DemoUser | null> {
   const normalizedEmail = email.toLowerCase().trim();
-  if (!IS_DYNAMO) {
+  if (!isDynamo()) {
     const row = readUsers().find((u) => u.email === normalizedEmail);
     return row ? withEarnedBadgesDefault(row) : null;
   }
   try {
     const res = await getDb().send(
       new QueryCommand({
-        TableName: TABLE,
+        TableName: getTable(),
         IndexName: "email-index",
         KeyConditionExpression: "email = :e",
         ExpressionAttributeValues: { ":e": normalizedEmail },
@@ -184,7 +185,7 @@ export async function getDemoUserByEmail(email: string): Promise<DemoUser | null
     console.warn("email-index query failed, falling back to table scan", error);
     const scan = await getDb().send(
       new ScanCommand({
-        TableName: TABLE,
+        TableName: getTable(),
         FilterExpression: "email = :e",
         ExpressionAttributeValues: { ":e": normalizedEmail },
         Limit: 1,
@@ -198,14 +199,14 @@ export async function getDemoUserByEmail(email: string): Promise<DemoUser | null
 export async function getDemoUserByToken(token: string): Promise<DemoUser | null> {
   const normalizedToken = normalizeDemoToken(token);
   if (!normalizedToken) return null;
-  if (!IS_DYNAMO) {
+  if (!isDynamo()) {
     const row = readUsers().find((u) => u.demoToken === normalizedToken);
     return row ? withEarnedBadgesDefault(row) : null;
   }
   try {
     const res = await getDb().send(
       new QueryCommand({
-        TableName: TABLE,
+        TableName: getTable(),
         IndexName: "token-index",
         KeyConditionExpression: "demoToken = :t",
         ExpressionAttributeValues: { ":t": normalizedToken },
@@ -218,7 +219,7 @@ export async function getDemoUserByToken(token: string): Promise<DemoUser | null
     console.warn("token-index query failed, falling back to table scan", error);
     const scan = await getDb().send(
       new ScanCommand({
-        TableName: TABLE,
+        TableName: getTable(),
         FilterExpression: "demoToken = :t",
         ExpressionAttributeValues: { ":t": normalizedToken },
         Limit: 1,
@@ -233,7 +234,7 @@ export async function updateDemoUser(
   id: string,
   updates: Partial<Omit<DemoUser, "id" | "createdAt">>
 ): Promise<void> {
-  if (!IS_DYNAMO) {
+  if (!isDynamo()) {
     const users = readUsers();
     const idx = users.findIndex((u) => u.id === id);
     if (idx !== -1) {
@@ -260,7 +261,7 @@ export async function updateDemoUser(
   try {
     await getDb().send(
       new UpdateCommand({
-        TableName: TABLE,
+        TableName: getTable(),
         Key: { id: String(id) },
         UpdateExpression: expr,
         ExpressionAttributeNames: names,
@@ -269,7 +270,7 @@ export async function updateDemoUser(
     );
   } catch (err) {
     console.error("[demo-db] updateDemoUser DynamoDB UpdateItem failed", {
-      table: TABLE,
+      table: getTable(),
       partitionKey: "id",
       id: String(id),
       fields: entries.map(([k]) => k),
