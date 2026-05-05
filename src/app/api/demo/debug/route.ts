@@ -27,9 +27,8 @@ export async function GET() {
     isDynamoResult = false; isDynamoReason = "no Lambda env, no USE_DYNAMODB flag → local JSON";
   }
 
-  const keyId     = customKeyId || lambdaKeyId;
-  const secretKey = customSecret || lambdaSecret;
-  const region    = regionCustom || regionAws || "ap-south-1";
+  const keyId  = customKeyId || lambdaKeyId;
+  const region = regionCustom || regionAws || "ap-south-1";
   const table     = tableRaw?.trim() || "akmind-demo-users";
 
   const envStatus = {
