@@ -4,9 +4,11 @@ import { DynamoDBDocumentClient, ScanCommand } from "@aws-sdk/lib-dynamodb";
 export async function GET() {
   const useDynamo = process.env.USE_DYNAMODB;
   const table = process.env.DEMO_USERS_TABLE?.trim() || "akmind-demo-users";
-  const region = process.env.AWS_REGION || "ap-south-1";
-  const hasKeyId = Boolean(process.env.AWS_ACCESS_KEY_ID);
-  const hasSecret = Boolean(process.env.AWS_SECRET_ACCESS_KEY);
+  const region = process.env.AWS_REGION || process.env.REGION || "ap-south-1";
+  const keyId = process.env.AWS_ACCESS_KEY_ID || process.env.ACCESS_KEY_ID;
+  const secretKey = process.env.AWS_SECRET_ACCESS_KEY || process.env.SECRET_ACCESS_KEY;
+  const hasKeyId = Boolean(keyId);
+  const hasSecret = Boolean(secretKey);
 
   const isDynamo =
     useDynamo === "true" ||
@@ -17,8 +19,8 @@ export async function GET() {
     isDynamo,
     DEMO_USERS_TABLE: table,
     AWS_REGION: region,
-    AWS_ACCESS_KEY_ID: hasKeyId ? "SET" : "MISSING",
-    AWS_SECRET_ACCESS_KEY: hasSecret ? "SET" : "MISSING",
+    ACCESS_KEY_ID: hasKeyId ? `SET (via ${process.env.AWS_ACCESS_KEY_ID ? "AWS_ACCESS_KEY_ID" : "ACCESS_KEY_ID"})` : "MISSING",
+    SECRET_ACCESS_KEY: hasSecret ? `SET (via ${process.env.AWS_SECRET_ACCESS_KEY ? "AWS_SECRET_ACCESS_KEY" : "SECRET_ACCESS_KEY"})` : "MISSING",
     NODE_ENV: process.env.NODE_ENV,
   };
 
@@ -35,8 +37,8 @@ export async function GET() {
     const client = new DynamoDBClient({
       region,
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+        accessKeyId: keyId!,
+        secretAccessKey: secretKey!,
       },
     });
     const doc = DynamoDBDocumentClient.from(client);

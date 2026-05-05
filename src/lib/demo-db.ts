@@ -79,10 +79,10 @@ function isDynamo(): boolean {
 
 const getDb = () => {
   const client = new DynamoDBClient({
-    region: process.env.AWS_REGION || "ap-south-1",
+    region: process.env.AWS_REGION || process.env.REGION || "ap-south-1",
     credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+      accessKeyId: (process.env.AWS_ACCESS_KEY_ID || process.env.ACCESS_KEY_ID)!,
+      secretAccessKey: (process.env.AWS_SECRET_ACCESS_KEY || process.env.SECRET_ACCESS_KEY)!,
     },
   });
   return DynamoDBDocumentClient.from(client, {
