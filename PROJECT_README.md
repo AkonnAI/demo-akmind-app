@@ -8,11 +8,10 @@ This document is the **single source of truth** for **demo-akmind-app**: what it
 
 Recent production-facing changes implemented in this repository:
 
-- **Lesson video gates & “full lesson” card**
-  - **`VideoPlayer`** (`src/components/lesson/VideoPlayer.tsx`) still streams from **`NEXT_PUBLIC_CDN_URL`** (`lesson-videos.ts`). It can enforce **real playback** via `video.played` TimeRanges (not scrub-only).
-  - **Lesson 1:** learners can tap **Continue to Game** immediately — **no** `enforceWatchThrough`.
-  - **Lessons 2–4:** learners need **≥ 180 seconds** of actual playback (`MIN_LESSON_VIDEO_PLAY_SECONDS`), capped at **video duration** if the file is shorter than 3 minutes. Then a **“Full lesson experience”** card appears: copy includes **“Full lesson launching June 2026 — stay tuned”** and the only **Continue to Game** CTA for that path lives **on the card** (the standard gradient button is hidden until admins/L1 use the standard path).
-  - **Admin testers** (`admin@akmind.com` or display name `Admin`): all video gates bypassed; they always see the standard Continue button.
+- **Lesson video gates & purchase upsell**
+  - **`VideoPlayer`** (`src/components/lesson/VideoPlayer.tsx`) streams from **`NEXT_PUBLIC_CDN_URL`** (`lesson-videos.ts`). It enforces **real playback** via `video.played` TimeRanges (not scrub-only).
+  - **Lessons 1–3 (non-admin):** **≥ 120 seconds** of actual playback (`MIN_LESSON_VIDEO_PLAY_SECONDS`), capped at video duration if shorter. The player then **pauses** (`pauseVideo` prop); an **amber purchase upsell card** appears (demo preview, link to akmind.com, **Continue to Game →** / quiz). Learners have **no** separate standard Continue until this gate fires.
+  - **Admin testers** (`admin@akmind.com` or display name `Admin`): gates bypassed — immediate standard gradient **Continue** button.
   - Optional **`minPlayedSeconds`** + **`enforceWatchThrough`**; if `minPlayedSeconds` is omitted but `enforceWatchThrough` is true, legacy behavior uses **~92%** of the timeline played (`WATCH_PLAYED_THRESHOLD`).
 
 - **Demo session cookie & user API rate limit** (`src/lib/demo-session.ts`)
@@ -314,7 +313,7 @@ Returns full user list (all fields) for the admin dashboard. Protected by admin 
 |-------|------|
 | `/` | Landing: starfield, registration context, manual token entry, validates token |
 | `/demo` | Dashboard: lesson cards, XP, locks, **NOVAChat** launcher |
-| `/demo/lesson/[id]` | Lesson flow: **VideoPlayer** → (optional **June 2026** card for L2–4) → **NeuropolisShell** (L1–4) → quiz → results; **NOVAChat** suppressed during fullscreen game |
+| `/demo/lesson/[id]` | Lesson flow: **VideoPlayer** → (≥120s playback → pause → **purchase upsell** for lessons **1–3**, non-admin) → **NeuropolisShell** → quiz → results; **NOVAChat** suppressed during fullscreen game |
 | `/demo/complete` | Requires **`demoCompleted`**; confetti, badge PDF download, payment UI stub; redirects incomplete users to `/demo` |
 | `/admin` | Admin panel: user list, lesson progress, XP, quiz scores |
 
@@ -337,25 +336,15 @@ Content is primarily defined in **`src/app/demo/lesson/[id]/page.tsx`** (`LESSON
 Constants and derived flags from **`src/app/demo/lesson/[id]/page.tsx`**:
 
 ```typescript
-import type { DemoUser } from "@/types/demo"; // top of page.tsx
-
-/** Lessons 2–4: minimum seconds of actual video playback before continue unlocks. */
-const MIN_LESSON_VIDEO_PLAY_SECONDS = 180;
-
-function isAdminTester(user: DemoUser | null): boolean {
-  if (!user) return false;
-  return (
-    user.email?.toLowerCase() === "admin@akmind.com" || user.name === "Admin"
-  );
-}
+/** Lessons 1–3: minimum seconds of actual video playback before upsell + continue unlocks (non-admin). */
+const MIN_LESSON_VIDEO_PLAY_SECONDS = 120;
 
 const adminMode = isAdminTester(user);
-const minVideoRequired = !adminMode && lessonId >= 2 && lessonId <= 4;
-const showLaunchCard = minVideoRequired && videoWatchSatisfied;
-const showStandardContinue = !minVideoRequired || adminMode;
-const canContinueFromVideo =
-  adminMode || lessonId === 1 || videoWatchSatisfied;
+const minVideoRequired = !adminMode && lessonId >= 1 && lessonId <= 3;
+const showPurchaseUpsell = minVideoRequired && videoWatchSatisfied;
 ```
+
+After the **120-second** gate, **`VideoPlayer`** receives **`pauseVideo`** so the CDN MP4 stops. Learners see the **purchase upsell card** (amber border); **Continue to Game →** (or quiz) on that card is the **only** non-admin path forward. **Admins** use the standard gradient Continue immediately (no wait).
 
 `<VideoPlayer>` wiring:
 
@@ -366,69 +355,19 @@ const canContinueFromVideo =
   minPlayedSeconds={
     minVideoRequired ? MIN_LESSON_VIDEO_PLAY_SECONDS : undefined
   }
-  onWatchSatisfied={() => setVideoWatchSatisfied(true)}
+  pauseVideo={pauseVideo}
+  onWatchSatisfied={() => {
+    setVideoWatchSatisfied(true);
+    setPauseVideo(true);
+  }}
 />
-```
-
-After the **3-minute** gate, learners see the **full lesson** card; **Continue to Game** on that card enters the game phase. The standard gradient button is shown only when **`showStandardContinue`** (lesson 1, or admin bypass):
-
-```tsx
-{showLaunchCard && (
-  <div
-    className="mt-6 rounded-xl border px-5 py-5 sm:px-6 sm:py-6"
-    style={{
-      background: "rgba(99,102,241,0.08)",
-      borderColor: "rgba(99,102,241,0.28)",
-      backdropFilter: "blur(12px)",
-    }}
-  >
-    <p className="font-semibold text-indigo-200">Full lesson experience</p>
-    <p className="mt-2 text-sm text-slate-400">
-      Full lesson launching June 2026 — stay tuned. You can still continue to the
-      demo game below.
-    </p>
-    <button
-      type="button"
-      className="mt-5 rounded-xl px-7 py-3 font-semibold text-white transition-all duration-200 hover:-translate-y-0.5"
-      style={{
-        background: "linear-gradient(135deg, #6366F1, #4F46E5)",
-        boxShadow: "var(--glow-indigo)",
-      }}
-      onClick={() =>
-        lesson.hasGame ? setPhase("game") : setPhase("quiz")
-      }
-    >
-      {lesson.hasGame ? "Continue to Game →" : "Continue to Quiz →"}
-    </button>
-  </div>
-)}
-{showStandardContinue && (
-  <button
-    type="button"
-    disabled={!canContinueFromVideo}
-    className={`mt-6 rounded-xl px-7 py-3 font-semibold text-white transition-all duration-200 ${
-      canContinueFromVideo
-        ? "hover:-translate-y-0.5"
-        : "cursor-not-allowed opacity-45"
-    }`}
-    style={{
-      background: "linear-gradient(135deg, #6366F1, #4F46E5)",
-      boxShadow: "var(--glow-indigo)",
-    }}
-    onClick={() =>
-      lesson.hasGame ? setPhase("game") : setPhase("quiz")
-    }
-  >
-    {lesson.hasGame ? "Continue to Game →" : "Continue to Quiz →"}
-  </button>
-)}
 ```
 
 While **`phase === "game"`** and **`gameActive`**, **`suppressNovaChatFab`** hides **`NOVAChat`** so taps reach the canvas.
 
 ### 10b. `VideoPlayer.tsx` (full source — `src/components/lesson/VideoPlayer.tsx`)
 
-Satisfaction is evaluated on **`timeupdate`** and **`ended`**. Props: **`enforceWatchThrough`**, optional **`minPlayedSeconds`** (uses **`video.played`** summed seconds, capped by duration), optional **`onWatchSatisfied`**.
+Satisfaction is evaluated on **`timeupdate`** and **`ended`**. Props: **`enforceWatchThrough`**, optional **`minPlayedSeconds`** (uses **`video.played`** summed seconds, capped by duration), optional **`onWatchSatisfied`**, optional **`pauseVideo`** (when true, effect pauses the `<video>` element).
 
 ```tsx
 "use client";
@@ -951,27 +890,17 @@ export function bootstrapNeuropolisDemo(
 }
 ```
 
-### Lesson 1 — Welcome to Artificial Intelligence
+### Demo lessons 1–3 (`LESSONS` in `lesson/[id]/page.tsx`)
 
-- **Type:** `live`; info panel contrasts **paid live class** vs **demo** (recording + full Neuropolis + quiz, no purchase).
-- **Video:** S3 **`VideoPlayer`** — learners **skip** the watch gate (**Continue** always enabled via **`lessonId === 1`**).
-- **`hasGame`:** `true` → **Neuropolis level 1**.
-- **`xpReward`:** 100 (scaled by **`quizXpFromAccuracy`**).
-- **Quiz:** **3** questions (see `LESSONS[1].quiz` in `page.tsx`).
-- **Flow:** Video → Continue → Neuropolis → Quiz → Results → **`POST /api/demo/progress`**.
+The shipped demo has **three** lessons. Each uses **`VideoPlayer`**, **Neuropolis** (`hasGame: true`), then quiz.
 
-### Lesson 2 — History of AI — From Dreams to Machines
+**Video (non-admin):** ≥ **`MIN_LESSON_VIDEO_PLAY_SECONDS` (120)** real playback → player pauses → **purchase upsell card** → continue only via card CTA. **Admin:** standard Continue immediately.
 
-- **Video:** learners need **≥ `MIN_LESSON_VIDEO_PLAY_SECONDS`** real playback → **June 2026** card → Continue → **Neuropolis level 2**.
-- **`xpReward`:** 300; **5** quiz questions (milestones / Turing / ChatGPT, etc. — see `LESSONS[2].quiz` in `page.tsx`).
+- **Lesson 1 — History of AI — From Dreams to Machines** — Neuropolis level **1**; **`xpReward`:** 300; **5** quiz questions.
+- **Lesson 2 — AI vs Humans: What Can AI Do?** — Neuropolis level **2**; **`xpReward`:** 300; **5** quiz questions.
+- **Lesson 3 — Types of AI: Narrow, General & Super** — Neuropolis level **3**; **`xpReward`:** 300; **5** quiz questions.
 
-### Lesson 3 — AI vs Humans: What Can AI Do?
-
-- Same learner video gate as lesson 2 → **Neuropolis level 3**; **`xpReward`:** 300; **5** quiz questions.
-
-### Lesson 4 — Types of AI: Narrow, General & Super
-
-- Same learner video gate → **Neuropolis level 4**; **`xpReward`:** 300; **5** quiz questions.
+**Flow (each lesson):** Video → (gate / upsell if learner) → Neuropolis → Quiz → Results → **`POST /api/demo/progress`**.
 
 ### Quiz UX
 
@@ -980,9 +909,9 @@ export function bootstrapNeuropolisDemo(
 - **Total XP posted** on results: **`quizXp + (GAME_BONUS_XP if game complete)`** (200 bonus).
 - **`POST /api/demo/progress`** **adds** that total to stored **`xp`** (cumulative across lessons).
 
-### After lesson 4
+### After lesson 3
 
-- **`phase === 'complete'`** on lesson page: after ~3s, redirect **`/demo/complete`** if `lessonId >= 4`, else **`/demo`**.
+- **`phase === 'complete'`** on lesson page: after ~3s, redirect **`/demo/complete`** if `lessonId >= 3`, else **`/demo`**.
 
 ---
 
@@ -1328,7 +1257,7 @@ npm run dev
 ## 19. Conventions & extension points
 
 - **NOVA:** To teach NOVA new curriculum facts, extend **`src/lib/lesson-content.ts`** (summaries) and/or **`buildDemoLiveStats`** inputs in **`demo-nova-stats.ts`**. Wire additional props into **`NOVAChat`** from **`demo/page.tsx`** and **`lesson/[id]/page.tsx`** so `POST /api/nova` receives consistent `xp`, `lessonsComplete`, `quizScores`, `currentModule`, `lessonOrder`.
-- **New lesson:** Add to **`LESSONS`** in `lesson/[id]/page.tsx` + dashboard **`LESSONS`** in `demo/page.tsx`; wire `gameActive && lessonId === n` → **`NeuropolisShell`** (and extend **`bootstrapDemoLevel.ts`** / scenes if needed); align **`MIN_LESSON_VIDEO_PLAY_SECONDS`** / gate rules if the lesson should mimic L2–4.
+- **New lesson:** Add to **`LESSONS`** in `lesson/[id]/page.tsx` + dashboard **`LESSONS`** in `demo/page.tsx`; wire `gameActive && lessonId === n` → **`NeuropolisShell`** (and extend **`bootstrapDemoLevel.ts`** / scenes if needed); align **`MIN_LESSON_VIDEO_PLAY_SECONDS`** / upsell gate rules if the lesson should mimic **1–3**.
 - **New game shell:** Mirror `GameShell3`/`4`; export `onComplete(xp)` and `onExit()`; dynamic import with **`ssr: false`** if using canvas/window keys.
 - **New character:** Add to `src/components/games/shared/`; import via `@/components/games/shared/CharacterName`.
 - **XP:** Lesson results should remain consistent with **additive** `POST /api/demo/progress` behavior.
@@ -1353,4 +1282,4 @@ npm run dev
 
 ---
 
-*Last updated: May 2026 — **`demo-session`** (365-day `demo_token`, **`GET /api/demo/user`** rate limit 240/min); lesson **video gates** (L1 open; L2–4 ≥180s playback + June 2026 card); **`NeuropolisShell`** / **`bootstrapNeuropolisDemo`** as live lesson games; **`VideoPlayer`** `minPlayedSeconds` + `enforceWatchThrough`; legacy **`GameShell2`–`GameShell4`** documented separately.*
+*Last updated: May 2026 — **`demo-session`** (365-day `demo_token`, **`GET /api/demo/user`** rate limit 240/min); lesson **video gates** (lessons **1–3**, non-admin: ≥120s playback → pause → purchase upsell); **`NeuropolisShell`** / **`bootstrapNeuropolisDemo`** as live lesson games; **`VideoPlayer`** `minPlayedSeconds` + `enforceWatchThrough` + **`pauseVideo`**; legacy **`GameShell2`–`GameShell4`** documented separately.*

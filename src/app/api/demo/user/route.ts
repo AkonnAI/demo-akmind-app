@@ -61,6 +61,7 @@ export async function GET(req: NextRequest) {
       xp: user.xp,
       badgeEarned: user.badgeEarned,
       demoCompleted: user.demoCompleted,
+      earnedBadges: user.earnedBadges ?? [],
     },
     {
       status: 200,

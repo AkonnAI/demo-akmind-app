@@ -15,9 +15,11 @@ export const progressSchema = z.object({
     .max(64)
     .trim()
     .transform((s) => s.toLowerCase()),
-  lessonId: z.number().int().min(1).max(4),
+  lessonId: z.number().int().min(1).max(3),
   quizScore: z.number().min(0).max(100).optional(),
   xp: z.number().min(0).max(9999).optional(),
+  /** Client snapshot of badge slugs already earned before this POST (for `newBadges` diff). */
+  badgesBefore: z.array(z.string()).optional(),
 });
 
 export const tokenSchema = z.object({

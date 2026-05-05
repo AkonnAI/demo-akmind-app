@@ -1,5 +1,7 @@
 "use client";
 
+import DemoCompleteCelebration from "@/components/demo/DemoCompleteCelebration";
+import { DEMO_COMPLETE_PREVIEW_USER } from "@/lib/demo-complete-preview-user";
 import { useEffect, useState } from "react";
 
 export default function AdminPage() {
@@ -108,26 +110,50 @@ export default function AdminPage() {
       style={{
         minHeight: "100vh",
         background: "#050510",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
         fontFamily: "monospace",
       }}
     >
       <div
         style={{
-          background: "#0f0f23",
-          border: "1px solid #6366f1",
-          borderRadius: "16px",
-          padding: "40px",
-          maxWidth: "500px",
-          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "40px 16px",
         }}
       >
+        <div
+          style={{
+            background: "#0f0f23",
+            border: "1px solid #6366f1",
+            borderRadius: "16px",
+            padding: "40px",
+            maxWidth: "500px",
+            width: "100%",
+          }}
+        >
         <h1 style={{ color: "#22d3ee", fontSize: "24px", marginBottom: "8px" }}>⚡ AKMIND Admin</h1>
-        <p style={{ color: "#475569", fontSize: "13px", marginBottom: "32px" }}>
-          Dev panel for testing games
+        <p style={{ color: "#475569", fontSize: "13px", marginBottom: "16px" }}>
+          Dev panel for testing games. Scroll down for the full completion preview.
         </p>
+
+        <a
+          href="#admin-completion-preview"
+          style={{
+            display: "block",
+            background: "#0ea5e9",
+            color: "#0f172a",
+            borderRadius: "10px",
+            padding: "12px 24px",
+            fontSize: "14px",
+            fontWeight: "bold",
+            width: "100%",
+            marginBottom: "12px",
+            textAlign: "center",
+            textDecoration: "none",
+          }}
+        >
+          Jump to completion preview (certificate + animation) ↓
+        </a>
 
         <button
           type="button"
@@ -147,6 +173,27 @@ export default function AdminPage() {
         >
           Get Admin Token
         </button>
+
+        <a
+          href="/demo/complete-preview"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "block",
+            background: "#312e81",
+            color: "#e0e7ff",
+            borderRadius: "10px",
+            padding: "10px 24px",
+            fontSize: "13px",
+            fontWeight: "600",
+            width: "100%",
+            marginBottom: "12px",
+            textAlign: "center",
+            textDecoration: "none",
+          }}
+        >
+          Same preview in a new tab →
+        </a>
 
         {token ? (
           <div
@@ -175,9 +222,23 @@ export default function AdminPage() {
                 Open Demo →
               </a>
               <a
-                href={`/demo/lesson/2?token=${q}`}
+                href={`/demo/lesson/1?token=${q}`}
                 style={{
                   background: "#b45309",
+                  color: "white",
+                  borderRadius: "8px",
+                  padding: "8px 16px",
+                  textDecoration: "none",
+                  fontSize: "13px",
+                  fontWeight: "bold",
+                }}
+              >
+                Game 1 Direct
+              </a>
+              <a
+                href={`/demo/lesson/2?token=${q}`}
+                style={{
+                  background: "#7c3aed",
                   color: "white",
                   borderRadius: "8px",
                   padding: "8px 16px",
@@ -191,20 +252,6 @@ export default function AdminPage() {
               <a
                 href={`/demo/lesson/3?token=${q}`}
                 style={{
-                  background: "#7c3aed",
-                  color: "white",
-                  borderRadius: "8px",
-                  padding: "8px 16px",
-                  textDecoration: "none",
-                  fontSize: "13px",
-                  fontWeight: "bold",
-                }}
-              >
-                Game 3 Direct
-              </a>
-              <a
-                href={`/demo/lesson/4?token=${q}`}
-                style={{
                   background: "#991b1b",
                   color: "white",
                   borderRadius: "8px",
@@ -214,7 +261,7 @@ export default function AdminPage() {
                   fontWeight: "bold",
                 }}
               >
-                Game 4 Direct
+                Game 3 Direct
               </a>
             </div>
           </div>
@@ -246,6 +293,41 @@ export default function AdminPage() {
         <p style={{ color: "#334155", fontSize: "11px", marginTop: "24px", textAlign: "center" }}>
           Only accessible in development. Remove before production.
         </p>
+        </div>
+      </div>
+
+      <div
+        id="admin-completion-preview"
+        style={{
+          scrollMarginTop: "16px",
+          borderTop: "2px solid rgba(129,140,248,0.45)",
+          paddingTop: "28px",
+          paddingBottom: "56px",
+          background:
+            "linear-gradient(180deg, rgba(18,18,35,0.98) 0%, rgba(8,8,16,1) 35%, #050510 100%)",
+        }}
+      >
+        <p
+          style={{
+            color: "#cbd5e1",
+            textAlign: "center",
+            fontSize: "14px",
+            padding: "8px 20px 20px",
+            maxWidth: "640px",
+            margin: "0 auto",
+            lineHeight: 1.55,
+          }}
+        >
+          <strong style={{ color: "#e2e8f0" }}>Completion experience</strong> — confetti, stats,
+          badges, certificate mock-up, PDF button, and the{" "}
+          <strong style={{ color: "#67e8f9" }}>Launching June 2026</strong> card (admin-only; not
+          shown to learners).
+        </p>
+        <DemoCompleteCelebration
+          user={DEMO_COMPLETE_PREVIEW_USER}
+          isPreview
+          showLaunchJuneCard
+        />
       </div>
     </div>
   );

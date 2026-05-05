@@ -46,13 +46,21 @@ interface VideoPlayerProps {
   onEnded?: () => void;
   onProgress?: (pct: number) => void;
   /**
-   * When true, `onWatchSatisfied` fires only after enough of the file has actually been played.
-   * Seeking to the end alone does not count until playback covers most of the timeline.
+   * When true, the watch gate must pass before `onWatchSatisfied` fires.
+   * With `minPlayedSeconds`, the gate opens when either total real playback reaches that
+   * many seconds, or the playhead reaches or passes that timestamp (seeking may count).
    */
   enforceWatchThrough?: boolean;
-  /** If set with `enforceWatchThrough`, satisfaction uses this many seconds of real playback (capped by video duration). */
+  /** Gate time in seconds: satisfied when playback totals this long OR currentTime crosses it. */
   minPlayedSeconds?: number;
   onWatchSatisfied?: () => void;
+  /** When true, pauses the video (e.g. after minimum watch time reveals upsell UI). */
+  pauseVideo?: boolean;
+  /**
+   * When true (after the demo watch gate), playback stays paused: controls hidden and
+   * programmatic resume attempts are blocked so the learner sees the overlay CTA instead.
+   */
+  playbackLocked?: boolean;
 }
 
 export default function VideoPlayer({
@@ -62,6 +70,8 @@ export default function VideoPlayer({
   enforceWatchThrough = false,
   minPlayedSeconds,
   onWatchSatisfied,
+  pauseVideo = false,
+  playbackLocked = false,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const satisfiedSent = useRef(false);
@@ -93,11 +103,15 @@ export default function VideoPlayer({
       const minS = minPlayedSeconds;
       if (minS != null && minS > 0) {
         const need = requiredPlayedSeconds(v, minS);
-        if (playedSecondsTotal(v) < need) return;
+        const played = playedSecondsTotal(v);
+        const eps = 0.25;
+        const crossedTimeMark = v.currentTime >= need - eps;
+        if (played < need && !crossedTimeMark) return;
       } else if (playedWatchFraction(v) < WATCH_PLAYED_THRESHOLD) {
         return;
       }
       satisfiedSent.current = true;
+      v.pause();
       onWatchSatisfied?.();
     };
 
@@ -123,12 +137,18 @@ export default function VideoPlayer({
     v.addEventListener("error", handleError);
     v.addEventListener("ended", handleEnded);
     v.addEventListener("timeupdate", handleTimeUpdate);
+    v.addEventListener("seeked", tryWatchSatisfied);
+    v.addEventListener("pause", tryWatchSatisfied);
+    v.addEventListener("playing", tryWatchSatisfied);
 
     return () => {
       v.removeEventListener("loadedmetadata", handleLoaded);
       v.removeEventListener("error", handleError);
       v.removeEventListener("ended", handleEnded);
       v.removeEventListener("timeupdate", handleTimeUpdate);
+      v.removeEventListener("seeked", tryWatchSatisfied);
+      v.removeEventListener("pause", tryWatchSatisfied);
+      v.removeEventListener("playing", tryWatchSatisfied);
     };
   }, [
     onEnded,
@@ -139,6 +159,21 @@ export default function VideoPlayer({
     retryKey,
     lessonId,
   ]);
+
+  useEffect(() => {
+    if (pauseVideo) videoRef.current?.pause();
+  }, [pauseVideo]);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !playbackLocked) return;
+    const blockPlay = () => {
+      void v.pause();
+    };
+    blockPlay();
+    v.addEventListener("play", blockPlay);
+    return () => v.removeEventListener("play", blockPlay);
+  }, [playbackLocked]);
 
   const handleRetry = () => {
     setLoading(true);
@@ -191,7 +226,7 @@ export default function VideoPlayer({
         key={`${lessonId}-${retryKey}`}
         ref={videoRef}
         className="h-full w-full"
-        controls
+        controls={!playbackLocked}
         preload="metadata"
         playsInline
         poster={posterUrl}

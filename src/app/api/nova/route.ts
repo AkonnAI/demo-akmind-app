@@ -28,7 +28,8 @@ function buildDemoSystemPrompt(
   lessonOrder: number
 ): string {
   const summaryModuleId = askedModule ?? currentModule;
-  const lessonIdForContent = askedModule != null ? 1 : Math.max(1, lessonOrder);
+  const lessonIdForContent =
+    askedModule != null ? 1 : Math.min(4, lessonOrder + 1);
   const moduleSummary = getModuleSummary(summaryModuleId);
   const lessonSummary = getLessonSummary(summaryModuleId, lessonIdForContent);
 
@@ -47,8 +48,8 @@ XP: ${live.xp}
 Level: ${live.level}
 Streak (lessons in order completed): ${live.streak}
 Badges earned: ${live.badges}
-Demo modules completed (1 when all 4 lessons done): ${live.modulesCompleted}
-Lessons completed in demo: ${live.lessonsCompleted} of 4
+Demo modules completed (1 when all 3 lessons done): ${live.modulesCompleted}
+Lessons completed in demo: ${live.lessonsCompleted} of 3
 Current module: ${live.currentModule}
 Recent average quiz score: ${live.recentQuizScore}%
 Badges list: ${live.badgeList.length ? live.badgeList.join(", ") : "none yet"}
@@ -68,7 +69,7 @@ End by mentioning what comes in the next lesson when it fits.
 
   const demoFacts = `
 DEMO PROGRAM:
-This is the free Akmind demo with 4 lessons (module 1 style): What is AI, History of AI, AI vs Humans, Types of AI.
+This is the free Akmind demo with 3 lessons (module 1 style): History of AI, AI vs Humans, Types of AI.
 After the demo, students can join the full program — 3 phases, 6 modules each, 180 lessons total.
 Pricing hint only if they ask: phases around ₹15,999 each or a full bundle around ₹39,999 (give rounded figures, not a sales pitch).
 `;

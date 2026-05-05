@@ -21,6 +21,7 @@ export async function DELETE() {
     quizScores: {},
     xp: 0,
     badgeEarned: false,
+    earnedBadges: [],
   });
   return ok({ message: "Admin progress reset" });
 }

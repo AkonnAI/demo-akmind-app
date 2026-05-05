@@ -23,14 +23,52 @@ export interface DemoUser {
   quizScores: Record<string, number>;
   xp: number;
   badgeEarned: boolean;
+  /** Slugs from `DEMO_BADGES` that the user has earned. */
+  earnedBadges: string[];
   createdAt: string;
 }
 
+/**
+ * Parse stored earnedBadges: JSON string (DynamoDB), plain array (local JSON / legacy),
+ * or raw `{ S: string }` if an item is ever handled pre-unmarshall.
+ */
+function parseEarnedBadges(raw: unknown): string[] {
+  if (raw === undefined || raw === null) return [];
+  if (
+    typeof raw === "object" &&
+    raw !== null &&
+    "S" in raw &&
+    typeof (raw as { S?: unknown }).S === "string"
+  ) {
+    raw = (raw as { S: string }).S;
+  }
+  if (Array.isArray(raw)) {
+    return raw.filter((x): x is string => typeof x === "string");
+  }
+  if (typeof raw === "string") {
+    try {
+      const p = JSON.parse(raw) as unknown;
+      return Array.isArray(p)
+        ? p.filter((x): x is string => typeof x === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function withEarnedBadgesDefault(u: DemoUser): DemoUser {
+  return {
+    ...u,
+    earnedBadges: parseEarnedBadges(u.earnedBadges as unknown),
+  };
+}
+
 export type CreateDemoUserInput = Omit<DemoUser, "id" | "createdAt">;
+/** DynamoDB table for demo users — env `DEMO_USERS_TABLE`, default `akmind-demo-users`. */
 const TABLE =
-  process.env.DEMO_USERS_TABLE ||
-  process.env.DYNAMODB_DEMO_TABLE ||
-  "akmind-demo-users";
+  process.env.DEMO_USERS_TABLE?.trim() || "akmind-demo-users";
 const HAS_TABLE_CONFIG = Boolean(
   process.env.DEMO_USERS_TABLE || process.env.DYNAMODB_DEMO_TABLE
 );
@@ -105,24 +143,26 @@ export async function createDemoUser(data: CreateDemoUserInput): Promise<DemoUse
     const users = readUsers();
     users.push(user);
     writeUsers(users);
-    return user;
+    return withEarnedBadgesDefault(user);
   }
 
   await getDb().send(
     new PutCommand({
       TableName: TABLE,
-      Item: user,
+      Item: {
+        ...user,
+        earnedBadges: JSON.stringify(user.earnedBadges ?? []),
+      },
     })
   );
-  return user;
+  return withEarnedBadgesDefault(user);
 }
 
 export async function getDemoUserByEmail(email: string): Promise<DemoUser | null> {
   const normalizedEmail = email.toLowerCase().trim();
   if (!IS_DYNAMO) {
-    return (
-      readUsers().find((u) => u.email === normalizedEmail) ?? null
-    );
+    const row = readUsers().find((u) => u.email === normalizedEmail);
+    return row ? withEarnedBadgesDefault(row) : null;
   }
   try {
     const res = await getDb().send(
@@ -134,7 +174,8 @@ export async function getDemoUserByEmail(email: string): Promise<DemoUser | null
         Limit: 1,
       })
     );
-    return (res.Items?.[0] as DemoUser) || null;
+    const row = res.Items?.[0] as DemoUser | undefined;
+    return row ? withEarnedBadgesDefault(row) : null;
   } catch (error) {
     console.warn("email-index query failed, falling back to table scan", error);
     const scan = await getDb().send(
@@ -145,7 +186,8 @@ export async function getDemoUserByEmail(email: string): Promise<DemoUser | null
         Limit: 1,
       })
     );
-    return (scan.Items?.[0] as DemoUser) || null;
+    const row = scan.Items?.[0] as DemoUser | undefined;
+    return row ? withEarnedBadgesDefault(row) : null;
   }
 }
 
@@ -153,9 +195,8 @@ export async function getDemoUserByToken(token: string): Promise<DemoUser | null
   const normalizedToken = normalizeDemoToken(token);
   if (!normalizedToken) return null;
   if (!IS_DYNAMO) {
-    return (
-      readUsers().find((u) => u.demoToken === normalizedToken) ?? null
-    );
+    const row = readUsers().find((u) => u.demoToken === normalizedToken);
+    return row ? withEarnedBadgesDefault(row) : null;
   }
   try {
     const res = await getDb().send(
@@ -167,7 +208,8 @@ export async function getDemoUserByToken(token: string): Promise<DemoUser | null
         Limit: 1,
       })
     );
-    return (res.Items?.[0] as DemoUser) || null;
+    const row = res.Items?.[0] as DemoUser | undefined;
+    return row ? withEarnedBadgesDefault(row) : null;
   } catch (error) {
     console.warn("token-index query failed, falling back to table scan", error);
     const scan = await getDb().send(
@@ -178,7 +220,8 @@ export async function getDemoUserByToken(token: string): Promise<DemoUser | null
         Limit: 1,
       })
     );
-    return (scan.Items?.[0] as DemoUser) || null;
+    const row = scan.Items?.[0] as DemoUser | undefined;
+    return row ? withEarnedBadgesDefault(row) : null;
   }
 }
 
@@ -200,17 +243,36 @@ export async function updateDemoUser(
   if (entries.length === 0) return;
   const expr = "SET " + entries.map((_, i) => `#f${i} = :v${i}`).join(", ");
   const names = Object.fromEntries(entries.map(([k], i) => [`#f${i}`, k]));
-  const values = Object.fromEntries(entries.map(([, v], i) => [`:v${i}`, v]));
-
-  await getDb().send(
-    new UpdateCommand({
-      TableName: TABLE,
-      Key: { id },
-      UpdateExpression: expr,
-      ExpressionAttributeNames: names,
-      ExpressionAttributeValues: values,
-    })
+  // DynamoDB: persist earnedBadges as a String attribute (JSON array).
+  const values = Object.fromEntries(
+    entries.map(([k, v], i) => [
+      `:v${i}`,
+      k === "earnedBadges"
+        ? JSON.stringify(Array.isArray(v) ? v : [])
+        : v,
+    ])
   );
+
+  try {
+    await getDb().send(
+      new UpdateCommand({
+        TableName: TABLE,
+        Key: { id: String(id) },
+        UpdateExpression: expr,
+        ExpressionAttributeNames: names,
+        ExpressionAttributeValues: values,
+      })
+    );
+  } catch (err) {
+    console.error("[demo-db] updateDemoUser DynamoDB UpdateItem failed", {
+      table: TABLE,
+      partitionKey: "id",
+      id: String(id),
+      fields: entries.map(([k]) => k),
+      error: err,
+    });
+    throw err;
+  }
 }
 
 export async function hasUsedDemo(email: string): Promise<boolean> {
@@ -235,5 +297,6 @@ export async function getOrCreateAdminUser(): Promise<DemoUser> {
     quizScores: {},
     xp: 0,
     badgeEarned: false,
+    earnedBadges: [],
   });
 }

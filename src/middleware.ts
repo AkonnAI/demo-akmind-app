@@ -1,20 +1,43 @@
 import { DEMO_TOKEN_COOKIE_MAX_AGE_SECONDS } from "@/lib/demo-session";
 import { NextRequest, NextResponse } from "next/server";
 
+function originAllowedForApi(origin: string): boolean {
+  const allowed = [
+    "https://www.akmind.com",
+    "https://demo.akmind.com",
+    "https://app.akmind.com",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:3002",
+    "http://[::1]:3000",
+    "http://[::1]:3001",
+    "http://[::1]:3002",
+  ];
+  if (allowed.includes(origin)) return true;
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      const u = new URL(origin);
+      return (
+        u.hostname === "localhost" ||
+        u.hostname === "127.0.0.1" ||
+        u.hostname === "[::1]"
+      );
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (pathname.startsWith("/api/")) {
     const origin = req.headers.get("origin") || "";
-    const allowed = [
-      "https://www.akmind.com",
-      "https://demo.akmind.com",
-      "https://app.akmind.com",
-      "http://localhost:3000",
-      "http://localhost:3001",
-      "http://localhost:3002",
-    ];
 
-    if (origin !== "" && !allowed.includes(origin)) {
+    if (origin !== "" && !originAllowedForApi(origin)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -46,9 +69,10 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  /** Query `token` wins so a fresh link overrides a stale cookie (e.g. admin dev token). */
   const token =
-    req.cookies.get("demo_token")?.value ||
-    req.nextUrl.searchParams.get("token");
+    req.nextUrl.searchParams.get("token") ||
+    req.cookies.get("demo_token")?.value;
 
   if (!token) {
     const redirectUrl = new URL("/", req.url);

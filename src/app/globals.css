@@ -13,7 +13,9 @@
   --bg-deep: #0a0f24;
   --bg-navy: #0d1230;
   --bg-glass: rgba(15, 20, 50, 0.6);
+  --bg-glass-light: rgba(255, 255, 255, 0.03);
   --bg-card: rgba(15, 20, 50, 0.7);
+  --bg-elevated: rgba(22, 30, 65, 0.8);
   --border-glass: rgba(139, 148, 255, 0.18);
   --border-glow: rgba(6, 182, 212, 0.35);
   --text-bright: #ffffff;
@@ -24,8 +26,14 @@
   --indigo: #6366f1;
   --amber: #f59e0b;
   --green: #10b981;
+  --glow-sm-cyan: 0 0 12px rgba(6, 182, 212, 0.3);
+  --glow-sm-indigo: 0 0 12px rgba(99, 102, 241, 0.3);
   --glow-cyan: 0 0 20px rgba(6, 182, 212, 0.3);
   --glow-indigo: 0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+html {
+  color-scheme: dark;
 }
 
 body {
@@ -33,17 +41,22 @@ body {
   background-image:
     radial-gradient(
       ellipse at 15% 15%,
-      rgba(99, 102, 241, 0.12) 0%,
+      rgba(99, 102, 241, 0.15) 0%,
       transparent 45%
     ),
     radial-gradient(
       ellipse at 85% 85%,
-      rgba(6, 182, 212, 0.1) 0%,
+      rgba(6, 182, 212, 0.12) 0%,
       transparent 45%
     ),
     radial-gradient(
       ellipse at 85% 15%,
-      rgba(139, 92, 246, 0.06) 0%,
+      rgba(139, 92, 246, 0.08) 0%,
+      transparent 35%
+    ),
+    radial-gradient(
+      ellipse at 15% 85%,
+      rgba(6, 182, 212, 0.06) 0%,
       transparent 35%
     );
   background-attachment: fixed;
@@ -51,6 +64,39 @@ body {
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   min-height: 100vh;
+}
+
+/* Demo shell — glass surfaces aligned with akmind-dashboard */
+.demo-ak-glass-surface {
+  background: rgba(15, 20, 50, 0.65);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(99, 102, 241, 0.12);
+}
+
+.demo-ak-glass-elevated {
+  background: rgba(15, 20, 50, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(139, 148, 255, 0.18);
+}
+
+.demo-ak-hero-panel {
+  background: rgba(15, 20, 50, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(139, 148, 255, 0.18);
+  background-image: linear-gradient(
+    180deg,
+    rgba(99, 102, 241, 0.06) 0%,
+    transparent 40%
+  );
+  background-repeat: no-repeat;
+}
+
+.demo-ak-section-heading {
+  border-left: 3px solid #06b6d4;
+  padding-left: 12px;
 }
 
 @keyframes float {
@@ -117,13 +163,13 @@ body {
     opacity: 0;
   }
   10% {
-    opacity: 0.6;
+    opacity: 0.7;
   }
   90% {
-    opacity: 0.3;
+    opacity: 0.4;
   }
   100% {
-    transform: translateY(-100px) scale(0.3);
+    transform: translateY(-120px) scale(0.3);
     opacity: 0;
   }
 }
@@ -200,6 +246,65 @@ body {
   animation-name: confetti-fall;
   animation-timing-function: linear;
   animation-fill-mode: both;
+}
+
+@keyframes demo-complete-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.demo-complete-main-card {
+  animation: demo-complete-card-in 0.7s ease-out both;
+}
+
+@keyframes particle-drift {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.6;
+  }
+  85% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translate(30px, -100px) rotate(180deg);
+    opacity: 0;
+  }
+}
+
+@keyframes particle-drift-left {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(-40px, -90px) rotate(-120deg);
+    opacity: 0;
+  }
+}
+
+@keyframes orb-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(8px, -12px) scale(1.05);
+  }
+  66% {
+    transform: translate(-6px, -6px) scale(0.97);
+  }
 }
 
 ::-webkit-scrollbar {

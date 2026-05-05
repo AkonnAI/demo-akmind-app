@@ -22,7 +22,7 @@ interface NOVAChatProps {
   /** Stable key for chat memory (e.g. email) */
   userKey?: string;
   currentModule?: number;
-  /** Current demo lesson number 1–4, for curriculum hints */
+  /** Current demo lesson number 1–3, for curriculum hints */
   lessonOrder?: number;
   quizScores?: Record<string, number> | null;
   badgeEarned?: boolean;

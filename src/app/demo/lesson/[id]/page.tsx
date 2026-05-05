@@ -3,9 +3,10 @@
 import VideoPlayer from "@/components/lesson/VideoPlayer";
 import NOVAChat from "@/components/NOVAChat";
 import type { DemoUser } from "@/types/demo";
+import { DEMO_BADGES } from "@/lib/demo-badges";
+import { normalizeClientDemoToken } from "@/lib/demo-token-client";
 import dynamic from "next/dynamic";
-import { motion } from "framer-motion";
-import { ArrowLeft, Check, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Suspense,
@@ -27,67 +28,33 @@ type LessonContent = {
   title: string;
   type: "live" | "self-paced";
   videoUrl: string;
-  duration: number;
+  /** Approximate length shown in UI (e.g. video runtime). */
+  durationLabel: string;
   xpReward: number;
   description: string;
+  /** Three short takeaways shown under the lesson title. */
+  summaryBullets: readonly [string, string, string];
   hasGame: boolean;
   quiz: QuizItem[];
 };
 
-/** Lessons 2–4: minimum seconds of actual video playback before continue unlocks. */
-const MIN_LESSON_VIDEO_PLAY_SECONDS = 180;
+/** Lessons 1–3: minimum seconds of actual video playback before upsell + continue unlocks (non-admin). */
+const MIN_LESSON_VIDEO_PLAY_SECONDS = 120;
 
 const LESSONS: Record<number, LessonContent> = {
   1: {
-    title: "Welcome to Artificial Intelligence",
-    type: "live",
-    videoUrl: "https://www.youtube.com/embed/ad79nYk2keg",
-    duration: 900,
-    xpReward: 100,
-    description:
-      "Icebreaker, defining AI, real-world examples kids use daily.",
-    hasGame: true,
-    quiz: [
-      {
-        q: "What does AI stand for?",
-        options: [
-          "Automated Internet",
-          "Artificial Intelligence",
-          "Advanced Interface",
-          "Automated Information",
-        ],
-        correct: 1,
-      },
-      {
-        q: "Which of these is an example of AI?",
-        options: [
-          "A calculator",
-          "A light switch",
-          "Voice assistant like Siri",
-          "A fan",
-        ],
-        correct: 2,
-      },
-      {
-        q: "AI systems learn from...",
-        options: [
-          "Magic",
-          "Random guessing",
-          "Data and examples",
-          "Human emotions",
-        ],
-        correct: 2,
-      },
-    ],
-  },
-  2: {
     title: "History of AI — From Dreams to Machines",
     type: "self-paced",
     videoUrl: "https://www.youtube.com/embed/JMUxmLyrhSk",
-    duration: 900,
+    durationLabel: "6+ min",
     xpReward: 300,
     description:
       "Timeline from ancient myths to ChatGPT. Key AI milestones.",
+    summaryBullets: [
+      "Stories and early dreams of intelligent machines long before computers existed.",
+      "Landmarks from Turing and early AI winters to Deep Blue, AlphaGo, and ChatGPT-era models.",
+      "How today’s assistants fit into the bigger picture—not magic, but decades of ideas and engineering.",
+    ],
     hasGame: true,
     quiz: [
       {
@@ -132,13 +99,18 @@ const LESSONS: Record<number, LessonContent> = {
       },
     ],
   },
-  3: {
+  2: {
     title: "AI vs Humans: What Can AI Do?",
     type: "self-paced",
     videoUrl: "https://www.youtube.com/embed/rcd7Ov9b5QM",
-    duration: 900,
+    durationLabel: "6+ min",
     xpReward: 300,
     description: "Strengths and limits of AI vs human intelligence.",
+    summaryBullets: [
+      "AI shines at speed, scale, and finding patterns in huge amounts of data.",
+      "Humans still lead on empathy, ethics, common sense in new situations, and true creativity.",
+      "The sweet spot is often collaboration—AI plus human judgment beats either alone.",
+    ],
     hasGame: true,
     quiz: [
       {
@@ -188,14 +160,19 @@ const LESSONS: Record<number, LessonContent> = {
       },
     ],
   },
-  4: {
+  3: {
     title: "Types of AI: Narrow, General & Super",
     type: "self-paced",
     videoUrl: "https://www.youtube.com/embed/aWKNGWdAMGA",
-    duration: 900,
+    durationLabel: "6+ min",
     xpReward: 300,
     description:
       "Different levels of AI. Where are we today vs science fiction?",
+    summaryBullets: [
+      "Narrow AI: specialized systems we use daily—voice assistants, recommendations, filters.",
+      "Artificial general intelligence (AGI): flexible, human-level AI—still a research goal, not a product.",
+      "Superintelligent AI lives in sci-fi for now; understanding types helps us discuss safety and the future responsibly.",
+    ],
     hasGame: true,
     quiz: [
       {
@@ -238,10 +215,9 @@ const LESSONS: Record<number, LessonContent> = {
 };
 
 const GAME_MECHANICS: Record<number, string> = {
-  1: "Neuropolis Level 1 — guide AX through the district with NOVA. Jump, explore, and complete the lesson arc.",
-  2: "Neuropolis Level 2 — The Vault: timelines, ciphers, and the Glitch Twin.",
-  3: "Neuropolis Level 3 — The Divide: switch modes and cross Human vs AI zones.",
-  4: "Neuropolis Level 4 — classify Narrow, General, and Super AI in the wild.",
+  1: "Neuropolis Level 2 — The Vault: timelines, ciphers, and the Glitch Twin.",
+  2: "Neuropolis Level 3 — The Divide: switch modes and cross Human vs AI zones.",
+  3: "Neuropolis Level 4 — classify Narrow, General, and Super AI in the wild.",
 };
 
 const GAME_BONUS_XP = 200;
@@ -262,12 +238,14 @@ function readCookieToken(): string | null {
 }
 
 function getToken(tokenFromUrl: string | null): string | null {
-  if (tokenFromUrl) return tokenFromUrl;
-  if (typeof sessionStorage !== "undefined") {
-    const sessionToken = sessionStorage.getItem("demo_token");
-    if (sessionToken) return sessionToken;
-  }
-  return readCookieToken();
+  const raw =
+    (tokenFromUrl && tokenFromUrl.trim()) ||
+    (typeof sessionStorage !== "undefined"
+      ? sessionStorage.getItem("demo_token")
+      : null) ||
+    readCookieToken();
+  if (!raw?.trim()) return null;
+  return normalizeClientDemoToken(raw);
 }
 
 function lessonUnlocked(lessonId: number, lessonsComplete: number[]): boolean {
@@ -314,9 +292,7 @@ function LessonPageInner() {
   const [user, setUser] = useState<DemoUser | null>(null);
   const [userLoading, setUserLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [phase, setPhase] = useState<"video" | "game" | "quiz" | "complete">(
-    "video"
-  );
+  const [phase, setPhase] = useState<"video" | "game" | "quiz">("video");
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [quizScoreCorrect, setQuizScoreCorrect] = useState(0);
   const [xpAwarded, setXpAwarded] = useState(false);
@@ -324,11 +300,22 @@ function LessonPageInner() {
   const [gameActive, setGameActive] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [pickedOption, setPickedOption] = useState<number | null>(null);
-  const [resultsXp, setResultsXp] = useState(0);
   const [showQuizResults, setShowQuizResults] = useState(false);
   const [videoWatchSatisfied, setVideoWatchSatisfied] = useState(false);
+  const [pauseVideo, setPauseVideo] = useState(false);
+  const [showXPOverlay, setShowXPOverlay] = useState(false);
+  const [showXPOverlayContinue, setShowXPOverlayContinue] = useState(false);
+  const [xpOverlayPayload, setXpOverlayPayload] = useState<{
+    xpEarned: number;
+    totalXpAfter: number;
+    newBadges: string[];
+  } | null>(null);
+  const [xpCounterDisplay, setXpCounterDisplay] = useState(0);
   const progressPosted = useRef(false);
   const resultsInitialized = useRef(false);
+  const xpOverlayTimerRef = useRef<ReturnType<
+    typeof globalThis.setTimeout
+  > | null>(null);
 
   const launchGame = () => {
     setGameActive(true);
@@ -358,7 +345,8 @@ function LessonPageInner() {
         return;
       }
       setLoadError(false);
-      setUser(await res.json());
+      const data = (await res.json()) as DemoUser;
+      setUser({ ...data, earnedBadges: data.earnedBadges ?? [] });
     } catch {
       setUser(null);
       setLoadError(true);
@@ -385,16 +373,9 @@ function LessonPageInner() {
   }, [lesson?.hasGame, phase]);
 
   useEffect(() => {
-    if (phase !== "complete" || !token) return;
-    const t = setTimeout(() => {
-      if (lessonId >= 4) {
-        router.push(`/demo/complete?token=${encodeURIComponent(token)}`);
-      } else {
-        router.push(`/demo?token=${encodeURIComponent(token)}`);
-      }
-    }, 3000);
-    return () => clearTimeout(t);
-  }, [phase, token, router, lessonId]);
+    setVideoWatchSatisfied(false);
+    setPauseVideo(false);
+  }, [lessonId]);
 
   const stepMeta = useMemo(() => {
     if (!lesson) return [];
@@ -415,7 +396,7 @@ function LessonPageInner() {
     if (!lesson) return 0;
     if (phase === "video") return 0;
     if (phase === "game") return 1;
-    if (phase === "quiz" || phase === "complete") {
+    if (phase === "quiz") {
       return lesson.hasGame ? 2 : 1;
     }
     return 0;
@@ -429,8 +410,19 @@ function LessonPageInner() {
   };
 
   const postLessonProgress = useCallback(
-    async (correctCount: number, total: number, totalXp: number) => {
-      if (!token || !lesson || progressPosted.current) return;
+    async (
+      correctCount: number,
+      total: number,
+      lessonXpEarned: number,
+      badgesBeforeSnapshot: string[]
+    ): Promise<{
+      ok: boolean;
+      totalXpAfter?: number;
+      newBadges?: string[];
+    }> => {
+      if (!token || !lesson || progressPosted.current) {
+        return { ok: false };
+      }
       progressPosted.current = true;
       const pct = total > 0 ? Math.round((correctCount / total) * 100) : 0;
       try {
@@ -441,36 +433,88 @@ function LessonPageInner() {
             token,
             lessonId,
             quizScore: pct,
-            xp: totalXp,
+            xp: lessonXpEarned,
+            badgesBefore: badgesBeforeSnapshot,
           }),
         });
         if (res.ok) {
           const data = (await res.json()) as {
             xp?: number;
             lessonsComplete?: number[];
+            quizScores?: Record<string, number>;
+            badgeEarned?: boolean;
+            demoCompleted?: boolean;
+            earnedBadges?: string[];
+            newBadges?: string[];
           };
-          if (data.xp !== undefined) {
-            setUser((u) => (u ? { ...u, xp: data.xp! } : u));
-          }
-          if (data.lessonsComplete) {
-            setUser((u) =>
-              u ? { ...u, lessonsComplete: data.lessonsComplete! } : u
-            );
-          }
-        } else {
-          progressPosted.current = false;
+          setUser((u) =>
+            u
+              ? {
+                  ...u,
+                  xp: data.xp ?? u.xp,
+                  lessonsComplete: data.lessonsComplete ?? u.lessonsComplete,
+                  quizScores: data.quizScores ?? u.quizScores,
+                  badgeEarned: data.badgeEarned ?? u.badgeEarned,
+                  demoCompleted: data.demoCompleted ?? u.demoCompleted,
+                  earnedBadges: data.earnedBadges ?? u.earnedBadges,
+                }
+              : u
+          );
+          return {
+            ok: true,
+            totalXpAfter: data.xp,
+            newBadges: data.newBadges ?? [],
+          };
         }
+        progressPosted.current = false;
+        return { ok: false };
       } catch {
         progressPosted.current = false;
-      } finally {
-        setXpAwarded(true);
+        return { ok: false };
       }
     },
     [token, lesson, lessonId]
   );
 
+  const xpParticles = useMemo(
+    () =>
+      Array.from({ length: 10 }, (_, i) => ({
+        left: `${(i * 41 + 7) % 88}%`,
+        delayS: (i % 6) * 0.25,
+        durationS: 2.5 + (i % 5) * 0.35,
+        size: 3 + (i % 3),
+      })),
+    []
+  );
+
   useEffect(() => {
-    if (!showQuizResults || !lesson || !token) return;
+    if (!showXPOverlay) return;
+    setShowXPOverlayContinue(false);
+    const t = window.setTimeout(() => setShowXPOverlayContinue(true), 2000);
+    return () => window.clearTimeout(t);
+  }, [showXPOverlay]);
+
+  useEffect(() => {
+    if (!showXPOverlay || !xpOverlayPayload) return;
+    const xpEarned = Math.max(0, xpOverlayPayload.xpEarned);
+    setXpCounterDisplay(0);
+    if (xpEarned === 0) return;
+    const inc = Math.max(1, Math.ceil(xpEarned / 60));
+    const id = window.setInterval(() => {
+      setXpCounterDisplay((c) => Math.min(xpEarned, c + inc));
+    }, 25);
+    const finish = window.setTimeout(() => {
+      window.clearInterval(id);
+      setXpCounterDisplay(xpEarned);
+    }, 1500);
+    return () => {
+      window.clearInterval(id);
+      window.clearTimeout(finish);
+    };
+  }, [showXPOverlay, xpOverlayPayload]);
+
+  useEffect(() => {
+    if (!showQuizResults || !lesson || !token || !user) return;
     if (resultsInitialized.current) return;
     resultsInitialized.current = true;
 
@@ -481,12 +525,48 @@ function LessonPageInner() {
     }
     setQuizScoreCorrect(correct);
 
+    const badgesBeforeSnapshot = [...(user.earnedBadges ?? [])];
+    const xpBeforeSnapshot = user.xp ?? 0;
+
     const quizXp = quizXpFromAccuracy(lesson.xpReward, correct, total);
     const gameXp = lesson.hasGame && gameComplete ? GAME_BONUS_XP : 0;
     const totalXp = quizXp + gameXp;
-    setResultsXp(totalXp);
 
-    void postLessonProgress(correct, total, totalXp);
+    const started = Date.now();
+
+    void postLessonProgress(correct, total, totalXp, badgesBeforeSnapshot)
+      .then((r) => {
+        if (r.ok && r.totalXpAfter !== undefined) {
+          const xpEarned = Math.max(0, r.totalXpAfter - xpBeforeSnapshot);
+          setXpOverlayPayload({
+            xpEarned,
+            totalXpAfter: r.totalXpAfter,
+            newBadges: r.newBadges ?? [],
+          });
+          const elapsed = Date.now() - started;
+          const delay = Math.max(0, 1500 - elapsed);
+          if (xpOverlayTimerRef.current !== null) {
+            window.clearTimeout(xpOverlayTimerRef.current);
+          }
+          xpOverlayTimerRef.current = globalThis.setTimeout(() => {
+            xpOverlayTimerRef.current = null;
+            setShowXPOverlay(true);
+          }, delay);
+        } else {
+          progressPosted.current = false;
+        }
+      })
+      .finally(() => setXpAwarded(true));
+
+    return () => {
+      if (xpOverlayTimerRef.current !== null) {
+        window.clearTimeout(xpOverlayTimerRef.current);
+        xpOverlayTimerRef.current = null;
+      }
+    };
+    // Intentionally omit `user` from deps — updating user after POST must not re-run
+    // this effect or the overlay timer is cleared before it fires.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     showQuizResults,
     lesson,
@@ -502,7 +582,6 @@ function LessonPageInner() {
     setXpAwarded(false);
     setShowQuizResults(false);
     setQuizScoreCorrect(0);
-    setResultsXp(0);
     setCurrentQuestion(0);
     setPickedOption(null);
     setQuizAnswers({});
@@ -510,13 +589,15 @@ function LessonPageInner() {
     setGameActive(false);
     setPhase("video");
     setVideoWatchSatisfied(false);
-  }, [lessonId]);
-
-  useEffect(() => {
-    if (user && isAdminTester(user)) {
-      setVideoWatchSatisfied(true);
+    setShowXPOverlay(false);
+    setShowXPOverlayContinue(false);
+    setXpOverlayPayload(null);
+    setXpCounterDisplay(0);
+    if (xpOverlayTimerRef.current !== null) {
+      window.clearTimeout(xpOverlayTimerRef.current);
+      xpOverlayTimerRef.current = null;
     }
-  }, [user, lessonId]);
+  }, [lessonId]);
 
   const advanceQuestion = () => {
     if (!lesson) return;
@@ -532,10 +613,6 @@ function LessonPageInner() {
     if (pickedOption !== null || !lesson) return;
     setPickedOption(idx);
     setQuizAnswers((prev) => ({ ...prev, [currentQuestion]: idx }));
-  };
-
-  const handleResultsContinue = () => {
-    setPhase("complete");
   };
 
   if (!Number.isFinite(lessonId) || !lesson) {
@@ -578,11 +655,8 @@ function LessonPageInner() {
   }
 
   const adminMode = isAdminTester(user);
-  const minVideoRequired = !adminMode && lessonId >= 2 && lessonId <= 4;
-  const showLaunchCard = minVideoRequired && videoWatchSatisfied;
-  const showStandardContinue = !minVideoRequired || adminMode;
-  const canContinueFromVideo =
-    adminMode || lessonId === 1 || videoWatchSatisfied;
+  const minVideoRequired = lessonId >= 1 && lessonId <= 3;
+  const showPurchaseUpsell = minVideoRequired && videoWatchSatisfied;
 
   if (user && !lessonUnlocked(lessonId, user.lessonsComplete)) {
     if (!adminMode) {
@@ -605,15 +679,12 @@ function LessonPageInner() {
 
   // Hide lesson NOVA widget during fullscreen Neuropolis so it never steals taps
   // (including dialogue-advance and canvas input). Admins use Exit + dashboard for chat.
-  const suppressNovaChatFab = phase === "game" && gameActive;
+  const suppressNovaChatFab =
+    (phase === "game" && gameActive) || showXPOverlay;
 
   const totalQs = lesson.quiz.length;
   const q = lesson.quiz[currentQuestion];
-  const durationMin = Math.round(lesson.duration / 60);
-  const typeLabel =
-    lessonId === 1
-      ? "Paid course: live class · Demo: recording + full game (free)"
-      : "Self-paced lesson video + game";
+  const typeLabel = "Self-paced lesson video + game";
 
   return (
     <div className="min-h-screen overflow-x-hidden">
@@ -716,111 +787,80 @@ function LessonPageInner() {
               backdropFilter: "blur(20px)",
             }}
           >
-            <VideoPlayer
-              lessonId={lessonId}
-              enforceWatchThrough={minVideoRequired}
-              minPlayedSeconds={
-                minVideoRequired ? MIN_LESSON_VIDEO_PLAY_SECONDS : undefined
-              }
-              onWatchSatisfied={() => setVideoWatchSatisfied(true)}
-            />
-
-            {lessonId === 1 && (
-              <div
-                className="mx-4 mt-4 rounded-xl border px-4 py-3 text-sm text-slate-200 sm:mx-6 sm:mt-5 sm:px-5 sm:py-4"
-                style={{
-                  background: "rgba(99,102,241,0.08)",
-                  borderColor: "rgba(99,102,241,0.25)",
-                  backdropFilter: "blur(12px)",
+            <div className="relative w-full">
+              <VideoPlayer
+                lessonId={lessonId}
+                enforceWatchThrough={minVideoRequired}
+                minPlayedSeconds={
+                  minVideoRequired ? MIN_LESSON_VIDEO_PLAY_SECONDS : undefined
+                }
+                playbackLocked={showPurchaseUpsell}
+                pauseVideo={pauseVideo}
+                onWatchSatisfied={() => {
+                  setVideoWatchSatisfied(true);
+                  setPauseVideo(true);
                 }}
-              >
-                <p className="font-semibold text-indigo-200">
-                  Lesson 1 — Live class in the full course
-                </p>
-                <p className="mt-1 text-slate-400">
-                  After purchase, students attend scheduled live sessions with an instructor. Here in the demo you get the same lesson as a recording—then use{" "}
-                  <span className="font-medium text-slate-300">
-                    Continue to Game
-                  </span>{" "}
-                  to play Neuropolis and complete the quiz. No purchase is required for this preview.
-                </p>
-              </div>
-            )}
+              />
+              {showPurchaseUpsell ? (
+                <div
+                  className="absolute inset-0 z-20 flex items-center justify-center overflow-y-auto rounded-xl bg-black/75 p-4 backdrop-blur-md sm:p-6"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="demo-preview-upsell-title"
+                >
+                  <div className="my-auto w-full max-w-lg rounded-xl border border-amber-400/40 bg-[rgba(15,20,40,0.95)] px-5 py-5 shadow-[0_8px_32px_rgba(245,158,11,0.15)] sm:px-6 sm:py-6">
+                    <p
+                      id="demo-preview-upsell-title"
+                      className="font-semibold text-amber-300"
+                    >
+                      You&apos;ve reached the 2-minute point
+                    </p>
+                    <p className="mt-2 text-sm text-slate-300">
+                      Purchase the full program to continue your AI journey — or keep
+                      going with this demo lesson.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <a
+                        href="https://www.akmind.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex rounded-lg bg-amber-500 px-5 py-2 text-sm font-semibold text-black transition hover:bg-amber-400"
+                      >
+                        Purchase full program
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          lesson.hasGame ? setPhase("game") : setPhase("quiz")
+                        }
+                        className="rounded-lg border border-indigo-500/50 px-5 py-2 text-sm text-indigo-300 transition hover:bg-indigo-500/10"
+                      >
+                        {lesson.hasGame
+                          ? "Continue to Game →"
+                          : "Continue to Quiz →"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
 
             <div className="p-6 sm:p-7">
               <h2 className="text-[22px] font-bold tracking-tight text-white">{lesson.title}</h2>
               <p className="mt-2 text-sm text-slate-400">{lesson.description}</p>
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-relaxed text-slate-300 marker:text-indigo-400">
+                {lesson.summaryBullets.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <span className="w-fit rounded-full bg-white/5 px-3 py-1 text-xs text-slate-400">
-                  ~{durationMin} min
+                  ~{lesson.durationLabel}
                 </span>
                 <span className="w-fit rounded-full bg-indigo-500/15 px-3 py-1 text-xs text-indigo-300">
                   {typeLabel}
                 </span>
               </div>
-              {minVideoRequired && !videoWatchSatisfied && (
-                <p className="mt-4 text-xs text-slate-500">
-                  Watch at least three minutes of the lesson video (real playback,
-                  not just skipping ahead). Then you&apos;ll see what&apos;s next for
-                  the full course and can continue to the game.
-                </p>
-              )}
-              {adminMode && (
-                <p className="mt-4 text-xs text-amber-200/80">
-                  Admin / tester: lesson video gates are bypassed.
-                </p>
-              )}
-              {showLaunchCard && (
-                <div
-                  className="mt-6 rounded-xl border px-5 py-5 sm:px-6 sm:py-6"
-                  style={{
-                    background: "rgba(99,102,241,0.08)",
-                    borderColor: "rgba(99,102,241,0.28)",
-                    backdropFilter: "blur(12px)",
-                  }}
-                >
-                  <p className="font-semibold text-indigo-200">
-                    Full lesson experience
-                  </p>
-                  <p className="mt-2 text-sm text-slate-400">
-                    Full lesson launching June 2026 — stay tuned. You can still
-                    continue to the demo game below.
-                  </p>
-                  <button
-                    type="button"
-                    className="mt-5 rounded-xl px-7 py-3 font-semibold text-white transition-all duration-200 hover:-translate-y-0.5"
-                    style={{
-                      background: "linear-gradient(135deg, #6366F1, #4F46E5)",
-                      boxShadow: "var(--glow-indigo)",
-                    }}
-                    onClick={() =>
-                      lesson.hasGame ? setPhase("game") : setPhase("quiz")
-                    }
-                  >
-                    {lesson.hasGame ? "Continue to Game →" : "Continue to Quiz →"}
-                  </button>
-                </div>
-              )}
-              {showStandardContinue && (
-                <button
-                  type="button"
-                  disabled={!canContinueFromVideo}
-                  className={`mt-6 rounded-xl px-7 py-3 font-semibold text-white transition-all duration-200 ${
-                    canContinueFromVideo
-                      ? "hover:-translate-y-0.5"
-                      : "cursor-not-allowed opacity-45"
-                  }`}
-                  style={{
-                    background: "linear-gradient(135deg, #6366F1, #4F46E5)",
-                    boxShadow: "var(--glow-indigo)",
-                  }}
-                  onClick={() =>
-                    lesson.hasGame ? setPhase("game") : setPhase("quiz")
-                  }
-                >
-                  {lesson.hasGame ? "Continue to Game →" : "Continue to Quiz →"}
-                </button>
-              )}
             </div>
           </div>
         )}
@@ -836,10 +876,10 @@ function LessonPageInner() {
               maxHeight: "100vh",
             }}
           >
-            {gameActive && lessonId >= 1 && lessonId <= 4 && (
+            {gameActive && lessonId >= 1 && lessonId <= 3 && (
               <LandscapeWrapper>
                 <NeuropolisShell
-                  level={lessonId as 1 | 2 | 3 | 4}
+                  level={lessonId as 1 | 2 | 3}
                   onComplete={async () => {
                     await exitGame();
                     setGameComplete(true);
@@ -850,7 +890,7 @@ function LessonPageInner() {
               </LandscapeWrapper>
             )}
 
-            {gameActive && (lessonId < 1 || lessonId > 4) && (
+            {gameActive && (lessonId < 1 || lessonId > 3) && (
               <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900 px-6 text-center text-white">
                 <p className="text-4xl">🎮</p>
                 <p className="mt-4 text-2xl font-bold">Game Coming Soon</p>
@@ -1059,77 +1099,101 @@ function LessonPageInner() {
             <p className="mt-2 text-slate-400">
               Score: {quizScoreCorrect}/{totalQs}
             </p>
-            <motion.p
-              className="mt-6 text-center text-[52px] font-black leading-none"
-              initial={{ scale: 0.5 }}
-              animate={{ scale: [0.5, 1.2, 1] }}
-              transition={{ duration: 0.6, times: [0, 0.6, 1] }}
-              style={{
-                background: "linear-gradient(135deg, #F59E0B, #F97316)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                animation: "count-up 0.6s ease",
-              }}
-            >
-              +{resultsXp} XP
-            </motion.p>
-            <p className="mt-2 text-sm text-green-400">
-              {xpAwarded ? "Progress saved!" : "Saving progress…"}
-            </p>
-            <button
-              type="button"
-              className="mt-8 w-full max-w-xs rounded-xl px-8 py-3 font-bold text-white transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50 sm:w-auto"
-              style={{ background: "linear-gradient(135deg, #6366F1, #4F46E5)" }}
-              disabled={!xpAwarded}
-              onClick={handleResultsContinue}
-            >
-              Continue →
-            </button>
-          </div>
-        )}
-
-        {phase === "complete" && (
-          <div className="flex flex-col items-center justify-center py-16">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 220, damping: 14 }}
-              className="grid h-[72px] w-[72px] place-items-center rounded-full text-white"
-              style={{
-                background: "linear-gradient(135deg, #10B981, #059669)",
-                boxShadow: "0 0 32px rgba(16,185,129,0.4)",
-              }}
-            >
-              <Check className="h-10 w-10" strokeWidth={3} />
-            </motion.div>
-            <motion.h2
-              className="mt-6 text-3xl font-bold"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              style={{
-                background: "linear-gradient(135deg, #FFFFFF, #67E8F9)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              Lesson Complete!
-            </motion.h2>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.25 }}
-              className="mt-4 rounded-full bg-amber-500/15 px-4 py-2 text-lg font-bold text-amber-300"
-            >
-              +{resultsXp} XP earned
-            </motion.div>
-            <p className="mt-6 text-sm text-slate-500">
-              Returning to {lessonId >= 4 ? "completion" : "dashboard"} in 3
-              seconds…
+            <p className="mt-8 text-sm text-slate-500">
+              {xpAwarded ? "Great work!" : "Saving progress…"}
             </p>
           </div>
         )}
       </main>
+
+      {showXPOverlay && xpOverlayPayload && token ? (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-4">
+          <style>{`
+            @keyframes lesson-xp-float {
+              0% { transform: translateY(110vh); opacity: 0; }
+              12% { opacity: 0.5; }
+              100% { transform: translateY(-25vh); opacity: 0; }
+            }
+            @keyframes lesson-xp-pulse {
+              0%, 100% { transform: scale(1); }
+              50% { transform: scale(1.05); }
+            }
+            @keyframes lesson-xp-badge-bounce {
+              0%, 100% { transform: translateY(0); }
+              50% { transform: translateY(-8px); }
+            }
+          `}</style>
+          {xpParticles.map((p, i) => (
+            <div
+              key={`xp-p-${i}`}
+              className="pointer-events-none absolute rounded-full bg-amber-400/35"
+              style={{
+                left: p.left,
+                bottom: "-5%",
+                width: p.size,
+                height: p.size,
+                animation: `lesson-xp-float ${p.durationS}s linear infinite`,
+                animationDelay: `${p.delayS}s`,
+              }}
+              aria-hidden
+            />
+          ))}
+          <div className="relative z-10 w-full max-w-md rounded-2xl border border-amber-500/30 bg-[#0d1117]/95 p-8 text-center shadow-[0_0_60px_rgba(245,158,11,0.12)] backdrop-blur-md">
+            <div
+              className="text-[42px] font-black leading-tight text-transparent sm:text-[50px]"
+              style={{
+                background:
+                  "linear-gradient(135deg, #FBBF24, #F59E0B, #EA580C)",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                animation: "lesson-xp-pulse 1.2s ease-in-out infinite",
+              }}
+            >
+              ⚡ +{xpCounterDisplay} XP
+            </div>
+            <p className="mt-4 text-lg font-semibold text-indigo-300">
+              Total XP: {xpOverlayPayload.totalXpAfter}
+            </p>
+            {xpOverlayPayload.newBadges.length > 0 ? (
+              <div className="mt-6 flex flex-col gap-3">
+                {xpOverlayPayload.newBadges.map((slug, bi) => (
+                  <p
+                    key={slug}
+                    className="text-base font-semibold text-amber-300"
+                    style={{
+                      animation:
+                        "lesson-xp-badge-bounce 0.6s ease-out 1 both",
+                      animationDelay: `${bi * 0.12}s`,
+                    }}
+                  >
+                    🏅 Badge Unlocked:{" "}
+                    {DEMO_BADGES.find((b) => b.slug === slug)?.name ?? slug}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+            {showXPOverlayContinue ? (
+              <button
+                type="button"
+                className="mt-8 w-full rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-indigo-500"
+                onClick={() => {
+                  if (lessonId >= 3) {
+                    router.push(
+                      `/demo/complete?token=${encodeURIComponent(token)}`
+                    );
+                  } else {
+                    router.push(`/demo?token=${encodeURIComponent(token)}`);
+                  }
+                }}
+              >
+                Continue →
+              </button>
+            ) : (
+              <p className="mt-8 text-xs text-slate-500">Get ready…</p>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {!userLoading && user && token && !suppressNovaChatFab ? (
         <NOVAChat

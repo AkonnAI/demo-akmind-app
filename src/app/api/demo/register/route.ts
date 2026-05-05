@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
     quizScores: {},
     xp: 0,
     badgeEarned: false,
+    earnedBadges: [],
   });
 
   const tokenOut = normalizeDemoToken(token);

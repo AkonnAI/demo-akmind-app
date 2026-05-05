@@ -1,5 +1,10 @@
 /** Live stats for NOVA in the public demo (no DynamoDB). */
 
+import {
+  countDemoLessonsInScope,
+  DEMO_LESSON_COUNT,
+} from "@/lib/demo-lesson-scope";
+
 export type DemoLiveStats = {
   xp: number;
   streak: number;
@@ -17,7 +22,7 @@ export type DemoLiveStats = {
 
 function demoStreakFromLessons(lessonsComplete: number[]): number {
   let s = 0;
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 3; i++) {
     if (lessonsComplete.includes(i)) s++;
     else break;
   }
@@ -38,8 +43,10 @@ function averageQuizScore(
 function lessonsDoneCount(
   lessonsComplete: number | number[] | undefined
 ): number {
-  if (Array.isArray(lessonsComplete)) return lessonsComplete.length;
-  if (typeof lessonsComplete === "number") return lessonsComplete;
+  if (Array.isArray(lessonsComplete))
+    return countDemoLessonsInScope(lessonsComplete);
+  if (typeof lessonsComplete === "number")
+    return lessonsComplete <= DEMO_LESSON_COUNT ? lessonsComplete : DEMO_LESSON_COUNT;
   return 0;
 }
 
@@ -64,7 +71,7 @@ export function buildDemoLiveStats(input: {
     xp,
     streak: demoStreakFromLessons(arr),
     badges: input.badgeEarned ? 1 : 0,
-    modulesCompleted: n >= 4 ? 1 : 0,
+    modulesCompleted: n >= 3 ? 1 : 0,
     lessonsCompleted: n,
     currentModule: input.currentModule ?? 1,
     currentLesson: input.currentLesson || "exploring the demo",

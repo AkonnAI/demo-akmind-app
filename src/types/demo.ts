@@ -8,4 +8,6 @@ export type DemoUser = {
   xp: number;
   badgeEarned: boolean;
   demoCompleted: boolean;
+  /** Slugs from `DEMO_BADGES` earned so far (server-maintained). */
+  earnedBadges: string[];
 };
