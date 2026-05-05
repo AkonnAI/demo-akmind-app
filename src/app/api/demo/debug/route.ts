@@ -51,14 +51,17 @@ export async function GET() {
   if (!isDynamoResult) {
     return ok({ ok: false, reason: isDynamoReason, envStatus });
   }
-  if (!keyId || !secretKey) {
-    return ok({ ok: false, reason: "No credentials found in either ACCESS_KEY_ID or AWS_ACCESS_KEY_ID", envStatus });
+  if (!keyId) {
+    return ok({ ok: false, reason: "No credentials found in ACCESS_KEY_ID or AWS_ACCESS_KEY_ID", envStatus });
   }
 
   try {
     const client = new DynamoDBClient({
       region,
-      credentials: { accessKeyId: keyId, secretAccessKey: secretKey },
+      // Use custom creds if present; otherwise let SDK chain handle session token
+      ...(customKeyId && customSecret
+        ? { credentials: { accessKeyId: customKeyId, secretAccessKey: customSecret } }
+        : {}),
     });
     const doc = DynamoDBDocumentClient.from(client);
 

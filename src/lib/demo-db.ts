@@ -80,14 +80,17 @@ function isDynamo(): boolean {
 }
 
 const getDb = () => {
+  const customKeyId = process.env.ACCESS_KEY_ID;
+  const customSecret = process.env.SECRET_ACCESS_KEY;
+  // If explicit IAM user credentials are present, use them.
+  // Otherwise use no explicit credentials so the SDK default chain picks up
+  // AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY + AWS_SESSION_TOKEN from the Lambda env.
+  // Never hardcode AWS_* vars directly — Lambda session creds require the session token too.
   const client = new DynamoDBClient({
     region: process.env.REGION || process.env.AWS_REGION || "ap-south-1",
-    credentials: {
-      // Prefer custom IAM credentials (set by user in Amplify console without AWS_ prefix)
-      // over Lambda execution role credentials — the execution role may lack DynamoDB perms
-      accessKeyId: (process.env.ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID)!,
-      secretAccessKey: (process.env.SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY)!,
-    },
+    ...(customKeyId && customSecret
+      ? { credentials: { accessKeyId: customKeyId, secretAccessKey: customSecret } }
+      : {}),
   });
   return DynamoDBDocumentClient.from(client, {
     marshallOptions: { removeUndefinedValues: true },
