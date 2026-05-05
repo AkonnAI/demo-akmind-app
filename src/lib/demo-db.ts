@@ -71,18 +71,22 @@ function getTable(): string {
   return process.env.DEMO_USERS_TABLE?.trim() || "akmind-demo-users";
 }
 function isDynamo(): boolean {
-  const flag = process.env.USE_DYNAMODB;
-  if (flag === "true") return true;
-  if (flag === "false") return false;
-  return Boolean(process.env.DEMO_USERS_TABLE || process.env.DYNAMODB_DEMO_TABLE);
+  if (process.env.USE_DYNAMODB === "false") return false;
+  if (process.env.USE_DYNAMODB === "true") return true;
+  // AWS_LAMBDA_FUNCTION_NAME is a reserved var always present in any Lambda runtime.
+  // Amplify SSR runs in Lambda, so this reliably detects "we are in production AWS"
+  // without depending on any user-configurable env var reaching the Lambda.
+  return Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
 }
 
 const getDb = () => {
   const client = new DynamoDBClient({
-    region: process.env.AWS_REGION || process.env.REGION || "ap-south-1",
+    region: process.env.REGION || process.env.AWS_REGION || "ap-south-1",
     credentials: {
-      accessKeyId: (process.env.AWS_ACCESS_KEY_ID || process.env.ACCESS_KEY_ID)!,
-      secretAccessKey: (process.env.AWS_SECRET_ACCESS_KEY || process.env.SECRET_ACCESS_KEY)!,
+      // Prefer custom IAM credentials (set by user in Amplify console without AWS_ prefix)
+      // over Lambda execution role credentials — the execution role may lack DynamoDB perms
+      accessKeyId: (process.env.ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID)!,
+      secretAccessKey: (process.env.SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY)!,
     },
   });
   return DynamoDBDocumentClient.from(client, {
