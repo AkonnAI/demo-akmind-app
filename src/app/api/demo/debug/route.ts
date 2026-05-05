@@ -5,7 +5,11 @@ import { NextRequest } from "next/server";
 
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get("secret");
-  if (secret !== process.env.ADMIN_PASSWORD) {
+  const validSecrets = [
+    process.env.DEMO_DEBUG_SECRET,
+    process.env.ADMIN_PASSWORD,
+  ].filter(Boolean);
+  if (!secret || !validSecrets.includes(secret)) {
     return fail("Unauthorized", 401);
   }
 
