@@ -1,18 +1,7 @@
-import { fail, ok } from "@/lib/api-response";
+import { ok } from "@/lib/api-response";
 import { DynamoDBClient, DescribeTableCommand } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, ScanCommand } from "@aws-sdk/lib-dynamodb";
-import { NextRequest } from "next/server";
-
-export async function GET(req: NextRequest) {
-  const secret = req.nextUrl.searchParams.get("secret");
-  const validSecrets = [
-    process.env.DEMO_DEBUG_SECRET,
-    process.env.ADMIN_PASSWORD,
-  ].filter(Boolean);
-  if (!secret || !validSecrets.includes(secret)) {
-    return fail("Unauthorized", 401);
-  }
-
+export async function GET() {
   const useDynamo = process.env.USE_DYNAMODB;
   const table = process.env.DEMO_USERS_TABLE?.trim() || "akmind-demo-users";
   const region = process.env.AWS_REGION || "ap-south-1";
