@@ -1,4 +1,5 @@
 import { Canvas }       from './engine/Canvas'
+import { CONFIG }       from './constants/config'
 import { GameLoop }     from './engine/GameLoop'
 import { InputManager } from './engine/InputManager'
 import { GameScene }    from './scenes/GameScene'
@@ -161,6 +162,7 @@ let activeLoop:   GameLoop     | null = null
 let sharedInput:  InputManager | null = null
 let sharedCanvas: Canvas       | null = null
 let touchControls: TouchControls | null = null
+let hudPointerDetach: (() => void) | null = null
 
 // ─── DOM HELPERS ──────────────────────────────────────────────
 
@@ -329,6 +331,25 @@ function launchLevel(num: number, options?: LaunchOptions): void {
                   touchControls: touchControls!,
                 })
 
+  const canvasEl = sharedCanvas.getCanvas()
+  if (num >= 2 && num <= 4) {
+    const onHudPointerDown = (e: PointerEvent): void => {
+      const rect = canvasEl.getBoundingClientRect()
+      const scaleX = CONFIG.CANVAS_WIDTH / rect.width
+      const scaleY = CONFIG.CANVAS_HEIGHT / rect.height
+      const canvasX = (e.clientX - rect.left) * scaleX
+      const canvasY = (e.clientY - rect.top) * scaleY
+      ;(scene as GameScene2 | GameScene3 | GameScene4).handleHudPointerDown(
+        canvasX,
+        canvasY,
+      )
+    }
+    canvasEl.addEventListener('pointerdown', onHudPointerDown)
+    hudPointerDetach = (): void => {
+      canvasEl.removeEventListener('pointerdown', onHudPointerDown)
+    }
+  }
+
   loop.onUpdate((dt) => {
     scene.update(dt)
     input.update()
@@ -343,6 +364,8 @@ function launchLevel(num: number, options?: LaunchOptions): void {
 }
 
 function stopCurrentLevel(): void {
+  hudPointerDetach?.()
+  hudPointerDetach = null
   if (activeLoop) {
     activeLoop.stop()
     activeLoop = null

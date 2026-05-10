@@ -769,138 +769,137 @@ export class Level4 {
 
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.globalAlpha = 1
-    ctx.globalCompositeOperation = 'source-over'
-    ctx.setLineDash([])
 
-    // LAYER 1 — Dark facility sky (Level 2–style mood, not clinical white)
-    const sky = ctx.createLinearGradient(0, 0, 0, 720)
-    sky.addColorStop(0, '#05030e')
-    sky.addColorStop(0.45, '#0c0520')
-    sky.addColorStop(1, '#120828')
+    // LAYER 1 — Deep corporate sky
+    const sky = ctx.createLinearGradient(0, 0, 0, H)
+    sky.addColorStop(0,    '#020408')
+    sky.addColorStop(0.4,  '#080c18')
+    sky.addColorStop(0.85, '#0c1020')
+    sky.addColorStop(1,    '#101828')
     ctx.fillStyle = sky
     ctx.fillRect(0, 0, W, H)
 
-    // Subtle vignette
-    const vig = ctx.createRadialGradient(W * 0.5, H * 0.35, 120, W * 0.5, H * 0.5, 520)
-    vig.addColorStop(0, 'rgba(0,0,0,0)')
-    vig.addColorStop(1, 'rgba(0,0,0,0.45)')
-    ctx.fillStyle = vig
-    ctx.fillRect(0, 0, W, H)
-
-    // LAYER 2 — Dim grid (readable, not bright)
-    ctx.lineWidth = 0.5
-    ctx.strokeStyle = 'rgba(0, 180, 255, 0.06)'
-    for (let y = 0; y < H; y += 48) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
-    }
-    for (let x = 0; x < W; x += 80) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke()
-    }
-
-    // LAYER 3 — Far towers as dark silhouettes
-    const towerXs =  [200, 1140, 2080, 3020, 3960, 4900, 5840, 6780, 7720, 8660]
-    const towerWs =  [160,  140,  200,  180,  160,  200,  140,  180,  160,  200]
-    const towerHs =  [380,  460,  300,  500,  380,  420,  340,  480,  360,  440]
-    for (let i = 0; i < towerXs.length; i++) {
-      const tx = towerXs[i]! - cameraX * 0.1
-      if (tx < -200 || tx > 1480) continue
-      const tw = towerWs[i]!
-      const th = towerHs[i]!
-      ctx.fillStyle = 'rgba(8, 10, 22, 0.92)'
+    // LAYER 2 — Far background towers (slow parallax 0.05)
+    const farTowers = [180,520,860,1200,1540,1880,2220,2560,2900,3240]
+    const farWidths = [120,80,140,100,120,90,130,110,80,140]
+    const farHeights= [320,420,280,460,350,400,310,450,330,410]
+    for (let i = 0; i < farTowers.length; i++) {
+      const tx = farTowers[i]! - cameraX * 0.05
+      if (tx < -200 || tx > W + 200) continue
+      const tw = farWidths[i]!
+      const th = farHeights[i]!
+      ctx.fillStyle = '#030508'
       ctx.fillRect(tx, 0, tw, th)
-      ctx.lineWidth = 1
-      ctx.strokeStyle = 'rgba(0, 180, 255, 0.12)'
-      ctx.strokeRect(tx + 0.5, 0.5, tw - 1, th - 1)
-    }
-
-    // LAYER 4 — Mid panels (muted, recessed)
-    const panelXs = [300, 2100, 4000, 5800, 7200, 8400]
-    for (const pwx of panelXs) {
-      const px = pwx - cameraX * 0.4
-      if (px < -300 || px > W + 300) continue
-      ctx.fillStyle = 'rgba(15, 18, 32, 0.85)'
-      ctx.fillRect(px, 80, 300, 250)
-      ctx.lineWidth = 1
-      ctx.strokeStyle = 'rgba(0, 181, 216, 0.2)'
-      ctx.strokeRect(px + 1, 81, 298, 248)
-      for (let row = 0; row < 3; row++) {
-        for (let col = 0; col < 3; col++) {
-          const sx2 = px + 20 + col * 80
-          const sy2 = 100 + row * 60
-          ctx.fillStyle = 'rgba(0, 80, 140, 0.12)'
-          ctx.fillRect(sx2, sy2, 40, 30)
-          ctx.lineWidth = 1
-          ctx.strokeStyle = 'rgba(0, 181, 216, 0.15)'
-          ctx.strokeRect(sx2 + 0.5, sy2 + 0.5, 39, 29)
+      // Window grid on towers
+      for (let wy = 20; wy < th - 20; wy += 24) {
+        for (let wx = 8; wx < tw - 8; wx += 18) {
+          const on = Math.sin(time * 0.3 + i * 7 + wy * 0.1 + wx * 0.2) > 0.3
+          ctx.fillStyle = on ? 'rgba(0,100,160,0.15)' : '#020406'
+          ctx.fillRect(tx + wx, wy, 8, 12)
         }
       }
     }
 
-    // LAYER 5 — Hazard strip at walkway (cyan-red accent)
-    const stripY = GY - 2
-    ctx.lineWidth = 2
-    ctx.strokeStyle = 'rgba(255, 60, 80, 0.45)'
-    ctx.beginPath(); ctx.moveTo(0, stripY); ctx.lineTo(W, stripY); ctx.stroke()
-    const diagOffset = -(cameraX % 120)
-    for (let i = -1; i < Math.ceil(W / 120) + 2; i++) {
-      const dx = diagOffset + i * 120
-      if (dx < -20 || dx > W + 20) continue
-      ctx.fillStyle = '#c41e3a'
+    // LAYER 3 — Mid towers (parallax 0.2)
+    const midTowers = [300,900,1500,2100,2700,3300,3900,4500,5100,5700,6300,6900,7500,8100]
+    const midWidths = [100,120,90,130,100,110,90,120,100,130,90,110,100,120]
+    const midHeights= [280,360,240,400,300,340,260,380,280,360,240,320,280,360]
+    for (let i = 0; i < midTowers.length; i++) {
+      const tx = midTowers[i]! - cameraX * 0.2
+      if (tx < -150 || tx > W + 150) continue
+      const tw = midWidths[i]!
+      const th = midHeights[i]!
+      ctx.fillStyle = '#050810'
+      ctx.fillRect(tx, 0, tw, th)
+      ctx.strokeStyle = 'rgba(0,140,200,0.08)'
+      ctx.lineWidth = 1
+      ctx.strokeRect(tx + 0.5, 0.5, tw - 1, th - 1)
+      // Vertical light strip on some towers
+      if (i % 3 === 0) {
+        const pulse = 0.4 + Math.sin(time * 0.8 + i) * 0.2
+        ctx.fillStyle = `rgba(0,180,255,${pulse * 0.12})`
+        ctx.fillRect(tx + tw - 6, 0, 4, th)
+      }
+    }
+
+    // LAYER 4 — Subtle grid (very faint)
+    ctx.lineWidth = 0.5
+    ctx.strokeStyle = 'rgba(0,150,220,0.03)'
+    for (let y = 0; y < GY; y += 60) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
+    }
+    const gOff = -(cameraX * 0.4) % 100
+    for (let x = gOff - 100; x < W + 100; x += 100) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, GY); ctx.stroke()
+    }
+
+    // LAYER 5 — NeuroCorps logo watermarks in background
+    const logoPositions = [400, 1200, 2000, 2800, 3600, 4400, 5200, 6000, 6800, 7600, 8400]
+    ctx.font = 'bold 48px Orbitron, sans-serif'
+    ctx.textAlign = 'center'
+    for (const lx of logoPositions) {
+      const sx = lx - cameraX * 0.3
+      if (sx < -100 || sx > W + 100) continue
+      ctx.fillStyle = 'rgba(0,140,200,0.03)'
+      ctx.fillText('N C', sx, GY * 0.4)
+    }
+    ctx.textAlign = 'left'
+
+    // LAYER 6 — Scan line effect (slow moving)
+    const scanY = (time * 40) % (GY + 20)
+    ctx.fillStyle = 'rgba(0,180,255,0.025)'
+    ctx.fillRect(0, scanY - 1, W, 3)
+
+    // LAYER 7 — Ceiling duct (corporate facility)
+    ctx.fillStyle = 'rgba(6,8,16,0.97)'
+    ctx.fillRect(0, 0, W, 45)
+    ctx.strokeStyle = 'rgba(0,180,255,0.2)'
+    ctx.lineWidth = 1
+    ctx.beginPath(); ctx.moveTo(0, 45); ctx.lineTo(W, 45); ctx.stroke()
+    // Duct vents
+    const ventOff = -(cameraX * 0.9) % 200
+    for (let vx = ventOff - 200; vx < W + 200; vx += 200) {
+      ctx.fillStyle = 'rgba(0,140,200,0.12)'
+      ctx.fillRect(vx, 30, 40, 15)
+      ctx.strokeStyle = 'rgba(0,180,255,0.15)'
+      ctx.lineWidth = 0.5
+      ctx.strokeRect(vx + 0.5, 30.5, 39, 14)
+    }
+
+    // LAYER 8 — Hazard walkway stripe
+    ctx.fillStyle = '#0f1520'
+    ctx.fillRect(0, GY - 16, W, 16)
+    ctx.strokeStyle = 'rgba(0,180,216,0.5)'
+    ctx.lineWidth = 1.5
+    ctx.beginPath(); ctx.moveTo(0, GY - 16); ctx.lineTo(W, GY - 16); ctx.stroke()
+    // Hazard diamonds
+    const dOff = -(cameraX * 0.9) % 80
+    for (let dx = dOff - 80; dx < W + 80; dx += 80) {
+      ctx.fillStyle = 'rgba(255,50,80,0.35)'
       ctx.beginPath()
-      ctx.moveTo(dx,     stripY - 7)
-      ctx.lineTo(dx + 7, stripY)
-      ctx.lineTo(dx,     stripY + 7)
-      ctx.lineTo(dx - 7, stripY)
+      ctx.moveTo(dx + 6, GY - 16)
+      ctx.lineTo(dx + 12, GY - 8)
+      ctx.lineTo(dx + 6, GY)
+      ctx.lineTo(dx, GY - 8)
       ctx.closePath()
       ctx.fill()
     }
 
-    // Walk deck (standing surface over the lower pit)
-    ctx.fillStyle = '#151b2b'
-    ctx.fillRect(0, GY - 14, W, 14)
-    ctx.strokeStyle = 'rgba(0, 181, 216, 0.4)'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.moveTo(0, GY)
-    ctx.lineTo(W, GY)
-    ctx.stroke()
-
-    // LAYER 6 — Floor depth (dark pit below deck)
-    ctx.fillStyle = '#06080f'
+    // LAYER 9 — Floor pit
+    ctx.fillStyle = '#04060c'
     ctx.fillRect(0, GY, W, H - GY)
     ctx.lineWidth = 0.5
-    ctx.strokeStyle = 'rgba(0, 181, 216, 0.08)'
-    for (let fy = GY + 20; fy < H; fy += 20) {
+    ctx.strokeStyle = 'rgba(0,140,200,0.05)'
+    for (let fy = GY + 24; fy < H; fy += 24) {
       ctx.beginPath(); ctx.moveTo(0, fy); ctx.lineTo(W, fy); ctx.stroke()
     }
-    const floorVOff = -(cameraX * 0.06) % 80
-    ctx.strokeStyle = 'rgba(0, 181, 216, 0.06)'
-    for (let fx = floorVOff - 80; fx < W + 80; fx += 80) {
-      ctx.beginPath(); ctx.moveTo(fx, GY); ctx.lineTo(fx, H); ctx.stroke()
-      for (let gy2 = GY + 80; gy2 < H; gy2 += 80) {
-        ctx.fillStyle = 'rgba(0, 120, 180, 0.08)'
-        ctx.beginPath(); ctx.arc(fx, gy2, 2.5, 0, Math.PI * 2); ctx.fill()
-      }
-    }
 
-    // LAYER 7 — Ceiling duct (dark)
-    ctx.fillStyle = 'rgba(8, 10, 24, 0.95)'
-    ctx.fillRect(0, 0, W, 50)
-    ctx.lineWidth = 1
-    ctx.strokeStyle = 'rgba(0, 181, 216, 0.18)'
-    ctx.beginPath(); ctx.moveTo(0, 50); ctx.lineTo(W, 50); ctx.stroke()
-    for (let lx = 0; lx < W; lx += 160) {
-      ctx.lineWidth = 1
-      ctx.strokeStyle = 'rgba(0, 181, 216, 0.12)'
-      ctx.beginPath(); ctx.moveTo(lx, 50); ctx.lineTo(lx, 72); ctx.stroke()
-      ctx.fillStyle = 'rgba(0, 181, 216, 0.15)'
-      ctx.beginPath(); ctx.arc(lx, 72, 5, 0, Math.PI * 2); ctx.fill()
-    }
-
-    // LAYER 8 — Slow scan line (subtle)
-    const pulseY = (time * 60) % 720
-    ctx.fillStyle = 'rgba(0, 181, 216, 0.04)'
-    ctx.fillRect(0, pulseY, W, 2)
+    // Vignette
+    const vig = ctx.createRadialGradient(W/2, H/2, 100, W/2, H/2, 600)
+    vig.addColorStop(0, 'rgba(0,0,0,0)')
+    vig.addColorStop(1, 'rgba(0,0,0,0.5)')
+    ctx.fillStyle = vig
+    ctx.fillRect(0, 0, W, H)
 
     ctx.globalAlpha = 1
     ctx.globalCompositeOperation = 'source-over'

@@ -2,6 +2,7 @@ import { InputManager } from '../engine/InputManager'
 import { DeviceManager } from '../engine/DeviceManager'
 import { GameLoop } from '../engine/GameLoop'
 import { Camera } from '../engine/Camera'
+import { audioManager } from '../engine/AudioManager'
 import { Player } from '../entities/Player'
 import { Projectile } from '../entities/Projectile'
 import { Haptics } from '../engine/Haptics'
@@ -185,7 +186,7 @@ export class GameScene3 {
       this.arenaFadeAlpha = 1.0
       this.introCinematicActive = true
       this.introCameraX = introStart
-      this.camera.x = introStart
+      this.camera.syncFromXY(introStart, 0)
       this.talk(
         [
           {
@@ -642,12 +643,17 @@ export class GameScene3 {
         )
         this.introCameraX -= 280 * dt
         if (this.introCameraX <= target) {
-          this.camera.x = target
+          this.camera.syncFromXY(target, 0)
         } else {
-          this.camera.x = Math.round(this.introCameraX)
+          this.camera.syncFromXY(Math.round(this.introCameraX), 0)
         }
       } else {
-        this.camera.follow(this.player.getCenterX(), LEVEL3_WORLD_WIDTH)
+        this.camera.follow(
+          this.player,
+          dt,
+          LEVEL3_WORLD_WIDTH,
+          CONFIG.CANVAS_HEIGHT,
+        )
       }
       this.nova.moveTo(this.player.x + 70, this.player.y - 30)
       this.prevPlayerX = this.player.getCenterX()
@@ -659,7 +665,12 @@ export class GameScene3 {
       this.shop.handleInput(this.input)
       this.player.vx = 0
       this.player.vy = 0
-      this.camera.follow(this.player.getCenterX(), LEVEL3_WORLD_WIDTH)
+      this.camera.follow(
+        this.player,
+        dt,
+        LEVEL3_WORLD_WIDTH,
+        CONFIG.CANVAS_HEIGHT,
+      )
       this.prevPlayerX = this.player.getCenterX()
       this.input.update()
       return
@@ -671,7 +682,12 @@ export class GameScene3 {
       if (this.input.isJustPressed('Space')) {
         this.onLevelComplete?.()
       }
-      this.camera.follow(this.player.getCenterX(), LEVEL3_WORLD_WIDTH)
+      this.camera.follow(
+        this.player,
+        dt,
+        LEVEL3_WORLD_WIDTH,
+        CONFIG.CANVAS_HEIGHT,
+      )
       this.nova.moveTo(this.player.x + 70, this.player.y - 30)
       this.level.update(
         dt,
@@ -685,7 +701,13 @@ export class GameScene3 {
       return
     }
 
+    const wantsJump =
+      this.input.isJustPressed('ArrowUp') || this.input.isJustPressed('Space')
+    const wasOnGround = this.player.isOnGround
     this.player.update(dt, this.input)
+    if (wantsJump && wasOnGround) {
+      audioManager.playSFX('jump')
+    }
 
     const platY = this.level.checkPlatformCollision(
       this.player.x,
@@ -757,6 +779,7 @@ export class GameScene3 {
 
     const cp = this.level.updateCheckpointsForPlayer(cxAfterMove)
     if (cp) {
+      audioManager.playSFX('gateOpen')
       const key =
         cp.x < 3000 ? 'l3_cp_1' : cp.x < 6000 ? 'l3_cp_2' : 'l3_cp_3'
       if (!DialogueBox.hasFired(key)) {
@@ -880,10 +903,14 @@ export class GameScene3 {
                 text: 'Gate two is open. One more pattern grid. Then run.',
               },
             ],
-            () => this.level.markEvidenceConsumed(),
+            () => {
+              this.level.markEvidenceConsumed()
+              audioManager.playSFX('gateOpen')
+            },
           )
         } else {
           this.level.markEvidenceConsumed()
+          audioManager.playSFX('gateOpen')
         }
         this.syncL3Objective()
         this.input.update()
@@ -916,8 +943,10 @@ export class GameScene3 {
       dt,
     )
     if (pgEv?.type === 'solved') {
+      audioManager.playSFX('correct')
       Haptics.fire('puzzleSolved')
       this.level.openGate(pgEv.gateId)
+      audioManager.playSFX('gateOpen')
       this.hud.addScore(100)
       this.score += 100
       this.hud.showMessage('PATTERN LOCK OPEN — +100 XP', 2)
@@ -927,6 +956,7 @@ export class GameScene3 {
       }
       this.syncL3Objective()
     } else if (pgEv?.type === 'wrong') {
+      audioManager.playSFX('wrong')
       this.hud.showMessage('PATTERN RESET', 0.8)
     } else if (pgEv?.type === 'correct') {
       this.hud.showMessage('STEP OK', 0.35)
@@ -953,6 +983,7 @@ export class GameScene3 {
 
     if (this.input.isJustPressed('KeyZ') && this.shootCD <= 0) {
       this.shootCD = this.shootCooldown
+      audioManager.playSFX('shoot')
       const dir = this.player.isFacingRight ? 1 : -1
       const px =
         this.player.x + (dir > 0 ? this.player.width + 4 : -4)
@@ -983,6 +1014,7 @@ export class GameScene3 {
       if (!d.active && !d.exploded) {
         d.exploded = true
         Haptics.fire('enemyDestroyed')
+        audioManager.playSFX('enemyHit')
         this.level.onEnemyKilledAt(d.x)
         this.hud.addScore(DRONE_XP)
         this.score += DRONE_XP
@@ -993,6 +1025,7 @@ export class GameScene3 {
       if (!e.active && !e.scoreEmitted) {
         e.scoreEmitted = true
         Haptics.fire('enemyDestroyed')
+        audioManager.playSFX('enemyHit')
         this.level.onEnemyKilledAt(e.x)
         this.hud.addScore(ENFORCER_XP)
         this.score += ENFORCER_XP
@@ -1003,6 +1036,7 @@ export class GameScene3 {
       if (!w.active && !w.scoreEmitted) {
         w.scoreEmitted = true
         Haptics.fire('enemyDestroyed')
+        audioManager.playSFX('enemyHit')
         this.level.onEnemyKilledAt(w.x)
         this.hud.addScore(WRAITH_XP)
         this.score += WRAITH_XP
@@ -1044,11 +1078,16 @@ export class GameScene3 {
       this.applyDamage(1)
     }
 
-    const camTarget =
-      this.introCameraX != null
-        ? this.introCameraX
-        : this.player.getCenterX()
-    this.camera.follow(camTarget, LEVEL3_WORLD_WIDTH)
+    if (this.introCameraX != null) {
+      this.camera.syncFromXY(this.introCameraX, 0)
+    } else {
+      this.camera.follow(
+        this.player,
+        dt,
+        LEVEL3_WORLD_WIDTH,
+        CONFIG.CANVAS_HEIGHT,
+      )
+    }
     this.nova.moveTo(this.player.x + 70, this.player.y - 30)
 
     this.level.update(
@@ -1065,6 +1104,7 @@ export class GameScene3 {
       this.player.x > 9000 &&
       this.level.exitPortal.open) {
       this.level.levelComplete = true
+      audioManager.playSFX('victory')
       this.player.vx = 0
       this.player.vy = 0
       this.talk(
@@ -1239,6 +1279,10 @@ export class GameScene3 {
     }
   }
 
+  handleHudPointerDown(canvasX: number, canvasY: number): void {
+    this.hud.handleClick(canvasX, canvasY)
+  }
+
   render(ctx: CanvasRenderingContext2D): void {
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.globalAlpha = 1
@@ -1334,6 +1378,14 @@ export class GameScene3 {
         CONFIG.CANVAS_WIDTH,
         56,
       )
+    }
+    if (this.dialogue.isVisible()) {
+      const playerScreenY = this.player.y - this.camera.y
+      if (playerScreenY > CONFIG.CANVAS_HEIGHT * 0.5) {
+        this.dialogue.setPosition('top')
+      } else {
+        this.dialogue.setPosition('bottom')
+      }
     }
     this.dialogue.render(ctx)
     this.shop.render(ctx, this.time)

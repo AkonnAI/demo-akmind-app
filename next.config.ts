@@ -11,7 +11,8 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=()",
+    // microphone=(self) allows NOVA voice input on this origin; () alone blocks mic everywhere (breaks Amplify/production).
+    value: "camera=(), microphone=(self), geolocation=()",
   },
   { key: "X-XSS-Protection", value: "1; mode=block" },
 ];

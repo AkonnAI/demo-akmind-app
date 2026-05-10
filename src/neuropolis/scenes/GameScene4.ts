@@ -2,6 +2,7 @@ import { InputManager } from '../engine/InputManager'
 import { DeviceManager } from '../engine/DeviceManager'
 import { GameLoop } from '../engine/GameLoop'
 import { Camera } from '../engine/Camera'
+import { audioManager } from '../engine/AudioManager'
 import { Player } from '../entities/Player'
 import { Projectile, type GravityField } from '../entities/Projectile'
 import { Haptics } from '../engine/Haptics'
@@ -26,6 +27,8 @@ const SPAWN_X = 180
 const DAMAGE_IFRAMES = 1.5
 const SHOOT_COOLDOWN = 0.28
 const GRAVITY_FIRE_COOLDOWN = 2.5
+const LOCK_RANGE      = 520
+const RETICLE_COLOR   = '#00b4d8'
 
 type Scene = 'play' | 'dialogue'
 type DialogueLine = {
@@ -349,17 +352,46 @@ export class GameScene4 {
     const pcy = this.player.y
     for (const d of this.level.drones) {
       if (!d.active || !(d as { activated?: boolean }).activated) continue
-      if (Math.hypot(d.x - pcx, (d.y + 10) - pcy) < 440) list.push(d)
+      if (Math.hypot(d.x - pcx, (d.y + 10) - pcy) < LOCK_RANGE) list.push(d)
     }
     for (const a of this.level.auditBots) {
       if (!a.active || !a.activated) continue
-      if (Math.hypot(a.x - pcx, (a.y + 10) - pcy) < 440) list.push(a)
+      if (Math.hypot(a.x - pcx, (a.y + 10) - pcy) < LOCK_RANGE) list.push(a)
     }
     for (const s of this.level.swarms) {
       if (!s.active || !s.activated) continue
-      if (Math.hypot(s.x - pcx, (s.y + 10) - pcy) < 440) list.push(s)
+      if (Math.hypot(s.x - pcx, (s.y + 10) - pcy) < LOCK_RANGE) list.push(s)
     }
     return list
+  }
+
+  private updateLockTarget(): void {
+    const pool = this.lockables
+    if (pool.length === 0) {
+      this.lockTarget = null
+      this.lockCycleIndex = 0
+      return
+    }
+    // Q-press cycles
+    if (this.input.isJustPressed('KeyQ') && pool.length > 0) {
+      this.lockCycleIndex = (this.lockCycleIndex + 1) % pool.length
+      this.lockTarget = pool[this.lockCycleIndex] ?? null
+      return
+    }
+    // Keep existing live target
+    if (this.lockTarget && this.lockTarget.active && pool.includes(this.lockTarget)) {
+      return
+    }
+    // Auto-pick nearest
+    let best: LockableEnemy | null = null
+    let bestD = LOCK_RANGE
+    const pcx = this.player.getCenterX()
+    const pcy = this.player.y
+    for (const e of pool) {
+      const d = Math.hypot(e.x - pcx, e.y - pcy)
+      if (d < bestD) { bestD = d; best = e }
+    }
+    this.lockTarget = best
   }
 
   private resolvePrismWallHits(): void {
@@ -616,18 +648,27 @@ export class GameScene4 {
         dt,
         this.input,
         () => {
+          audioManager.playSFX('correct')
+          audioManager.playSFX('gateOpen')
           Haptics.fire('puzzleSolved')
           this.level.openGate(2)
           this.hud.showMessage('SECTOR B UNLOCKED', 2)
           this.syncL4Objective()
         },
-        () => {},
+        () => {
+          audioManager.playSFX('wrong')
+        },
         (m, d) => this.hud.showMessage(m, d),
         (mag, dur) => this.triggerShake(mag, dur),
       )
       if (this.scene === 'play') {
         this.dialogue.update(dt)
-        this.camera.follow(this.player.getCenterX(), LEVEL4_WORLD_WIDTH)
+        this.camera.follow(
+          this.player,
+          dt,
+          LEVEL4_WORLD_WIDTH,
+          CONFIG.CANVAS_HEIGHT,
+        )
       }
       this.prevPlayerX = this.player.getCenterX()
       this.input.update()
@@ -657,14 +698,25 @@ export class GameScene4 {
         this.player.height,
         0,
       )
-      this.camera.follow(this.player.getCenterX(), LEVEL4_WORLD_WIDTH)
+      this.camera.follow(
+        this.player,
+        dt,
+        LEVEL4_WORLD_WIDTH,
+        CONFIG.CANVAS_HEIGHT,
+      )
       this.nova.moveTo(this.player.x + 70, this.player.y - 30)
       this.prevPlayerX = this.player.getCenterX()
       this.input.update()
       return
     }
 
+    const wantsJump =
+      this.input.isJustPressed('ArrowUp') || this.input.isJustPressed('Space')
+    const wasOnGround = this.player.isOnGround
     this.player.update(dt, this.input)
+    if (wantsJump && wasOnGround) {
+      audioManager.playSFX('jump')
+    }
 
     const platY = this.level.checkPlatformCollision(
       this.player.x,
@@ -708,6 +760,7 @@ export class GameScene4 {
 
     const cp = this.level.updateCheckpointsForPlayer(cxAfter)
     if (cp) {
+      audioManager.playSFX('gateOpen')
       this.respawnX = Math.max(40, cp.x - 20)
       this.respawnY = this.groundY - this.player.height
       const key =
@@ -821,18 +874,7 @@ export class GameScene4 {
     if (this.lockTarget && !this.lockTarget.active) this.lockTarget = null
 
     this.lockables = this.buildLockables()
-    if (!this.lockTarget && this.lockables.length > 0) {
-      this.lockTarget = this.lockables.reduce((nearest, e) => {
-        const dE = Math.hypot(e.x - this.player.getCenterX(), e.y - this.player.y)
-        const dN = Math.hypot(nearest.x - this.player.getCenterX(), nearest.y - this.player.y)
-        return dE < dN ? e : nearest
-      })
-    }
-
-    if (this.input.isJustPressed('KeyQ') && this.lockables.length > 0) {
-      this.lockCycleIndex = (this.lockCycleIndex + 1) % this.lockables.length
-      this.lockTarget = this.lockables[this.lockCycleIndex] ?? null
-    }
+    this.updateLockTarget()
 
     if (this.input.isJustPressed('KeyZ') && this.shootCD <= 0) {
       const slot = this.player.weaponSlot
@@ -841,6 +883,7 @@ export class GameScene4 {
       } else {
         this.shootCD =
           slot === 3 ? this.shootCooldown + 0.15 : this.shootCooldown
+        audioManager.playSFX('shoot')
         if (slot === 3) this.gravityFireCD = GRAVITY_FIRE_COOLDOWN
         const dir = this.player.isFacingRight ? 1 : -1
         const px =
@@ -870,6 +913,7 @@ export class GameScene4 {
       if (!d.active && !d.exploded) {
         d.exploded = true
         Haptics.fire('enemyDestroyed')
+        audioManager.playSFX('enemyHit')
         this.hud.addScore(DRONE_XP)
         this.score += DRONE_XP
         this.spawnFireDeath(d.x, d.y + 20)
@@ -879,6 +923,7 @@ export class GameScene4 {
       if (!a.active && !a.scoreEmitted) {
         a.scoreEmitted = true
         Haptics.fire('enemyDestroyed')
+        audioManager.playSFX('enemyHit')
         this.hud.addScore(AUDIT_XP)
         this.score += AUDIT_XP
         this.spawnFireDeath(a.x, a.y)
@@ -979,6 +1024,8 @@ export class GameScene4 {
       const nowBalanced = sc.isBalanced()
       if (nowBalanced && !this.balancedFlags[i]) {
         this.balancedFlags[i] = true
+        audioManager.playSFX('correct')
+        audioManager.playSFX('gateOpen')
         Haptics.fire('puzzleSolved')
         this.triggerShake(4, 0.4)
         this.hud.showMessage('SCALE BALANCED — GATE OPEN', 3, '#00ff88')
@@ -996,7 +1043,12 @@ export class GameScene4 {
       }
     }
 
-    this.camera.follow(this.player.getCenterX(), LEVEL4_WORLD_WIDTH)
+    this.camera.follow(
+      this.player,
+      dt,
+      LEVEL4_WORLD_WIDTH,
+      CONFIG.CANVAS_HEIGHT,
+    )
     this.nova.moveTo(this.player.x + 70, this.player.y - 30)
 
     // Fix 10 — Level complete: both scales balanced + player past level end
@@ -1004,10 +1056,11 @@ export class GameScene4 {
       !this.levelCompleteTriggered &&
       this.level.scale1.isBalanced() &&
       this.level.scale2.isBalanced() &&
-      this.player.x > this.level.levelEnd
+      this.player.x >       this.level.levelEnd
     ) {
       this.levelCompleteTriggered = true
       this.level.levelComplete = true
+      audioManager.playSFX('victory')
       this.player.vx = 0
       this.player.vy = 0
       this.talk(
@@ -1048,6 +1101,10 @@ export class GameScene4 {
     this.input.update()
   }
 
+  handleHudPointerDown(canvasX: number, canvasY: number): void {
+    this.hud.handleClick(canvasX, canvasY)
+  }
+
   render(ctx: CanvasRenderingContext2D): void {
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.globalAlpha = 1
@@ -1078,12 +1135,36 @@ export class GameScene4 {
       const rx = lock.x - this.camera.x
       const ry = lock.y
       ctx.save()
-      ctx.strokeStyle = '#00b4d8'
+      // Outer rotating brackets
+      ctx.strokeStyle = RETICLE_COLOR
       ctx.lineWidth = 2
-      ctx.globalAlpha = 0.45 + Math.sin(this.lockTimer) * 0.2
-      ctx.beginPath()
-      ctx.arc(rx, ry, 22, 0, Math.PI * 2)
-      ctx.stroke()
+      ctx.globalAlpha = 0.55 + Math.sin(this.lockTimer) * 0.2
+      const bSize = 18
+      const bGap  = 6
+      // Top-left
+      ctx.beginPath(); ctx.moveTo(rx - bSize, ry - bSize); ctx.lineTo(rx - bGap, ry - bSize); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(rx - bSize, ry - bSize); ctx.lineTo(rx - bSize, ry - bGap); ctx.stroke()
+      // Top-right
+      ctx.beginPath(); ctx.moveTo(rx + bGap, ry - bSize); ctx.lineTo(rx + bSize, ry - bSize); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(rx + bSize, ry - bSize); ctx.lineTo(rx + bSize, ry - bGap); ctx.stroke()
+      // Bottom-left
+      ctx.beginPath(); ctx.moveTo(rx - bSize, ry + bGap); ctx.lineTo(rx - bSize, ry + bSize); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(rx - bSize, ry + bSize); ctx.lineTo(rx - bGap, ry + bSize); ctx.stroke()
+      // Bottom-right
+      ctx.beginPath(); ctx.moveTo(rx + bSize, ry + bGap); ctx.lineTo(rx + bSize, ry + bSize); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(rx + bGap, ry + bSize); ctx.lineTo(rx + bSize, ry + bSize); ctx.stroke()
+      // Center dot
+      ctx.fillStyle = RETICLE_COLOR
+      ctx.globalAlpha = 0.9
+      ctx.beginPath(); ctx.arc(rx, ry, 3, 0, Math.PI * 2); ctx.fill()
+      // Cycle hint
+      if (this.lockables.length > 1) {
+        ctx.font = '9px Orbitron, sans-serif'
+        ctx.fillStyle = RETICLE_COLOR
+        ctx.textAlign = 'center'
+        ctx.fillText(`[Q] ${this.lockCycleIndex + 1}/${this.lockables.length}`, rx, ry - 26)
+        ctx.textAlign = 'left'
+      }
       ctx.globalAlpha = 1
       ctx.restore()
     }
@@ -1096,6 +1177,14 @@ export class GameScene4 {
     }
 
     this.hud.render(ctx, { deferControls: true })
+    if (this.dialogue.isVisible()) {
+      const playerScreenY = this.player.y - this.camera.y
+      if (playerScreenY > CONFIG.CANVAS_HEIGHT * 0.5) {
+        this.dialogue.setPosition('top')
+      } else {
+        this.dialogue.setPosition('bottom')
+      }
+    }
     this.dialogue.render(ctx)
 
     ctx.fillStyle = 'rgba(0,0,0,0.88)'

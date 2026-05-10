@@ -78,6 +78,30 @@ export class InputManager {
     this.held.delete(code)
   }
 
+  /** Remove a key from this frame's just-pressed set (and alias keys for arrows). */
+  consumeJustPressed(key: GameKey): void {
+    switch (key) {
+      case 'ArrowLeft':
+        this.justPressed.delete('ArrowLeft')
+        this.justPressed.delete('KeyA')
+        break
+      case 'ArrowRight':
+        this.justPressed.delete('ArrowRight')
+        this.justPressed.delete('KeyD')
+        break
+      case 'ArrowUp':
+        this.justPressed.delete('ArrowUp')
+        this.justPressed.delete('KeyW')
+        break
+      case 'ArrowDown':
+        this.justPressed.delete('ArrowDown')
+        this.justPressed.delete('KeyS')
+        break
+      default:
+        this.justPressed.delete(key)
+    }
+  }
+
   update(): void {
     this.justPressed.clear()
     this.justReleased.clear()

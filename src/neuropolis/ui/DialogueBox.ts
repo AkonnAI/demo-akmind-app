@@ -226,10 +226,6 @@ export class DialogueBox {
     const clipBotTop = Math.round(8 * S)
     const clipBotBottom = Math.round(12 * S)
     const portraitTopOff = Math.round(4 * S)
-    const arrowInsetX = Math.round(18 * S)
-    const arrowYFromBottom = Math.round(22 * S)
-    const topArrowCap = Math.round(72 * S)
-    const topArrowBHSub = Math.round(28 * S)
     const counterInsetX = Math.round(12 * S)
     const counterInsetY = Math.round(8 * S)
 
@@ -291,12 +287,11 @@ export class DialogueBox {
         ctx.globalAlpha = pulse
         ctx.font = arrowFont
         ctx.fillStyle = col
-        ctx.textAlign = 'right'
-        ctx.textBaseline = 'middle'
+        ctx.textAlign = 'left'
         ctx.fillText(
           '▶ SPACE / TAP',
-          mx + innerW - arrowInsetX,
-          BY + Math.min(topArrowCap, BH - topArrowBHSub),
+          pxL,
+          BY + BH - Math.round(20 * S),
         )
         ctx.globalAlpha = 1
         ctx.restore()
@@ -363,12 +358,11 @@ export class DialogueBox {
         ctx.globalAlpha = pulse
         ctx.font = arrowFont
         ctx.fillStyle = col
-        ctx.textAlign = 'right'
-        ctx.textBaseline = 'middle'
+        ctx.textAlign = 'left'
         ctx.fillText(
           '▶ SPACE / TAP',
-          mx + innerW - arrowInsetX,
-          BY + BH - arrowYFromBottom,
+          pxL,
+          BY + BH - Math.round(20 * S),
         )
         ctx.globalAlpha = 1
         ctx.restore()

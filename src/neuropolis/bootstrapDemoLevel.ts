@@ -1,4 +1,6 @@
 import { Canvas } from "./engine/Canvas";
+import { audioManager } from "./engine/AudioManager";
+import { CONFIG } from "./constants/config";
 import { DeviceManager } from "./engine/DeviceManager";
 import { GameLoop } from "./engine/GameLoop";
 import { InputManager } from "./engine/InputManager";
@@ -20,6 +22,21 @@ export function bootstrapNeuropolisDemo(
   onLevelComplete: () => void
 ): () => void {
   DeviceManager.init();
+  audioManager.preload({
+    jump: "/sounds/jump.mp3",
+    shoot: "/sounds/shoot.mp3",
+    enemyHit: "/sounds/enemyHit.mp3",
+    bossHit: "/sounds/bossHit.mp3",
+    coin: "/sounds/coin.mp3",
+    correct: "/sounds/correct.mp3",
+    wrong: "/sounds/wrong.mp3",
+    checkpoint: "/sounds/checkpoint.mp3",
+    gateOpen: "/sounds/gateOpen.mp3",
+    victory: "/sounds/victory.mp3",
+    bgDistrict2: "/sounds/district2-bg.mp3",
+    bgDistrict3: "/sounds/district3-bg.mp3",
+    bgDistrict4: "/sounds/district4-bg.mp3",
+  });
   root.replaceChildren();
 
   const gameContainer = document.createElement("div");
@@ -58,9 +75,13 @@ export function bootstrapNeuropolisDemo(
 
   let disposed = false;
 
+  let onPointerDown = (_e: PointerEvent): void => {};
+
   const teardown = (): void => {
     if (disposed) return;
     disposed = true;
+    audioManager.stopMusic();
+    canvasEl.removeEventListener("pointerdown", onPointerDown);
     loop.stop();
     touchControls.destroy();
     input.destroy();
@@ -88,6 +109,29 @@ export function bootstrapNeuropolisDemo(
     default:
       teardown();
       throw new Error(`Invalid Neuropolis demo level: ${level}`);
+  }
+
+  onPointerDown = (e: PointerEvent): void => {
+    if (disposed || !scene) return;
+    const rect = canvasEl.getBoundingClientRect();
+    const scaleX = CONFIG.CANVAS_WIDTH / rect.width;
+    const scaleY = CONFIG.CANVAS_HEIGHT / rect.height;
+    const canvasX = (e.clientX - rect.left) * scaleX;
+    const canvasY = (e.clientY - rect.top) * scaleY;
+    scene.handleHudPointerDown(canvasX, canvasY);
+  };
+  canvasEl.addEventListener("pointerdown", onPointerDown);
+
+  switch (level) {
+    case 1:
+      audioManager.playMusic("bgDistrict2");
+      break;
+    case 2:
+      audioManager.playMusic("bgDistrict3");
+      break;
+    case 3:
+      audioManager.playMusic("bgDistrict4");
+      break;
   }
 
   loop.onUpdate((dt) => {

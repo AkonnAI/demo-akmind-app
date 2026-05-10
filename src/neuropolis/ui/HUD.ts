@@ -1,4 +1,5 @@
 import { CONFIG } from '../constants/config'
+import { audioManager } from '../engine/AudioManager'
 import { XPBar } from './XPBar'
 
 const S = CONFIG.CANVAS_WIDTH / 1280
@@ -20,6 +21,8 @@ export class HUD {
   private messageColor = '#00e5ff'
   private time         = 0
   private weaponName   = ''
+
+  private muteBtn = { x: 0, y: 0, size: 28 }
 
   setHP(hp: number): void        { this.hp        = Math.max(0, hp) }
   setWeapon(name: string): void  { this.weaponName = name }
@@ -43,6 +46,13 @@ export class HUD {
     this.message      = msg
     this.msgTimer     = duration
     this.messageColor = color ?? '#00e5ff'
+  }
+
+  handleClick(cx: number, cy: number): void {
+    const b = this.muteBtn
+    if (cx >= b.x && cx <= b.x + b.size && cy >= b.y && cy <= b.y + b.size) {
+      audioManager.toggleMute()
+    }
   }
 
   update(dt: number): void {
@@ -156,6 +166,28 @@ export class HUD {
     this.xpBar.render(ctx)
 
     ctx.textAlign = 'left'
+
+    {
+      const S = CONFIG.CANVAS_WIDTH / 1280
+      const btnSize = Math.round(28 * S)
+      const btnX = CONFIG.CANVAS_WIDTH - Math.round(44 * S)
+      const btnY = Math.round(8 * S)
+      this.muteBtn = { x: btnX, y: btnY, size: btnSize }
+
+      ctx.save()
+      ctx.fillStyle = 'rgba(8,4,30,0.85)'
+      ctx.fillRect(btnX, btnY, btnSize, btnSize)
+      ctx.strokeStyle = '#334155'
+      ctx.lineWidth = 1
+      ctx.strokeRect(btnX, btnY, btnSize, btnSize)
+      ctx.font = `${Math.round(16 * S)}px sans-serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillStyle = '#94a3b8'
+      ctx.fillText(audioManager.isMuted() ? '🔇' : '🔊', btnX + btnSize / 2, btnY + btnSize / 2)
+      ctx.restore()
+    }
+
     ctx.restore()
   }
 }

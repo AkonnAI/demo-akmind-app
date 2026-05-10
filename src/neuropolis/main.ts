@@ -2,6 +2,7 @@ import { DeviceManager }   from './engine/DeviceManager'
 import { Canvas }          from './engine/Canvas'
 import { GameLoop }        from './engine/GameLoop'
 import { InputManager }    from './engine/InputManager'
+import { CONFIG }          from './constants/config'
 import { BootScene }       from './scenes/BootScene'
 import { CinematicScene }  from './scenes/CinematicScene'
 import { GameScene }       from './scenes/GameScene'
@@ -23,6 +24,7 @@ if (!(gameContainer instanceof HTMLElement)) {
 
 const canvas = new Canvas()
 const ctx    = canvas.getContext()
+const canvasEl = canvas.getCanvas()
 const input  = new InputManager()
 const loop   = new GameLoop()
 const touchControls = new TouchControls(gameContainer, input)
@@ -52,6 +54,27 @@ let game6: GameScene6 | null = null
 let game7: GameScene7 | null = null
 let game8: GameScene8 | null = null
 let bootTimer = 0
+
+canvasEl.addEventListener('pointerdown', (e: PointerEvent) => {
+  const rect = canvasEl.getBoundingClientRect()
+  const scaleX = CONFIG.CANVAS_WIDTH / rect.width
+  const scaleY = CONFIG.CANVAS_HEIGHT / rect.height
+  const canvasX = (e.clientX - rect.left) * scaleX
+  const canvasY = (e.clientY - rect.top) * scaleY
+  switch (current) {
+    case 'game2':
+      game2?.handleHudPointerDown(canvasX, canvasY)
+      break
+    case 'game3':
+      game3?.handleHudPointerDown(canvasX, canvasY)
+      break
+    case 'game4':
+      game4?.handleHudPointerDown(canvasX, canvasY)
+      break
+    default:
+      break
+  }
+})
 
 loop.onUpdate((dt) => {
   switch (current) {

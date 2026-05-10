@@ -133,6 +133,27 @@ export default function NOVAChat({
 
         const data = (await res.json()) as { response: string };
 
+        const lower = data.response.toLowerCase();
+        let replyEmotion:
+          | "happy"
+          | "thinking"
+          | "excited"
+          | "concerned" = "happy";
+        if (
+          lower.includes("amazing") ||
+          lower.includes("brilliant") ||
+          lower.includes("excellent")
+        ) {
+          replyEmotion = "excited";
+        } else if (lower.includes("hmm") || lower.includes("interesting")) {
+          replyEmotion = "thinking";
+        } else if (
+          lower.includes("struggling") ||
+          lower.includes("difficult")
+        ) {
+          replyEmotion = "concerned";
+        }
+
         setMessages((prev) => [
           ...prev,
           {
@@ -141,22 +162,9 @@ export default function NOVAChat({
             content: data.response,
           },
         ]);
-        void speak(data.response);
+        void speak(data.response, { emotion: replyEmotion });
 
-        const lower = data.response.toLowerCase();
-        if (
-          lower.includes("amazing") ||
-          lower.includes("brilliant") ||
-          lower.includes("excellent")
-        ) {
-          setEmotion("excited");
-        } else if (lower.includes("hmm") || lower.includes("interesting")) {
-          setEmotion("thinking");
-        } else if (lower.includes("struggling") || lower.includes("difficult")) {
-          setEmotion("concerned");
-        } else {
-          setEmotion("happy");
-        }
+        setEmotion(replyEmotion);
       } catch {
         setMessages((prev) => [
           ...prev,

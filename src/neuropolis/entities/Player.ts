@@ -9,6 +9,11 @@ export class Player {
 
   vx: number = 0
   vy: number = 0
+
+  /** Horizontal velocity (alias of {@link vx} for camera / tooling). */
+  get velocityX(): number {
+    return this.vx
+  }
   isOnGround: boolean = false
   isFacingRight: boolean = true
 

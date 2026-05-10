@@ -6,7 +6,13 @@ import {
   type DemoLiveStats,
 } from "@/lib/demo-nova-stats";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+let groqSingleton: Groq | null = null;
+function getGroq(): Groq | null {
+  const key = process.env.GROQ_API_KEY?.trim();
+  if (!key) return null;
+  if (!groqSingleton) groqSingleton = new Groq({ apiKey: key });
+  return groqSingleton;
+}
 
 const demoMemory: Map<string, Array<{ role: string; content: string }>> =
   new Map();
@@ -185,6 +191,19 @@ export async function POST(req: NextRequest) {
       askedModule,
       typeof lessonOrder === "number" && lessonOrder > 0 ? lessonOrder : 1
     );
+
+    const groq = getGroq();
+    if (!groq) {
+      console.error("NOVA: GROQ_API_KEY is missing (set it in Amplify env)");
+      return Response.json(
+        {
+          response:
+            "I am not connected on this deployment yet — ask your teacher or check back soon. Your lessons and games still work!",
+          error: true,
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
 
     const completion = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",

@@ -1,6 +1,7 @@
 import { InputManager }       from '../engine/InputManager'
 import { GameLoop }           from '../engine/GameLoop'
 import { Camera }             from '../engine/Camera'
+import { audioManager }       from '../engine/AudioManager'
 import { Player }             from '../entities/Player'
 import { Projectile }         from '../entities/Projectile'
 import { Haptics }            from '../engine/Haptics'
@@ -260,7 +261,7 @@ export class GameScene2 {
       this.player.y           = ARENA_GROUND_Y - this.player.height
       this.player.vx          = 0
       this.player.vy          = 0
-      this.camera.x           = 0
+      this.camera.syncFromXY(0, 0)
       this.dialogue.setPosition('bottom')
       this.dialogue.setHeight(BOSS_DIALOGUE_HEIGHT)
       this.dialogue.setHorizontalInset(BOSS_DIALOGUE_INSET)
@@ -475,6 +476,7 @@ export class GameScene2 {
         if (c.isLanded()) {
           c.exploded = true
           Haptics.fire('enemyDestroyed')
+          audioManager.playSFX('enemyHit')
           this.triggerShake(SHAKE_CRAWLER_DEAD_MAG, SHAKE_CRAWLER_DEAD_DUR)
           this.explosions.push({
             x: c.x, y: this.bg.getGroundY() - 10,
@@ -499,6 +501,7 @@ export class GameScene2 {
       if (!m.active && !m.exploded) {
         m.exploded = true
         Haptics.fire('enemyDestroyed')
+        audioManager.playSFX('enemyHit')
         this.triggerShake(4, 0.25)
         this.explosions.push({
           x: m.x, y: m.y, t: 0.5, maxT: 0.5,
@@ -515,6 +518,7 @@ export class GameScene2 {
       if (!w.active && !w.exploded) {
         w.exploded = true
         Haptics.fire('enemyDestroyed')
+        audioManager.playSFX('enemyHit')
         this.triggerShake(4, 0.25)
         this.explosions.push({
           x: w.x, y: w.y, t: 0.5, maxT: 0.5,
@@ -554,7 +558,7 @@ export class GameScene2 {
         this.level.projectiles =
           this.level.projectiles.filter(p => p.active)
       }
-      this.camera.follow(this.player.getCenterX(), WORLD_WIDTH)
+      this.camera.follow(this.player, dt, WORLD_WIDTH, CONFIG.CANVAS_HEIGHT)
       this.nova.moveTo(this.player.x + 70, this.player.y - 30)
       this.input.update()
       return
@@ -562,19 +566,33 @@ export class GameScene2 {
 
     // ── PLAY ──────────────────────────
     const prevGround = this.player.isOnGround
+
+    this.processCipherTerminalKeyboardEarly()
+
     const hackOverlay = !!(this.activeTerminal?.isHacking)
     const arenaFadeBusy = this.arenaFadePhase === 'out' ||
       this.arenaFadePhase === 'exitOut'
     const groundY = this.inBossArena ? ARENA_GROUND_Y : this.bg.getGroundY()
 
-    if (!hackOverlay && !arenaFadeBusy) {
+    const moveFrozen = arenaFadeBusy && !hackOverlay
+
+    if (!moveFrozen) {
+      const wantsJump =
+        this.input.isJustPressed('ArrowUp') || this.input.isJustPressed('Space')
+      const wasOnGround = this.player.isOnGround
       this.player.update(dt, this.input)
-    } else if (!hackOverlay && arenaFadeBusy) {
-      this.player.vx = 0
-      this.player.update(dt, this.input)
+      if (wantsJump && wasOnGround) {
+        audioManager.playSFX('jump')
+      }
     } else {
+      const wantsJump =
+        this.input.isJustPressed('ArrowUp') || this.input.isJustPressed('Space')
+      const wasOnGround = this.player.isOnGround
       this.player.vx = 0
-      this.player.vy = 0
+      this.player.update(dt, this.input)
+      if (wantsJump && wasOnGround) {
+        audioManager.playSFX('jump')
+      }
     }
 
     if (!this.inBossArena) {
@@ -623,23 +641,44 @@ export class GameScene2 {
       ], () => { this.bossArena?.startObserving() })
     }
 
-    // Gate / Cipher-Terminal blocking — no popups.  Level 2's
-    // gating mechanic is the Cipher Terminal: player hacks it
-    // by cycling digits to the correct year.  Here we just push
-    // the player back if any blocker sits in front of them
-    // (arena wall, vault door, or active cipher terminal).
-    if (this.level.isGateBlocking(
-      this.player.x, this.player.y,
-      this.player.width, this.player.height
-    )) {
-      this.player.x  -= this.player.vx * dt * 3
-      this.player.vx  = 0
+    // Cipher-terminal wall (always) + gate blocking — no popups.
+    // Terminal loop pushes horizontally; isGateBlocking handles
+    // arena wall and vault door pushback.
+    const playerW  = this.player.width
+    const playerH  = this.player.height
+
+    // Terminal wall — ALWAYS runs, independent of gate check
+    for (const t of this.level.getCipherTerminals()) {
+      if (!t.active) continue
+      const tLeft  = t.x - t.w / 2
+      const tRight = t.x + t.w / 2
+      const pLeft  = this.player.x
+      const pRight = this.player.x + this.player.width
+      const pBottom = this.player.y + this.player.height
+
+      // Only block if player is below terminal top (not above it entirely)
+      if (pBottom > t.y && pRight > tLeft - 2 && pLeft < tRight + 2) {
+        if (this.player.vx >= 0 && pRight > tLeft && pLeft <= tLeft) {
+          this.player.x  = tLeft - this.player.width - 1
+          this.player.vx = 0
+        }
+        if (this.player.vx <= 0 && pLeft < tRight && pRight >= tRight) {
+          this.player.x  = tRight + 1
+          this.player.vx = 0
+        }
+      }
+    }
+
+    // Original gate check stays below, unchanged
+    if (this.level.isGateBlocking(this.player.x, this.player.y, playerW, playerH)) {
+      this.player.x -= this.player.vx * dt * 3
+      this.player.vx = 0
     }
 
     if (!this.inBossArena) {
-      this.camera.follow(this.player.getCenterX(), WORLD_WIDTH)
+      this.camera.follow(this.player, dt, WORLD_WIDTH, CONFIG.CANVAS_HEIGHT)
     } else {
-      this.camera.x = 0
+      this.camera.syncFromXY(0, 0)
     }
     this.nova.moveTo(this.player.x + 70, this.player.y - 30)
 
@@ -680,6 +719,7 @@ export class GameScene2 {
           this.hud.showMessage('WRONG YEAR — TRY AGAIN', 2)
           this.talk([{ speaker:'NOVA', text: ev.novaHint, expression:'warning' }])
         } else if (ev.type === 'vault_open') {
+          audioManager.playSFX('gateOpen')
           this.score += 200
           this.hud.addScore(200)
           this.hud.showMessage('VAULT CIPHER CRACKED — +200 XP BONUS', 3)
@@ -716,7 +756,7 @@ export class GameScene2 {
       }
     }
 
-    // ── CIPHER TERMINAL — full-screen hack overlay (PLAY continues) ──
+    // ── CIPHER TERMINAL — inactive / walked away (keyboard handled earlier)
     if (this.activeTerminal) {
       const t = this.activeTerminal
       if (!t.active) {
@@ -725,45 +765,6 @@ export class GameScene2 {
       } else if (Math.abs(this.player.getCenterX() - t.x) > TERMINAL_WALK_AWAY) {
         t.isHacking         = false
         this.activeTerminal = null
-      } else if (this.scene === 'play' && t.isHacking) {
-        if (this.input.isJustPressed('KeyF') ||
-            this.input.isJustPressed('Escape')) {
-          t.isHacking         = false
-          this.activeTerminal = null
-        } else {
-          const idx = Math.min(3, Math.max(0, t.digitIndex))
-          if (this.input.isJustPressed('KeyZ') ||
-              this.input.isJustPressed('ArrowUp')) {
-            t.digits[idx] = ((t.digits[idx] ?? 0) + 1) % 10
-          }
-          if (this.input.isJustPressed('KeyE') ||
-              this.input.isJustPressed('ArrowDown')) {
-            t.digits[idx] = ((t.digits[idx] ?? 0) + 9) % 10
-          }
-          if (this.input.isJustPressed('Space')) {
-            if (t.digitIndex < 3) {
-              t.digitIndex++
-            } else {
-              const ev = this.level.submitCipherTerminal(t)
-              if (ev.type === 'solved') {
-                this.activeTerminal = null
-                this.triggerShake(TERMINAL_SHAKE_CORRECT, TERMINAL_SHAKE_CORRECT_T)
-                this.score += TERMINAL_SOLVE_XP
-                this.hud.addScore(TERMINAL_SOLVE_XP)
-                this.hud.showMessage(`TERMINAL CRACKED — ${ev.era}`, 2.5)
-                this.talk([{
-                  speaker:'NOVA', text: ev.novaLine, expression:'happy',
-                }])
-              } else {
-                this.triggerShake(TERMINAL_SHAKE_WRONG, TERMINAL_SHAKE_WRONG_T)
-                this.hud.showMessage(
-                  `INCORRECT — ${ev.novaHint}`,
-                  3.5
-                )
-              }
-            }
-          }
-        }
       }
     }
 
@@ -773,7 +774,8 @@ export class GameScene2 {
         !this.activeTerminal?.isHacking &&
         this.input.isJustPressed('KeyZ') &&
         this.shootCD <= 0) {
-      this.shootCD = SHOOT_COOLDOWN
+        this.shootCD = SHOOT_COOLDOWN
+        audioManager.playSFX('shoot')
       const dir = this.player.isFacingRight ? 1 : -1
       const px  = this.player.x + (dir > 0 ? this.player.width + 4 : -4)
       const py  = this.player.y + this.player.height * 0.38
@@ -865,6 +867,7 @@ export class GameScene2 {
         this.lastCheckpoint = cp
         this.respawnX = cp.x - 40
         this.respawnY = this.bg.getGroundY() - this.player.height
+        audioManager.playSFX('gateOpen')
         this.triggerShake(2, 0.15)
         this.hud.showMessage('✓ CHECKPOINT', 2)
         this.talk([{
@@ -920,6 +923,7 @@ export class GameScene2 {
         this.player.x > LEVEL_END_X &&
         this.level.vaultDoor.open) {
       this.level.levelComplete = true
+      audioManager.playSFX('victory')
       this.score += 500
       this.hud.addScore(500)
       this.hud.showMessage('LEVEL 2 COMPLETE — +500 XP', 5)
@@ -995,6 +999,7 @@ export class GameScene2 {
           if (!bossDamagedByPlayerThisFrame) {
             bossDamagedByPlayerThisFrame = true
             ba.takeHit()
+            audioManager.playSFX('bossHit')
             this.triggerShake(SHAKE_CARD_CORRECT_MAG + 1, 0.25)
             this.hud.showMessage('HIT — KEEP GOING', 1)
           }
@@ -1047,6 +1052,7 @@ export class GameScene2 {
       }
       if (ba.isDefeated() && !this.bossVictoryStarted) {
         this.bossVictoryStarted = true
+        audioManager.playSFX('victory')
         this.triggerShake(SHAKE_TWIN_DEAD_MAG, SHAKE_TWIN_DEAD_DUR)
         this.score += BOSS_XP
         this.hud.addScore(BOSS_XP)
@@ -1234,6 +1240,69 @@ export class GameScene2 {
     ctx.restore()
   }
 
+  handleHudPointerDown(canvasX: number, canvasY: number): void {
+    this.hud.handleClick(canvasX, canvasY)
+  }
+
+  /**
+   * Cipher keyboard before {@link Player.update} so Space / arrows apply to the terminal
+   * without also triggering jump or movement aliases in the same frame.
+   */
+  private processCipherTerminalKeyboardEarly(): void {
+    const t = this.activeTerminal
+    if (!t?.active || !t.isHacking || this.scene !== 'play') return
+    if (Math.abs(this.player.getCenterX() - t.x) > TERMINAL_WALK_AWAY) return
+
+    if (this.input.isJustPressed('KeyF') ||
+        this.input.isJustPressed('Escape')) {
+      t.isHacking = false
+      this.activeTerminal = null
+      this.input.consumeJustPressed('KeyF')
+      this.input.consumeJustPressed('Escape')
+      return
+    }
+
+    const idx = Math.min(3, Math.max(0, t.digitIndex))
+    if (this.input.isJustPressed('KeyZ') ||
+        this.input.isJustPressed('ArrowUp')) {
+      t.digits[idx] = ((t.digits[idx] ?? 0) + 1) % 10
+      this.input.consumeJustPressed('KeyZ')
+      this.input.consumeJustPressed('ArrowUp')
+    }
+    if (this.input.isJustPressed('KeyE') ||
+        this.input.isJustPressed('ArrowDown')) {
+      t.digits[idx] = ((t.digits[idx] ?? 0) + 9) % 10
+      this.input.consumeJustPressed('KeyE')
+      this.input.consumeJustPressed('ArrowDown')
+    }
+    if (this.input.isJustPressed('Space')) {
+      if (t.digitIndex < 3) {
+        t.digitIndex++
+      } else {
+        const ev = this.level.submitCipherTerminal(t)
+        if (ev.type === 'solved') {
+          this.activeTerminal = null
+          audioManager.playSFX('correct')
+          this.triggerShake(TERMINAL_SHAKE_CORRECT, TERMINAL_SHAKE_CORRECT_T)
+          this.score += TERMINAL_SOLVE_XP
+          this.hud.addScore(TERMINAL_SOLVE_XP)
+          this.hud.showMessage(`TERMINAL CRACKED — ${ev.era}`, 2.5)
+          this.talk([{
+            speaker:'NOVA', text: ev.novaLine, expression:'happy',
+          }])
+        } else {
+          audioManager.playSFX('wrong')
+          this.triggerShake(TERMINAL_SHAKE_WRONG, TERMINAL_SHAKE_WRONG_T)
+          this.hud.showMessage(
+            `INCORRECT — ${ev.novaHint}`,
+            3.5
+          )
+        }
+      }
+      this.input.consumeJustPressed('Space')
+    }
+  }
+
   render(ctx: CanvasRenderingContext2D): void {
     ctx.save()
     if (this.shakeMag > 0) {
@@ -1391,6 +1460,14 @@ export class GameScene2 {
 
     const bossUi = !!(this.inBossArena && this.bossArena)
     this.hud.render(ctx, { deferControls: bossUi })
+    if (this.dialogue.isVisible()) {
+      const playerScreenY = this.player.y - this.camera.y
+      if (playerScreenY > CONFIG.CANVAS_HEIGHT * 0.5) {
+        this.dialogue.setPosition('top')
+      } else {
+        this.dialogue.setPosition('bottom')
+      }
+    }
     this.dialogue.render(ctx)
     if (bossUi) {
       this.renderBossHealthBar(ctx)
@@ -1463,10 +1540,12 @@ export class GameScene2 {
   ): void {
     const W = CONFIG.CANVAS_WIDTH
     const H = CONFIG.CANVAS_HEIGHT
-    const px = 300
-    const py = 150
-    const pw = 680
-    const ph = 420
+    const TERMINAL_W = 680
+    const TERMINAL_H = 420
+    const px = CONFIG.CANVAS_WIDTH / 2 - TERMINAL_W / 2
+    const py = CONFIG.CANVAS_HEIGHT - TERMINAL_H - 80
+    const pw = TERMINAL_W
+    const ph = TERMINAL_H
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.82)'
     ctx.fillRect(0, 0, W, H)

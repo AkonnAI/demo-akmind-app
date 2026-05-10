@@ -889,6 +889,10 @@ export class Level2 {
     return null
   }
 
+  getCipherTerminals(): CipherTerminal[] {
+    return this.cipherTerminals
+  }
+
   isGateBlocking(
     ax: number, ay: number, aw: number, ah: number
   ): boolean {
@@ -904,10 +908,14 @@ export class Level2 {
       if (ax + aw > v.x && ax < v.x + totalW &&
           ay + ah > v.y && ay < v.y + v.h) return true
     }
-    // Cipher Terminals block the path while still active.  The
-    // terminal's collision AABB is the full body (48×120 px) bolted
-    // to the ground.  See getCipherTerminalBlock.
-    if (this.getCipherTerminalBlock(ax, ay, aw, ah) !== null) return true
+    // Cipher terminals block as hard walls
+    for (const t of this.cipherTerminals) {
+      if (!t.active) continue
+      const tLeft  = t.x - t.w / 2
+      const tRight = t.x + t.w / 2
+      if (ax + aw > tLeft && ax < tRight &&
+          ay + ah > t.y  && ay < t.y + t.h) return true
+    }
     return false
   }
 
