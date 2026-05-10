@@ -18,6 +18,15 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Amplify Hosting injects env vars at build time only — not into Lambda runtime.
+  // Capturing here bakes them into the server bundle so API routes can read them.
+  env: {
+    GROQ_API_KEY: process.env.GROQ_API_KEY ?? "",
+    GROQ_MODEL_ID: process.env.GROQ_MODEL_ID ?? "",
+    ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY ?? "",
+    ELEVENLABS_VOICE_ID: process.env.ELEVENLABS_VOICE_ID ?? "",
+    ELEVENLABS_MODEL_ID: process.env.ELEVENLABS_MODEL_ID ?? "",
+  },
   compress: true,
   images: {
     formats: ["image/webp"],
