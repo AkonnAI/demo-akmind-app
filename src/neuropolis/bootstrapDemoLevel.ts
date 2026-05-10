@@ -25,15 +25,24 @@ export function bootstrapNeuropolisDemo(
   const gameContainer = document.createElement("div");
   gameContainer.id = "game-container";
   Object.assign(gameContainer.style, {
-    position: "relative",
-    width: "100%",
-    height: "100%",
+    position: "fixed",
+    top: "0",
+    left: "0",
+    width: "100vw",
+    height: "100vh",
     overflow: "hidden",
     background: "#0a0a1a",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   });
 
   const canvasEl = document.createElement("canvas");
   canvasEl.id = "game-canvas";
+  Object.assign(canvasEl.style, {
+    position: "absolute",
+    display: "block",
+  });
 
   gameContainer.appendChild(canvasEl);
   root.appendChild(gameContainer);

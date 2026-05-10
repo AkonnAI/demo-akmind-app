@@ -682,18 +682,21 @@ function LessonPageInner() {
   const suppressNovaChatFab =
     (phase === "game" && gameActive) || showXPOverlay;
 
+  const isGameFullscreen = phase === "game" && gameActive;
+
   const totalQs = lesson.quiz.length;
   const q = lesson.quiz[currentQuestion];
   const typeLabel = "Self-paced lesson video + game";
 
   return (
-    <div className="min-h-screen overflow-x-hidden">
+    <div className={isGameFullscreen ? "fixed inset-0 overflow-hidden bg-[#0a0a1a]" : "min-h-screen overflow-x-hidden"}>
       <header
         className="sticky top-0 z-20 border-b"
         style={{
           background: "rgba(6,8,20,0.9)",
           borderColor: "rgba(99,102,241,0.15)",
           backdropFilter: "blur(20px)",
+          display: isGameFullscreen ? "none" : undefined,
         }}
       >
         <div className="mx-auto flex h-16 max-w-5xl items-center gap-3 px-3 sm:px-4">
@@ -777,7 +780,10 @@ function LessonPageInner() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-3 py-4 sm:px-6 sm:py-7">
+      <main
+        className="mx-auto max-w-4xl px-3 py-4 sm:px-6 sm:py-7"
+        style={{ display: isGameFullscreen ? "none" : undefined }}
+      >
         {phase === "video" && (
           <div
             className="overflow-hidden rounded-[20px] border shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
@@ -862,107 +868,6 @@ function LessonPageInner() {
                 </span>
               </div>
             </div>
-          </div>
-        )}
-
-        {phase === "game" && lesson.hasGame && (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 50,
-              overflow: "hidden",
-              maxWidth: "100vw",
-              maxHeight: "100vh",
-            }}
-          >
-            {gameActive && lessonId >= 1 && lessonId <= 3 && (
-              <LandscapeWrapper>
-                <NeuropolisShell
-                  level={lessonId as 1 | 2 | 3}
-                  onComplete={async () => {
-                    await exitGame();
-                    setGameComplete(true);
-                    setPhase("quiz");
-                  }}
-                  onExit={exitGame}
-                />
-              </LandscapeWrapper>
-            )}
-
-            {gameActive && (lessonId < 1 || lessonId > 3) && (
-              <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900 px-6 text-center text-white">
-                <p className="text-4xl">🎮</p>
-                <p className="mt-4 text-2xl font-bold">Game Coming Soon</p>
-                <p className="mt-2 max-w-md text-slate-300">
-                  {GAME_MECHANICS[lessonId]}
-                </p>
-                <button
-                  type="button"
-                  className="mt-8 rounded-xl bg-cyan-500 px-8 py-3 font-bold text-black"
-                  onClick={() => {
-                    setGameComplete(true);
-                    setGameActive(false);
-                  }}
-                >
-                  Complete Game
-                </button>
-              </div>
-            )}
-
-            {gameComplete && !gameActive && (
-              <div
-                className="mx-3 rounded-2xl border p-6 text-center sm:mx-0 sm:p-8"
-                style={{
-                  background: "rgba(16,185,129,0.08)",
-                  borderColor: "rgba(16,185,129,0.2)",
-                }}
-              >
-                <CheckCircle2 className="mx-auto h-10 w-10 text-green-400" />
-                <p className="mt-3 text-lg font-semibold text-green-300">
-                  Game complete! <span className="text-amber-300">+200 XP earned</span>
-                </p>
-                <button
-                  type="button"
-                  className="mt-6 rounded-xl px-8 py-3 font-bold text-white"
-                  style={{ background: "linear-gradient(135deg, #6366F1, #4F46E5)" }}
-                  onClick={() => setPhase("quiz")}
-                >
-                  Continue to Quiz →
-                </button>
-              </div>
-            )}
-
-            {!gameComplete && !gameActive && (
-              <div
-                className="mx-3 rounded-[20px] border px-8 py-12 text-center sm:mx-0"
-                style={{
-                  background:
-                    "linear-gradient(135deg, rgba(15,10,40,0.95), rgba(10,20,50,0.95))",
-                  borderColor: "rgba(99,102,241,0.2)",
-                }}
-              >
-                <p className="text-6xl text-indigo-300/70">🎮</p>
-                <h2 className="mt-4 text-[24px] font-bold tracking-tight text-white">
-                  Story Game: {lesson.title}
-                </h2>
-                <p className="mt-2 text-sm text-slate-300 sm:text-base">
-                  {GAME_MECHANICS[lessonId] ?? "Interactive story adventure."}
-                </p>
-                <p className="mt-4 text-xs text-slate-500">Tap to launch game</p>
-                <button
-                  type="button"
-                  className="mt-6 w-full max-w-md rounded-xl px-8 py-4 text-lg font-bold text-white transition-all duration-200 hover:-translate-y-0.5 sm:w-auto"
-                  style={{
-                    background: "linear-gradient(135deg, #6366F1, #4F46E5)",
-                    boxShadow: "var(--glow-indigo)",
-                  }}
-                  onClick={launchGame}
-                >
-                  Launch Game →
-                </button>
-              </div>
-            )}
           </div>
         )}
 
@@ -1105,6 +1010,120 @@ function LessonPageInner() {
           </div>
         )}
       </main>
+
+      {phase === "game" && lesson.hasGame && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: "100vw",
+            height: "100vh",
+            zIndex: 9999,
+            background: "#0a0a1a",
+            overflow: "hidden",
+          }}
+        >
+          {gameActive && lessonId >= 1 && lessonId <= 3 && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+              }}
+            >
+              <LandscapeWrapper>
+                <NeuropolisShell
+                  level={lessonId as 1 | 2 | 3}
+                  onComplete={async () => {
+                    await exitGame();
+                    setGameComplete(true);
+                    setPhase("quiz");
+                  }}
+                  onExit={exitGame}
+                />
+              </LandscapeWrapper>
+            </div>
+          )}
+
+          {gameActive && (lessonId < 1 || lessonId > 3) && (
+            <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900 px-6 text-center text-white">
+              <p className="text-4xl">🎮</p>
+              <p className="mt-4 text-2xl font-bold">Game Coming Soon</p>
+              <p className="mt-2 max-w-md text-slate-300">
+                {GAME_MECHANICS[lessonId]}
+              </p>
+              <button
+                type="button"
+                className="mt-8 rounded-xl bg-cyan-500 px-8 py-3 font-bold text-black"
+                onClick={() => {
+                  setGameComplete(true);
+                  setGameActive(false);
+                }}
+              >
+                Complete Game
+              </button>
+            </div>
+          )}
+
+          {gameComplete && !gameActive && (
+            <div
+              className="mx-3 rounded-2xl border p-6 text-center sm:mx-0 sm:p-8"
+              style={{
+                background: "rgba(16,185,129,0.08)",
+                borderColor: "rgba(16,185,129,0.2)",
+              }}
+            >
+              <CheckCircle2 className="mx-auto h-10 w-10 text-green-400" />
+              <p className="mt-3 text-lg font-semibold text-green-300">
+                Game complete! <span className="text-amber-300">+200 XP earned</span>
+              </p>
+              <button
+                type="button"
+                className="mt-6 rounded-xl px-8 py-3 font-bold text-white"
+                style={{ background: "linear-gradient(135deg, #6366F1, #4F46E5)" }}
+                onClick={() => setPhase("quiz")}
+              >
+                Continue to Quiz →
+              </button>
+            </div>
+          )}
+
+          {!gameComplete && !gameActive && (
+            <div
+              className="mx-3 rounded-[20px] border px-8 py-12 text-center sm:mx-0"
+              style={{
+                background:
+                  "linear-gradient(135deg, rgba(15,10,40,0.95), rgba(10,20,50,0.95))",
+                borderColor: "rgba(99,102,241,0.2)",
+              }}
+            >
+              <p className="text-6xl text-indigo-300/70">🎮</p>
+              <h2 className="mt-4 text-[24px] font-bold tracking-tight text-white">
+                Story Game: {lesson.title}
+              </h2>
+              <p className="mt-2 text-sm text-slate-300 sm:text-base">
+                {GAME_MECHANICS[lessonId] ?? "Interactive story adventure."}
+              </p>
+              <p className="mt-4 text-xs text-slate-500">Tap to launch game</p>
+              <button
+                type="button"
+                className="mt-6 w-full max-w-md rounded-xl px-8 py-4 text-lg font-bold text-white transition-all duration-200 hover:-translate-y-0.5 sm:w-auto"
+                style={{
+                  background: "linear-gradient(135deg, #6366F1, #4F46E5)",
+                  boxShadow: "var(--glow-indigo)",
+                }}
+                onClick={launchGame}
+              >
+                Launch Game →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {showXPOverlay && xpOverlayPayload && token ? (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-4">

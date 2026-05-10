@@ -21,6 +21,7 @@ import {
   GlitchTwinBoss,
   ARENA_GROUND_Y,
 } from '../bosses/GlitchTwinBoss'
+import { MissionCard, type MissionCardData } from '../ui/MissionCard'
 
 // Structural lock-on target — matches Projectile.LockTarget so any
 // object with x/y/active works (Crawler, WallHugger, …).  Keeps the
@@ -146,6 +147,7 @@ export class GameScene2 {
   private hud:      HUD
   private dialogue: DialogueBox
   private nova:     NovaOrb
+  private missionCard = new MissionCard()
 
   private hp            = 3
   private score         = 0
@@ -270,6 +272,15 @@ export class GameScene2 {
 
     this.initDataRainColumns()
     console.log('[GameScene2] Level 2 loaded — underground, water, crawlers.')
+
+    this.missionCard.show({
+      levelCode: 'LEVEL 2',
+      levelName: 'THE VAULT',
+      district: 'DISTRICT 1 — ALGORITHM SLUMS',
+      lesson: 'HISTORY OF AI',
+      objective: 'CRACK THE CIPHER TERMINALS. FIND THE EVIDENCE.',
+      controls: ['← → MOVE', '↑ JUMP', 'Z SHOOT', 'E INTERACT'],
+    } satisfies MissionCardData)
   }
 
   private initDataRainColumns(): void {
@@ -389,6 +400,16 @@ export class GameScene2 {
   }
 
   update(dtRaw: number): void {
+    this.missionCard.update(dtRaw)
+    if (this.missionCard.isActive()) {
+      if (this.input.isJustPressed('Space') || this.input.isJustPressed('ArrowUp')) {
+        this.missionCard.skip()
+      }
+      this.hud.update(dtRaw)
+      this.input.update()
+      return
+    }
+
     const dt = dtRaw * this.slowMotionScale
 
     this.time += dt
@@ -508,7 +529,13 @@ export class GameScene2 {
     // Dialogue state — player frozen.
     if (this.scene === 'dialogue') {
       this.dialogue.update(dt)
-      if (this.input.isJustPressed('Space')) this.dialogue.advance()
+      if (this.input.isJustPressed('Space')) {
+        if (this.missionCard.isActive()) {
+          this.missionCard.skip()
+        } else {
+          this.dialogue.advance()
+        }
+      }
       this.player.vx = 0
       if (!this.player.isOnGround) {
         this.player.vy += CONFIG.GRAVITY * dt
@@ -1425,6 +1452,8 @@ export class GameScene2 {
       this.renderHackingScreen(ctx, this.activeTerminal)
       ctx.restore()
     }
+
+    this.missionCard.render(ctx)
   }
 
   /** Full-screen cipher terminal overlay (spec: Change 1). */

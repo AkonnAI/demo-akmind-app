@@ -1,6 +1,8 @@
 import { CONFIG } from '../constants/config'
 import { XPBar } from './XPBar'
 
+const S = CONFIG.CANVAS_WIDTH / 1280
+
 const ORB = 'Orbitron'
 const PS2 = "'Press Start 2P'"
 
@@ -54,36 +56,44 @@ export class HUD {
 
   renderControlsBar(ctx: CanvasRenderingContext2D): void {
     const W = CONFIG.CANVAS_WIDTH
+    const CH = CONFIG.CANVAS_HEIGHT
+    const controlsBarH = Math.round(24 * S)
+    const barTop = CH - controlsBarH
     ctx.save()
     ctx.imageSmoothingEnabled = false
     ctx.fillStyle = 'rgba(8, 4, 30, 0.9)'
-    ctx.fillRect(0, 700, W, 20)
+    ctx.fillRect(0, barTop, W, controlsBarH)
     ctx.strokeStyle = '#1a1035'; ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(0, 700.5); ctx.lineTo(W, 700.5); ctx.stroke()
-    ctx.font = `bold 11px ${ORB}, sans-serif`
+    ctx.beginPath(); ctx.moveTo(0, barTop + 0.5); ctx.lineTo(W, barTop + 0.5); ctx.stroke()
+    ctx.font = `bold ${Math.round(13 * S)}px ${ORB}, sans-serif`
     ctx.fillStyle = '#e2e8f0'
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText('← → / A D MOVE   ↑ / W / SPACE JUMP   Z SHOOT   X WEAPON   E INTERACT', W / 2, 713)
+    ctx.fillText('← → / A D MOVE   ↑ / W / SPACE JUMP   Z SHOOT   X WEAPON   E INTERACT', W / 2, barTop + controlsBarH / 2)
     ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left'
     ctx.restore()
   }
 
   render(ctx: CanvasRenderingContext2D, opts?: HUDRenderOptions): void {
     const W = CONFIG.CANVAS_WIDTH
+    const hpRowH = Math.round(44 * S)
+    const objRowH = Math.round(26 * S)
     ctx.save()
     ctx.imageSmoothingEnabled = false
 
     // Row 1 — HP + Level name
     ctx.fillStyle = 'rgba(8, 4, 30, 0.9)'
-    ctx.fillRect(0, 0, W, 36)
+    ctx.fillRect(0, 0, W, hpRowH)
     ctx.strokeStyle = '#1a1035'; ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(0, 36.5); ctx.lineTo(W, 36.5); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(0, hpRowH + 0.5); ctx.lineTo(W, hpRowH + 0.5); ctx.stroke()
 
     ctx.font = `14px ${ORB}, sans-serif`
     ctx.fillStyle = '#ff4444'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
     ctx.fillText('HP', 16, 24)
 
-    const sq = 16, gap = 4, startX = 52, heartY = 10
+    const sq = Math.round(18 * S)
+    const gap = Math.round(5 * S)
+    const startX = Math.round(52 * S)
+    const heartY = Math.round((hpRowH - sq) / 2)
     for (let i = 0; i < this.maxHp; i++) {
       const hx = startX + i * (sq + gap)
       if (i < this.hp) {
@@ -106,21 +116,23 @@ export class HUD {
       ctx.textAlign = 'left'
     }
 
-    ctx.font = `bold 13px ${PS2}, sans-serif`
+    ctx.font = `bold ${Math.round(15 * S)}px ${PS2}, sans-serif`
     ctx.fillStyle = '#00e5ff'; ctx.textAlign = 'center'
     ctx.fillText(this.level, 640, 24)
 
     // Row 2 — Objective
     ctx.fillStyle = 'rgba(5, 3, 14, 0.85)'
-    ctx.fillRect(0, 36, W, 20)
+    ctx.fillRect(0, hpRowH, W, objRowH)
     ctx.strokeStyle = '#1a1035'; ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(0, 56.5); ctx.lineTo(W, 56.5); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(0, hpRowH + objRowH + 0.5); ctx.lineTo(W, hpRowH + objRowH + 0.5); ctx.stroke()
 
     const objA = 0.7 + Math.sin(this.time * 1.5) * 0.3
     ctx.globalAlpha = objA
-    ctx.font = `13px ${ORB}, sans-serif`
+    ctx.font = `${Math.round(14 * S)}px ${ORB}, sans-serif`
     ctx.fillStyle = '#cbd5e1'; ctx.textAlign = 'center'
-    ctx.fillText(this.objective.slice(0, 52), 640, 50)
+    ctx.textBaseline = 'middle'
+    ctx.fillText(this.objective, W / 2, hpRowH + objRowH / 2)
+    ctx.textBaseline = 'alphabetic'
     ctx.globalAlpha = 1
 
     // Center message
@@ -128,7 +140,7 @@ export class HUD {
       const alpha = this.msgTimer > 0.5 ? 1 : this.msgTimer * 2
       ctx.save()
       ctx.globalAlpha = alpha
-      ctx.font = `bold 14px ${ORB}, sans-serif`
+      ctx.font = `bold ${Math.round(18 * S)}px ${ORB}, sans-serif`
       ctx.textAlign = 'center'
       const mw = ctx.measureText(this.message).width + 32
       ctx.fillStyle = '#000000'; ctx.globalAlpha = 0.8 * alpha

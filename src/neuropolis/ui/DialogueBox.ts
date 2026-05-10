@@ -1,5 +1,7 @@
 import { CONFIG } from '../constants/config'
 
+const S = CONFIG.CANVAS_WIDTH / 1280
+
 type Speaker = 'NOVA' | 'AX' | 'NARRATOR' | 'CHAOS' | 'KAEL' | 'KIRAN' | 'NPC'
 
 export interface DialogueLine {
@@ -57,7 +59,7 @@ export class DialogueBox {
 
   private time = 0
   private position: 'top' | 'bottom' = 'bottom'
-  private boxHeight = 130
+  private boxHeight = Math.round(160 * S)
   /** Side margins so the panel does not span full canvas width (keeps mid-screen visible). */
   private horizontalInset = 0
 
@@ -208,16 +210,39 @@ export class DialogueBox {
     const BH = this.boxHeight
     const mx = this.horizontalInset
     const innerW = W - 2 * mx
-    const pxL = mx + 12
-    const portraitW = 84
-    const portraitPad = 8
-    const textMaxW = Math.max(200, innerW - 24 - portraitW - portraitPad)
+    const pxL = mx + Math.round(16 * S)
+    const portraitW = Math.round(90 * S)
+    const portraitPad = Math.round(8 * S)
+    const textMaxW = Math.max(
+      Math.round(200 * S),
+      innerW - Math.round(24 * S) - portraitW - portraitPad,
+    )
+
+    const barW = Math.round(4 * S)
+    const topBY = Math.round(56 * S)
+    const nameYOff = Math.round(22 * S)
+    const bodyYOff = Math.round(50 * S)
+    const lineH = Math.round(28 * S)
+    const clipBotTop = Math.round(8 * S)
+    const clipBotBottom = Math.round(12 * S)
+    const portraitTopOff = Math.round(4 * S)
+    const arrowInsetX = Math.round(18 * S)
+    const arrowYFromBottom = Math.round(22 * S)
+    const topArrowCap = Math.round(72 * S)
+    const topArrowBHSub = Math.round(28 * S)
+    const counterInsetX = Math.round(12 * S)
+    const counterInsetY = Math.round(8 * S)
+
+    const speakerFont = `bold ${Math.round(14 * S)}px ${FONT_PS2}, sans-serif`
+    const bodyFont = `${Math.round(18 * S)}px ${FONT_ORB}, sans-serif`
+    const arrowFont = `${Math.round(18 * S)}px ${FONT_ORB}, sans-serif`
+    const counterFont = `${Math.round(11 * S)}px ${FONT_ORB}, sans-serif`
 
     ctx.save()
     ctx.imageSmoothingEnabled = false
 
     if (isTop) {
-      const BY = 56
+      const BY = topBY
       ctx.fillStyle = 'rgba(2, 1, 18, 0.96)'
       ctx.fillRect(mx, BY, innerW, BH)
       ctx.strokeStyle = border60
@@ -227,43 +252,68 @@ export class DialogueBox {
       ctx.lineTo(mx + innerW, BY + BH)
       ctx.stroke()
       ctx.fillStyle = col
-      ctx.fillRect(mx, BY, 4, BH)
+      ctx.fillRect(mx, BY, barW, BH)
 
-      ctx.font = `bold 12px ${FONT_PS2}, sans-serif`
+      ctx.font = speakerFont
       ctx.fillStyle = col
       ctx.textAlign = 'left'
-      ctx.fillText(line.speaker, pxL, BY + 22)
+      ctx.fillText(line.speaker, pxL, BY + nameYOff)
 
-      ctx.font = `11px ${FONT_ORB}, sans-serif`
+      ctx.font = bodyFont
       ctx.fillStyle = '#f1f5f9'
       ctx.shadowColor = 'rgba(0,0,0,0.8)'
       ctx.shadowBlur = 3
       ctx.shadowOffsetX = 0
       ctx.shadowOffsetY = 0
       const rows = this.wrapLines(ctx, this.displayed, textMaxW)
-      let ty = BY + 50
-      const lineH = 24
+      let ty = BY + bodyYOff
       for (const r of rows) {
-        if (ty > BY + BH - 8) break
+        if (ty > BY + BH - clipBotTop) break
         ctx.fillText(r, pxL, ty)
         ty += lineH
       }
       ctx.shadowBlur = 0
 
       const portraitX = mx + innerW - portraitW - portraitPad
-      this.drawPortrait(ctx, portraitX, BY + 4, portraitW, portraitW, col, initial)
+      this.drawPortrait(
+        ctx,
+        portraitX,
+        BY + portraitTopOff,
+        portraitW,
+        portraitW,
+        col,
+        initial,
+      )
 
       if (this.done) {
         const pulse = 0.4 + Math.sin(this.time * 4) * 0.4
         ctx.save()
         ctx.globalAlpha = pulse
-        ctx.font = `14px ${FONT_ORB}, sans-serif`
+        ctx.font = arrowFont
         ctx.fillStyle = col
         ctx.textAlign = 'right'
         ctx.textBaseline = 'middle'
-        ctx.fillText('▶', mx + innerW - 18, BY + Math.min(72, BH - 28))
+        ctx.fillText(
+          '▶ SPACE / TAP',
+          mx + innerW - arrowInsetX,
+          BY + Math.min(topArrowCap, BH - topArrowBHSub),
+        )
         ctx.globalAlpha = 1
         ctx.restore()
+
+        if (this.lines.length > 1) {
+          ctx.save()
+          ctx.font = counterFont
+          ctx.fillStyle = withAlpha(col, 0.5)
+          ctx.textAlign = 'right'
+          ctx.textBaseline = 'bottom'
+          ctx.fillText(
+            `${this.idx + 1}/${this.lines.length}`,
+            mx + innerW - counterInsetX,
+            BY + BH - counterInsetY,
+          )
+          ctx.restore()
+        }
       }
     } else {
       const BY = CH - BH
@@ -276,41 +326,66 @@ export class DialogueBox {
       ctx.lineTo(mx + innerW, BY)
       ctx.stroke()
       ctx.fillStyle = col
-      ctx.fillRect(mx, BY, 4, BH)
+      ctx.fillRect(mx, BY, barW, BH)
 
-      ctx.font = `bold 12px ${FONT_PS2}, sans-serif`
+      ctx.font = speakerFont
       ctx.fillStyle = col
       ctx.textAlign = 'left'
-      ctx.fillText(line.speaker, pxL, BY + 22)
+      ctx.fillText(line.speaker, pxL, BY + nameYOff)
 
-      ctx.font = `11px ${FONT_ORB}, sans-serif`
+      ctx.font = bodyFont
       ctx.fillStyle = '#f1f5f9'
       ctx.shadowColor = 'rgba(0,0,0,0.8)'
       ctx.shadowBlur = 3
       const rows = this.wrapLines(ctx, this.displayed, textMaxW)
-      let ty = BY + 50
-      const lineH = 24
+      let ty = BY + bodyYOff
       for (const r of rows) {
-        if (ty > BY + BH - 12) break
+        if (ty > BY + BH - clipBotBottom) break
         ctx.fillText(r, pxL, ty)
         ty += lineH
       }
       ctx.shadowBlur = 0
 
       const portraitX = mx + innerW - portraitW - portraitPad
-      this.drawPortrait(ctx, portraitX, BY + 4, portraitW, portraitW, col, initial)
+      this.drawPortrait(
+        ctx,
+        portraitX,
+        BY + portraitTopOff,
+        portraitW,
+        portraitW,
+        col,
+        initial,
+      )
 
       if (this.done) {
         const pulse = 0.4 + Math.sin(this.time * 4) * 0.4
         ctx.save()
         ctx.globalAlpha = pulse
-        ctx.font = `14px ${FONT_ORB}, sans-serif`
+        ctx.font = arrowFont
         ctx.fillStyle = col
         ctx.textAlign = 'right'
         ctx.textBaseline = 'middle'
-        ctx.fillText('▶', mx + innerW - 18, BY + BH - 22)
+        ctx.fillText(
+          '▶ SPACE / TAP',
+          mx + innerW - arrowInsetX,
+          BY + BH - arrowYFromBottom,
+        )
         ctx.globalAlpha = 1
         ctx.restore()
+
+        if (this.lines.length > 1) {
+          ctx.save()
+          ctx.font = counterFont
+          ctx.fillStyle = withAlpha(col, 0.5)
+          ctx.textAlign = 'right'
+          ctx.textBaseline = 'bottom'
+          ctx.fillText(
+            `${this.idx + 1}/${this.lines.length}`,
+            mx + innerW - counterInsetX,
+            BY + BH - counterInsetY,
+          )
+          ctx.restore()
+        }
       }
     }
 

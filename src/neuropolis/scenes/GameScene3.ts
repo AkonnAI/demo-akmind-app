@@ -22,6 +22,7 @@ import { attachDialoguePointerAdvance } from '../ui/dialoguePointerAdvance'
 import { MarketEnforcer } from '../entities/MarketEnforcer'
 import { Drone } from '../entities/Drone'
 import type { LockTarget } from '../entities/Projectile'
+import { MissionCard, type MissionCardData } from '../ui/MissionCard'
 
 const DRONE_XP = 50
 const ENFORCER_XP = 80
@@ -87,6 +88,7 @@ export class GameScene3 {
   private dialogue: DialogueBox
   private nova: NovaOrb
   private shop: UpgradeShop
+  private missionCard = new MissionCard()
 
   private touchControls?: TouchControls
   private dialoguePointerDetach: (() => void) | null = null
@@ -207,6 +209,15 @@ export class GameScene3 {
     }
 
     console.log('[GameScene3] Level 3 — Data Market.')
+
+    this.missionCard.show({
+      levelCode: 'LEVEL 3',
+      levelName: 'THE DATA MARKET',
+      district: 'DISTRICT 1 — ALGORITHM SLUMS',
+      lesson: 'PATTERN RECOGNITION IN DATA',
+      objective: 'STEP THE PATTERN. COLLECT EVIDENCE. REACH THE EXIT.',
+      controls: ['← → MOVE', '↑ JUMP', 'Z SHOOT', 'E INTERACT'],
+    } satisfies MissionCardData)
   }
 
   private syncL3Objective(): void {
@@ -541,6 +552,16 @@ export class GameScene3 {
   }
 
   update(dtRaw: number): void {
+    this.missionCard.update(dtRaw)
+    if (this.missionCard.isActive()) {
+      if (this.input.isJustPressed('Space') || this.input.isJustPressed('ArrowUp')) {
+        this.missionCard.skip()
+      }
+      this.hud.update(dtRaw)
+      this.input.update()
+      return
+    }
+
     const dt = dtRaw
     const prevCenterX = this.prevPlayerX
     this.time += dt
@@ -585,8 +606,13 @@ export class GameScene3 {
 
     if (this.scene === 'dialogue') {
       this.dialogue.update(dt)
-      if (
-        this.input.isJustPressed('Space') ||
+      if (this.input.isJustPressed('Space')) {
+        if (this.missionCard.isActive()) {
+          this.missionCard.skip()
+        } else {
+          this.dialogue.advance()
+        }
+      } else if (
         this.input.isJustPressed('KeyZ') ||
         this.input.isJustPressed('KeyE')
       ) {
@@ -1335,5 +1361,7 @@ export class GameScene3 {
     }
 
     ctx.restore()
+
+    this.missionCard.render(ctx)
   }
 }

@@ -26,6 +26,22 @@ export default function NeuropolisShell({ level, onComplete, onExit }: Props) {
 
   useEffect(() => {
     setExitPortalHost(document.body);
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onFirstTouch = () => {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    };
+    window.addEventListener("touchstart", onFirstTouch, { once: true });
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("touchstart", onFirstTouch);
+      if (document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => {});
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -83,6 +99,12 @@ export default function NeuropolisShell({ level, onComplete, onExit }: Props) {
           inset: 0,
           background: "#0a0a1a",
           zIndex: 1,
+          touchAction: "none",
+          overscrollBehavior: "none",
+          paddingTop: "env(safe-area-inset-top)",
+          paddingBottom: "env(safe-area-inset-bottom)",
+          paddingLeft: "env(safe-area-inset-left)",
+          paddingRight: "env(safe-area-inset-right)",
         }}
       >
         <div
@@ -92,6 +114,7 @@ export default function NeuropolisShell({ level, onComplete, onExit }: Props) {
             inset: 0,
             width: "100%",
             height: "100%",
+            touchAction: "none",
           }}
         />
       </div>
