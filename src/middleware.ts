@@ -12,6 +12,7 @@ function originAllowedForApi(origin: string, req: NextRequest): boolean {
   }
 
   const allowed = [
+    "https://akmind.com",
     "https://www.akmind.com",
     "https://demo.akmind.com",
     "https://app.akmind.com",
