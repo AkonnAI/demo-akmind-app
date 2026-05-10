@@ -6,9 +6,13 @@ import {
   type DemoLiveStats,
 } from "@/lib/demo-nova-stats";
 
+/** Amplify / serverless: keep handler on Node; env reads at request time. */
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 let groqSingleton: Groq | null = null;
 function getGroq(): Groq | null {
-  const key = process.env.GROQ_API_KEY?.trim();
+  const key = process.env["GROQ_API_KEY"]?.trim();
   if (!key) return null;
   if (!groqSingleton) groqSingleton = new Groq({ apiKey: key });
   return groqSingleton;
@@ -198,7 +202,7 @@ export async function POST(req: NextRequest) {
       return Response.json(
         {
           response:
-            "I am not connected on this deployment yet — ask your teacher or check back soon. Your lessons and games still work!",
+            "NOVA chat is not configured on this server yet (the host must set GROQ_API_KEY). Your lessons and games still work!",
           error: true,
         },
         { headers: { "Cache-Control": "no-store" } },

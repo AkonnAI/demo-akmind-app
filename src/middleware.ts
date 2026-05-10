@@ -1,7 +1,16 @@
 import { DEMO_TOKEN_COOKIE_MAX_AGE_SECONDS } from "@/lib/demo-session";
 import { NextRequest, NextResponse } from "next/server";
 
-function originAllowedForApi(origin: string): boolean {
+function originAllowedForApi(origin: string, req: NextRequest): boolean {
+  // Same-origin browser requests (e.g. *.amplifyapp.com, preview URLs, custom domains)
+  if (origin !== "") {
+    try {
+      if (origin === new URL(req.url).origin) return true;
+    } catch {
+      /* ignore */
+    }
+  }
+
   const allowed = [
     "https://www.akmind.com",
     "https://demo.akmind.com",
@@ -37,7 +46,7 @@ export function middleware(req: NextRequest) {
   if (pathname.startsWith("/api/")) {
     const origin = req.headers.get("origin") || "";
 
-    if (origin !== "" && !originAllowedForApi(origin)) {
+    if (origin !== "" && !originAllowedForApi(origin, req)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

@@ -131,9 +131,47 @@ export default function NOVAChat({
           }),
         });
 
-        const data = (await res.json()) as { response: string };
+        const data = (await res.json()) as {
+          response?: string;
+          error?: boolean;
+        };
 
-        const lower = data.response.toLowerCase();
+        if (!res.ok) {
+          const blurb =
+            res.status === 403
+              ? "This deployment blocked the chat request. If you are the developer, allow your hosting URL for /api routes or redeploy with the latest app fix."
+              : data.response?.trim() ||
+                `NOVA returned an error (${res.status}). Try again later.`;
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: (Date.now() + 1).toString(),
+              role: "nova",
+              content: blurb,
+            },
+          ]);
+          void speak(blurb, { emotion: "concerned" });
+          setEmotion("concerned");
+          return;
+        }
+
+        const responseText = data.response ?? "";
+        if (!responseText.trim()) {
+          const blurb = "NOVA sent an empty reply. Try asking again.";
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: (Date.now() + 1).toString(),
+              role: "nova",
+              content: blurb,
+            },
+          ]);
+          void speak(blurb, { emotion: "concerned" });
+          setEmotion("concerned");
+          return;
+        }
+
+        const lower = responseText.toLowerCase();
         let replyEmotion:
           | "happy"
           | "thinking"
@@ -159,10 +197,10 @@ export default function NOVAChat({
           {
             id: (Date.now() + 1).toString(),
             role: "nova",
-            content: data.response,
+            content: responseText,
           },
         ]);
-        void speak(data.response, { emotion: replyEmotion });
+        void speak(responseText, { emotion: replyEmotion });
 
         setEmotion(replyEmotion);
       } catch {
