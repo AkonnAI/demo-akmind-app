@@ -30,9 +30,7 @@ const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
 /** Public health check — open in browser to verify Lambda env (no secrets). */
 export async function GET() {
   noStore();
-  const viaJoined = serverEnvJoined(["GROQ", "API", "KEY"]);
-  const viaDirect = process.env.GROQ_API_KEY;
-  const groqConfigured = !!viaJoined;
+  const groqConfigured = !!serverEnvJoined(["GROQ", "API", "KEY"]);
   const elevenConfigured =
     !!serverEnvJoined(["ELEVENLABS", "API", "KEY"]) &&
     !!serverEnvJoined(["ELEVENLABS", "VOICE", "ID"]);
@@ -43,14 +41,6 @@ export async function GET() {
       hint: groqConfigured
         ? "Groq env visible to this server. If chat still fails, check Groq dashboard / model access."
         : "Server does not see GROQ_API_KEY. In Amplify: add variable for this branch and redeploy (not only preview env).",
-      _debug: {
-        joinedKeyLen: viaJoined?.length ?? 0,
-        directKeyLen: viaDirect?.length ?? 0,
-        nodeEnv: process.env.NODE_ENV,
-        envKeys: Object.keys(process.env).filter((k) =>
-          ["GROQ", "ELEVEN", "NODE", "AWS", "NEXT"].some((p) => k.startsWith(p))
-        ),
-      },
     },
     { headers: { "Cache-Control": "no-store" } },
   );
