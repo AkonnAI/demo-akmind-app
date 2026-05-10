@@ -1,21 +1,49 @@
 import Groq from "groq-sdk";
+import { unstable_noStore as noStore } from "next/cache";
 import { NextRequest } from "next/server";
 import { getLessonSummary, getModuleSummary } from "@/lib/lesson-content";
 import {
   buildDemoLiveStats,
   type DemoLiveStats,
 } from "@/lib/demo-nova-stats";
+import { serverEnvJoined } from "@/lib/server-env";
 
 /** Amplify / serverless: keep handler on Node; env reads at request time. */
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 let groqSingleton: Groq | null = null;
+let groqSingletonKey: string | null = null;
+
 function getGroq(): Groq | null {
-  const key = process.env["GROQ_API_KEY"]?.trim();
+  const key = serverEnvJoined(["GROQ", "API", "KEY"]);
   if (!key) return null;
-  if (!groqSingleton) groqSingleton = new Groq({ apiKey: key });
+  if (!groqSingleton || groqSingletonKey !== key) {
+    groqSingleton = new Groq({ apiKey: key });
+    groqSingletonKey = key;
+  }
   return groqSingleton;
+}
+
+const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
+
+/** Public health check — open in browser to verify Lambda env (no secrets). */
+export async function GET() {
+  noStore();
+  const groqConfigured = !!serverEnvJoined(["GROQ", "API", "KEY"]);
+  const elevenConfigured =
+    !!serverEnvJoined(["ELEVENLABS", "API", "KEY"]) &&
+    !!serverEnvJoined(["ELEVENLABS", "VOICE", "ID"]);
+  return Response.json(
+    {
+      groqConfigured,
+      elevenConfigured,
+      hint: groqConfigured
+        ? "Groq env visible to this server. If chat still fails, check Groq dashboard / model access."
+        : "Server does not see GROQ_API_KEY. In Amplify: add variable for this branch and redeploy (not only preview env).",
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 const demoMemory: Map<string, Array<{ role: string; content: string }>> =
@@ -130,6 +158,7 @@ Keep it warm. Keep it short. Keep it real.`;
 }
 
 export async function POST(req: NextRequest) {
+  noStore();
   try {
     const body = await req.json();
     const {
@@ -209,8 +238,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const groqModel =
+      serverEnvJoined(["GROQ", "MODEL", "ID"]) ?? DEFAULT_GROQ_MODEL;
+
     const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: groqModel,
       messages: [
         { role: "system", content: systemPrompt },
         ...fullHistory.slice(-12).map(

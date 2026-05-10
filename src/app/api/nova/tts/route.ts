@@ -1,4 +1,6 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { NextRequest } from "next/server";
+import { serverEnvJoined } from "@/lib/server-env";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -55,9 +57,10 @@ function isTtsEmotion(s: string): s is TtsEmotion {
 
 /** Whether ElevenLabs TTS is configured (no secrets exposed). */
 export async function GET() {
+  noStore();
   const enabled =
-    !!process.env["ELEVENLABS_API_KEY"]?.trim() &&
-    !!process.env["ELEVENLABS_VOICE_ID"]?.trim();
+    !!serverEnvJoined(["ELEVENLABS", "API", "KEY"]) &&
+    !!serverEnvJoined(["ELEVENLABS", "VOICE", "ID"]);
   return Response.json(
     { enabled },
     { headers: { "Cache-Control": "no-store" } },
@@ -65,8 +68,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env["ELEVENLABS_API_KEY"]?.trim();
-  const voiceId = process.env["ELEVENLABS_VOICE_ID"]?.trim();
+  noStore();
+  const apiKey = serverEnvJoined(["ELEVENLABS", "API", "KEY"]);
+  const voiceId = serverEnvJoined(["ELEVENLABS", "VOICE", "ID"]);
   if (!apiKey || !voiceId) {
     return Response.json({ error: "TTS not configured" }, { status: 503 });
   }
@@ -97,7 +101,8 @@ export async function POST(req: NextRequest) {
     body.emotion && isTtsEmotion(body.emotion) ? body.emotion : "happy";
 
   const modelId =
-    process.env["ELEVENLABS_MODEL_ID"]?.trim() || "eleven_multilingual_v2";
+    serverEnvJoined(["ELEVENLABS", "MODEL", "ID"]) ||
+    "eleven_multilingual_v2";
 
   try {
     const upstream = await fetch(`${ELEVEN_API}/${voiceId}`, {
