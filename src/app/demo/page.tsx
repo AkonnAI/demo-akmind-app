@@ -4,10 +4,6 @@ import AkmindLogo from "@/components/AkmindLogo";
 import NOVAChat from "@/components/NOVAChat";
 import NOVACharacter from "@/components/NOVACharacter";
 import { DEMO_BADGES } from "@/lib/demo-badges";
-import {
-  countDemoLessonsInScope,
-  DEMO_LESSON_COUNT,
-} from "@/lib/demo-lesson-scope";
 import { normalizeClientDemoToken } from "@/lib/demo-token-client";
 import type { DemoUser } from "@/types/demo";
 import {
@@ -32,7 +28,7 @@ import {
   useState,
 } from "react";
 
-const LESSONS = [
+const LESSONS_EXPLORERS = [
   {
     id: 1,
     title: "History of AI — From Dreams to Machines",
@@ -66,21 +62,65 @@ const LESSONS = [
   },
 ] as const;
 
+const LESSONS_BUILDERS = [
+  {
+    id: 11,
+    title: "ML Fundamentals",
+    type: "Self-Paced + Game",
+    description: "Placeholder — ML fundamentals for builders.",
+    duration: "6+ min",
+    xpReward: 300,
+    color: "purple" as const,
+    hasGame: true,
+  },
+  {
+    id: 12,
+    title: "Training Your First Model",
+    type: "Self-Paced + Game",
+    description: "Placeholder — train your first model.",
+    duration: "6+ min",
+    xpReward: 300,
+    color: "cyan" as const,
+    hasGame: true,
+  },
+  {
+    id: 13,
+    title: "Neural Networks in Action",
+    type: "Self-Paced + Game",
+    description: "Placeholder — neural networks in action.",
+    duration: "6+ min",
+    xpReward: 300,
+    color: "amber" as const,
+    hasGame: true,
+  },
+] as const;
+
 function readCookieToken(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(/(?:^|; )demo_token=([^;]*)/);
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-function isUnlocked(lessonId: number, lessonsComplete: number[]): boolean {
-  if (lessonId === 1) return true;
-  return lessonsComplete.includes(lessonId - 1);
+function isUnlocked(
+  lessonId: number,
+  lessonsComplete: number[],
+  lessons: readonly { id: number }[],
+): boolean {
+  const ids = lessons.map((l) => l.id);
+  const idx = ids.indexOf(lessonId);
+  if (idx === -1) return false;
+  if (idx === 0) return true;
+  return lessonsComplete.includes(ids[idx - 1]!);
 }
 
-function streakFromStart(lessonsComplete: number[]): number {
+function streakFromStart(
+  lessonsComplete: number[],
+  lessons: readonly { id: number }[],
+): number {
+  const ids = lessons.map((l) => l.id);
   let s = 0;
-  for (let i = 1; i <= 3; i++) {
-    if (lessonsComplete.includes(i)) s++;
+  for (const id of ids) {
+    if (lessonsComplete.includes(id)) s++;
     else break;
   }
   return s;
@@ -193,21 +233,26 @@ function DemoDashboardInner() {
       .filter((b): b is (typeof DEMO_BADGES)[number] => Boolean(b));
   }, [user?.earnedBadges]);
 
-  const lessonsDone = user ? countDemoLessonsInScope(user.lessonsComplete) : 0;
+  const lessons =
+    user?.course === "AI Builders" ? LESSONS_BUILDERS : LESSONS_EXPLORERS;
+
+  const lessonsDone = user
+    ? lessons.filter((l) => user.lessonsComplete.includes(l.id)).length
+    : 0;
   const badgesEarnedCount = user?.earnedBadges?.length ?? 0;
   const xp = user?.xp ?? 0;
   const userName = user?.name || "";
   const heroLevel = Math.max(1, Math.floor(xp / 300) + 1);
   const xpHeroPct = Math.min(100, (xp / 900) * 100);
-  const streak = user ? streakFromStart(user.lessonsComplete) : 0;
+  const streak = user ? streakFromStart(user.lessonsComplete, lessons) : 0;
   const adminMode = isAdminTester(user);
   const parentInitial = (user?.name || "?").trim().charAt(0).toUpperCase() || "?";
 
   const nextLessonId = user
-    ? LESSONS.find(
+    ? lessons.find(
         (l) =>
           !user.lessonsComplete.includes(l.id) &&
-          (adminMode || isUnlocked(l.id, user.lessonsComplete))
+          (adminMode || isUnlocked(l.id, user.lessonsComplete, lessons))
       )?.id
     : undefined;
 
@@ -354,13 +399,13 @@ function DemoDashboardInner() {
               </div>
               <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-indigo-400">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" />
-                AI EXPLORERS PROGRAM · DEMO
+                {user.course.toUpperCase()} PROGRAM · DEMO
               </p>
               <h1 className="mt-3 max-w-[85%] text-2xl font-extrabold tracking-tight text-white md:text-3xl lg:max-w-xl">
                 {user.childName}&apos;s Learning Journey
               </h1>
               <p className="mt-1 text-sm text-slate-400">
-                AI Explorers Program · Demo
+                {user.course} · Demo
               </p>
               <div className="mt-6 h-2 max-w-md overflow-hidden rounded-full bg-slate-800/80">
                 <div
@@ -414,7 +459,7 @@ function DemoDashboardInner() {
                   <CheckCircle2 className="h-5 w-5 text-emerald-400" />
                 </div>
                 <p className="mt-3 text-xl font-bold tabular-nums text-white sm:text-2xl">
-                  {lessonsDone}/{DEMO_LESSON_COUNT}
+                  {lessonsDone}/{lessons.length}
                 </p>
                 <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                   LESSONS DONE
@@ -461,10 +506,11 @@ function DemoDashboardInner() {
                 Your Learning Path
               </h2>
               <div className="flex flex-col gap-4">
-                {LESSONS.map((lesson) => {
+                {lessons.map((lesson) => {
                   const done = user.lessonsComplete.includes(lesson.id);
                   const unlocked =
-                    adminMode || isUnlocked(lesson.id, user.lessonsComplete);
+                    adminMode ||
+                    isUnlocked(lesson.id, user.lessonsComplete, lessons);
                   const active =
                     unlocked && !done && lesson.id === nextLessonId;
                   const quizScore = user.quizScores[String(lesson.id)];
@@ -782,7 +828,7 @@ function DemoDashboardInner() {
             quizScores={user?.quizScores}
             badgeEarned={user?.badgeEarned}
             currentModule={1}
-            lessonOrder={nextLessonId ?? 1}
+            lessonOrder={nextLessonId ?? lessons[0]?.id ?? 1}
             currentLesson="Demo Dashboard"
           />
         </div>

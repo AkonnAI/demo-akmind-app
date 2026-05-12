@@ -6,6 +6,9 @@ export const registerSchema = z.object({
   phone: z.string().min(7).max(20).trim(),
   childName: z.string().min(2).max(60).trim(),
   presetToken: z.string().max(64).optional(),
+  course: z
+    .enum(["AI Explorers", "AI Builders", "AI Innovators"])
+    .optional(),
 });
 
 export const progressSchema = z.object({
@@ -15,7 +18,14 @@ export const progressSchema = z.object({
     .max(64)
     .trim()
     .transform((s) => s.toLowerCase()),
-  lessonId: z.number().int().min(1).max(3),
+  lessonId: z
+    .number()
+    .int()
+    .refine(
+      (n) =>
+        (n >= 1 && n <= 3) || (n >= 11 && n <= 13),
+      "lessonId must be 1–3 (Explorers) or 11–13 (Builders)"
+    ),
   quizScore: z.number().min(0).max(100).optional(),
   xp: z.number().min(0).max(9999).optional(),
   /** Client snapshot of badge slugs already earned before this POST (for `newBadges` diff). */

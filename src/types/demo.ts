@@ -1,6 +1,8 @@
 export type DemoUser = {
   name: string;
   childName: string;
+  /** Demo program track (from registration / server profile). */
+  course: "AI Explorers" | "AI Builders" | "AI Innovators";
   email?: string;
   phone?: string;
   lessonsComplete: number[];

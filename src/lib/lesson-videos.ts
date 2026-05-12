@@ -9,15 +9,21 @@ export const LESSON_VIDEOS: Record<number, LessonVideoMeta> = {
   1: { title: "History of AI", hasCaptions: false },
   2: { title: "AI vs Humans", hasCaptions: false },
   3: { title: "Types of AI", hasCaptions: false },
+  11: { title: "AI Builders — Lesson 1", hasCaptions: false },
+  12: { title: "AI Builders — Lesson 2", hasCaptions: false },
+  13: { title: "AI Builders — Lesson 3", hasCaptions: false },
 };
 
 /**
- * Demo lesson ids are 1–3; the S3 bucket uses folders `lesson-2` … `lesson-4`
- * for those assets (demo 1 → lesson-2, demo 2 → lesson-3, demo 3 → lesson-4).
+ * Demo Explorers ids 1–3 map to CDN folders `lesson-2` … `lesson-4`.
+ * AI Builders demo ids 11–13 use folders `lesson-11` … `lesson-13`.
  */
 export function cdnLessonFolderNumber(demoLessonId: number): number {
   if (demoLessonId >= 1 && demoLessonId <= 3) {
     return demoLessonId + 1;
+  }
+  if (demoLessonId >= 11 && demoLessonId <= 13) {
+    return demoLessonId;
   }
   return demoLessonId;
 }

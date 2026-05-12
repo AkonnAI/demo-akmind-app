@@ -38,10 +38,10 @@ type LessonContent = {
   quiz: QuizItem[];
 };
 
-/** Lessons 1–3: minimum seconds of actual video playback before upsell + continue unlocks (non-admin). */
+/** Demo lessons 1–3 and 11–13: minimum seconds of video playback before upsell + continue unlocks (non-admin). */
 const MIN_LESSON_VIDEO_PLAY_SECONDS = 120;
 
-const LESSONS: Record<number, LessonContent> = {
+const LESSONS_EXPLORERS: Record<number, LessonContent> = {
   1: {
     title: "History of AI — From Dreams to Machines",
     type: "self-paced",
@@ -214,10 +214,114 @@ const LESSONS: Record<number, LessonContent> = {
   },
 };
 
+const placeholderQuiz = (lessonNum: number): QuizItem[] => [
+  {
+    q: `[Builders L${lessonNum}] Placeholder: What is machine learning?`,
+    options: [
+      "Programs that learn from data",
+      "Only hardware upgrades",
+      "Manual rule lists only",
+      "Unrelated to AI",
+    ],
+    correct: 0,
+  },
+  {
+    q: `[Builders L${lessonNum}] Placeholder: A model trained on examples is called…`,
+    options: [
+      "Supervised learning",
+      "Random guessing",
+      "Static scripting",
+      "Disk formatting",
+    ],
+    correct: 0,
+  },
+  {
+    q: `[Builders L${lessonNum}] Placeholder: Overfitting means…`,
+    options: [
+      "The model memorizes training noise",
+      "The model is too small",
+      "Training is too fast",
+      "Data is always perfect",
+    ],
+    correct: 0,
+  },
+  {
+    q: `[Builders L${lessonNum}] Placeholder: A prompt is…`,
+    options: [
+      "Input text to guide a model",
+      "A type of CPU",
+      "A video codec",
+      "A database index",
+    ],
+    correct: 0,
+  },
+  {
+    q: `[Builders L${lessonNum}] Placeholder: Responsible AI includes…`,
+    options: [
+      "Fairness, safety, and transparency",
+      "Ignoring errors",
+      "Skipping testing",
+      "Hiding data sources",
+    ],
+    correct: 0,
+  },
+];
+
+const LESSONS_BUILDERS: Record<number, LessonContent> = {
+  11: {
+    title: "AI Builders — Foundations (placeholder)",
+    type: "self-paced",
+    videoUrl: "https://www.youtube.com/embed/JMUxmLyrhSk",
+    durationLabel: "6+ min",
+    xpReward: 300,
+    description: "Placeholder lesson content for AI Builders track (lesson 11).",
+    summaryBullets: [
+      "Placeholder takeaway one for Builders lesson 11.",
+      "Placeholder takeaway two for Builders lesson 11.",
+      "Placeholder takeaway three for Builders lesson 11.",
+    ],
+    hasGame: true,
+    quiz: placeholderQuiz(1),
+  },
+  12: {
+    title: "AI Builders — Build & iterate (placeholder)",
+    type: "self-paced",
+    videoUrl: "https://www.youtube.com/embed/JMUxmLyrhSk",
+    durationLabel: "6+ min",
+    xpReward: 300,
+    description: "Placeholder lesson content for AI Builders track (lesson 12).",
+    summaryBullets: [
+      "Placeholder takeaway one for Builders lesson 12.",
+      "Placeholder takeaway two for Builders lesson 12.",
+      "Placeholder takeaway three for Builders lesson 12.",
+    ],
+    hasGame: true,
+    quiz: placeholderQuiz(2),
+  },
+  13: {
+    title: "AI Builders — Ship responsibly (placeholder)",
+    type: "self-paced",
+    videoUrl: "https://www.youtube.com/embed/JMUxmLyrhSk",
+    durationLabel: "6+ min",
+    xpReward: 300,
+    description: "Placeholder lesson content for AI Builders track (lesson 13).",
+    summaryBullets: [
+      "Placeholder takeaway one for Builders lesson 13.",
+      "Placeholder takeaway two for Builders lesson 13.",
+      "Placeholder takeaway three for Builders lesson 13.",
+    ],
+    hasGame: true,
+    quiz: placeholderQuiz(3),
+  },
+};
+
 const GAME_MECHANICS: Record<number, string> = {
   1: "Neuropolis Level 2 — The Vault: timelines, ciphers, and the Glitch Twin.",
   2: "Neuropolis Level 3 — The Divide: switch modes and cross Human vs AI zones.",
   3: "Neuropolis Level 4 — classify Narrow, General, and Super AI in the wild.",
+  11: "AI Builders simulation — foundations track (coming soon).",
+  12: "AI Builders simulation — build & iterate (coming soon).",
+  13: "AI Builders simulation — ship responsibly (coming soon).",
 };
 
 const GAME_BONUS_XP = 200;
@@ -249,8 +353,14 @@ function getToken(tokenFromUrl: string | null): string | null {
 }
 
 function lessonUnlocked(lessonId: number, lessonsComplete: number[]): boolean {
-  if (lessonId === 1) return true;
-  return lessonsComplete.includes(lessonId - 1);
+  if (lessonId === 1 || lessonId === 11) return true;
+  if (lessonId >= 2 && lessonId <= 3) {
+    return lessonsComplete.includes(lessonId - 1);
+  }
+  if (lessonId >= 12 && lessonId <= 13) {
+    return lessonsComplete.includes(lessonId - 1);
+  }
+  return false;
 }
 
 function isAdminTester(user: DemoUser | null): boolean {
@@ -286,7 +396,10 @@ function LessonPageInner() {
     return Number.isFinite(n) ? n : NaN;
   }, [rawId]);
 
-  const lesson = Number.isFinite(lessonId) ? LESSONS[lessonId] : undefined;
+  const lesson = useMemo(() => {
+    if (!Number.isFinite(lessonId)) return undefined;
+    return LESSONS_EXPLORERS[lessonId] ?? LESSONS_BUILDERS[lessonId];
+  }, [lessonId]);
 
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<DemoUser | null>(null);
@@ -365,6 +478,22 @@ function LessonPageInner() {
       setLoadError(true);
     }
   }, [tokenFromUrl, loadUser]);
+
+  useEffect(() => {
+    if (userLoading || !token) return;
+    if (!Number.isFinite(lessonId)) return;
+    if (!LESSONS_EXPLORERS[lessonId] && !LESSONS_BUILDERS[lessonId]) return;
+    if (!user) return;
+    if (isAdminTester(user)) return;
+    const t = encodeURIComponent(token);
+    if (lessonId >= 11 && user.course !== "AI Builders") {
+      router.replace(`/demo?token=${t}`);
+      return;
+    }
+    if (lessonId >= 1 && lessonId <= 3 && user.course === "AI Builders") {
+      router.replace(`/demo?token=${t}`);
+    }
+  }, [userLoading, token, lessonId, user, router]);
 
   useEffect(() => {
     if (!lesson?.hasGame && phase === "game") {
@@ -655,7 +784,10 @@ function LessonPageInner() {
   }
 
   const adminMode = isAdminTester(user);
-  const minVideoRequired = lessonId >= 1 && lessonId <= 3;
+  const minVideoRequired =
+    (lessonId >= 1 && lessonId <= 3) || (lessonId >= 11 && lessonId <= 13);
+  const isBuildersSimulationLesson =
+    user?.course === "AI Builders" && lessonId >= 11 && lessonId <= 13;
   const showPurchaseUpsell = minVideoRequired && videoWatchSatisfied;
 
   if (user && !lessonUnlocked(lessonId, user.lessonsComplete)) {
@@ -1049,7 +1181,47 @@ function LessonPageInner() {
             </div>
           )}
 
-          {gameActive && (lessonId < 1 || lessonId > 3) && (
+          {gameActive && isBuildersSimulationLesson && (
+            <div
+              className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0a1a] px-6 text-center text-white"
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+              }}
+            >
+              <p className="text-lg font-semibold text-slate-200 sm:text-xl">
+                AI Builders Simulation — Coming Soon
+              </p>
+              <div className="mt-8 flex flex-wrap justify-center gap-3">
+                <button
+                  type="button"
+                  className="rounded-xl bg-cyan-500 px-6 py-3 text-sm font-bold text-black sm:px-8"
+                  onClick={async () => {
+                    await exitGame();
+                    setGameComplete(true);
+                    setPhase("quiz");
+                  }}
+                >
+                  Continue to Quiz →
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-slate-500 px-6 py-3 text-sm font-semibold text-slate-200 sm:px-8"
+                  onClick={() => {
+                    void exitGame();
+                  }}
+                >
+                  Exit
+                </button>
+              </div>
+            </div>
+          )}
+
+          {gameActive &&
+            (lessonId < 1 || lessonId > 3) &&
+            !isBuildersSimulationLesson && (
             <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900 px-6 text-center text-white">
               <p className="text-4xl">🎮</p>
               <p className="mt-4 text-2xl font-bold">Game Coming Soon</p>
@@ -1196,7 +1368,9 @@ function LessonPageInner() {
                 type="button"
                 className="mt-8 w-full rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-indigo-500"
                 onClick={() => {
-                  if (lessonId >= 3) {
+                  const lastInTrack =
+                    user?.course === "AI Builders" ? lessonId >= 13 : lessonId >= 3;
+                  if (lastInTrack) {
                     router.push(
                       `/demo/complete?token=${encodeURIComponent(token)}`
                     );

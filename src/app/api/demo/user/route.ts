@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
     {
       name: user.name,
       childName: user.childName,
+      course: user.course,
       email: user.email,
       phone: user.phone,
       lessonsComplete: user.lessonsComplete,

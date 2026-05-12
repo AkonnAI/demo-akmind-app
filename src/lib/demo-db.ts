@@ -25,6 +25,8 @@ export interface DemoUser {
   badgeEarned: boolean;
   /** Slugs from `DEMO_BADGES` that the user has earned. */
   earnedBadges: string[];
+  /** Persisted program track; omitted on legacy rows defaults to `"AI Explorers"` when read. */
+  course: "AI Explorers" | "AI Builders" | "AI Innovators";
   createdAt: string;
 }
 
@@ -58,10 +60,19 @@ function parseEarnedBadges(raw: unknown): string[] {
   return [];
 }
 
+function normalizeDemoCourse(
+  raw: unknown
+): DemoUser["course"] {
+  if (raw === "AI Builders" || raw === "AI Innovators") return raw;
+  return "AI Explorers";
+}
+
 function withEarnedBadgesDefault(u: DemoUser): DemoUser {
+  const course = normalizeDemoCourse(u.course);
   return {
     ...u,
     earnedBadges: parseEarnedBadges(u.earnedBadges as unknown),
+    course,
   };
 }
 
@@ -123,7 +134,9 @@ function readUsers(): DemoUser[] {
   const raw = fs.readFileSync(file, "utf-8");
   try {
     const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? (parsed as DemoUser[]) : [];
+    return Array.isArray(parsed)
+      ? parsed.map((row) => withEarnedBadgesDefault(row as DemoUser))
+      : [];
   } catch {
     return [];
   }
@@ -310,5 +323,6 @@ export async function getOrCreateAdminUser(): Promise<DemoUser> {
     xp: 0,
     badgeEarned: false,
     earnedBadges: [],
+    course: "AI Explorers",
   });
 }

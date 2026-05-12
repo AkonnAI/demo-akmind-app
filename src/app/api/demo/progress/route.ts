@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
     const userForBadges: ClientDemoUser = {
       name: user.name,
       childName: user.childName,
+      course: user.course,
       email: user.email,
       phone: user.phone,
       lessonsComplete: merged,

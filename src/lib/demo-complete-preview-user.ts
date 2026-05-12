@@ -4,6 +4,7 @@ import type { DemoUser } from "@/types/demo";
 export const DEMO_COMPLETE_PREVIEW_USER: DemoUser = {
   name: "Alex Kim",
   childName: "River Kim",
+  course: "AI Explorers",
   email: "preview@akmind.demo",
   phone: "+91 90000 00000",
   lessonsComplete: [1, 2, 3],

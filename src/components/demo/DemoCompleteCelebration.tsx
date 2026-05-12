@@ -11,8 +11,11 @@ import { useMemo, useState } from "react";
 
 const CONFETTI_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#a855f7"];
 const LANDING_URL = process.env.NEXT_PUBLIC_LANDING_URL ?? "https://www.akmind.com";
-const FULL_COURSE_LINE = "Unlock the full AI Explorers program at akmind.com";
 const STAY_TUNED_LINE = "Stay tuned for more updates.";
+
+function fullCourseLine(course: string) {
+  return `Unlock the full ${course} program at akmind.com`;
+}
 
 const CONFETTI_PIECES = Array.from({ length: 20 }, (_, i) => ({
   left: `${(i * 4.7 + ((i * 11) % 9)) % 100}%`,
@@ -54,12 +57,14 @@ export default function DemoCompleteCelebration({
   showLaunchJuneCard?: boolean;
 }) {
   const [badgeDownloading, setBadgeDownloading] = useState(false);
+  const courseName = user.course;
 
   const downloadBadge = async () => {
     if (!user) return;
     setBadgeDownloading(true);
     try {
       const logoData = await fetchWordmarkDataUrl();
+      const courseUpper = courseName.toUpperCase();
 
       const doc = new jsPDF({
         orientation: "landscape",
@@ -103,7 +108,7 @@ export default function DemoCompleteCelebration({
       doc.setFontSize(20);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 41, 59);
-      doc.text("AI EXPLORER — DEMO CERTIFICATE", 148, yAfterHeader + 18, {
+      doc.text(`${courseUpper} — DEMO CERTIFICATE`, 148, yAfterHeader + 18, {
         align: "center",
       });
 
@@ -131,7 +136,7 @@ export default function DemoCompleteCelebration({
       );
 
       doc.text(
-        "has successfully completed the AKMIND AI Explorers Demo Program",
+        `has successfully completed the AKMIND ${courseName} Demo Program`,
         148,
         yAfterHeader + 68,
         { align: "center" }
@@ -166,7 +171,7 @@ export default function DemoCompleteCelebration({
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(8, 145, 178);
-      doc.text(FULL_COURSE_LINE, 148, yPos, { align: "center" });
+      doc.text(fullCourseLine(courseName), 148, yPos, { align: "center" });
       yPos += 8;
       doc.setFont("helvetica", "italic");
       doc.setTextColor(100, 116, 139);
@@ -232,7 +237,7 @@ export default function DemoCompleteCelebration({
       doc.setFont("helvetica", "italic");
       doc.setTextColor(100, 116, 139);
       doc.text(
-        "Complete the full AI Explorers Program to earn 30+ badges",
+        `Complete the full ${courseName} program to earn 30+ badges`,
         148,
         192,
         { align: "center" }
@@ -332,10 +337,10 @@ export default function DemoCompleteCelebration({
               WebkitTextFillColor: "transparent",
             }}
           >
-            Demo Complete!
+            Demo Complete — {courseName}!
           </h1>
           <p className="mt-3 text-center text-slate-400">
-            {childName} has finished the AKMIND demo!
+            {childName} has finished the AKMIND {courseName} demo!
           </p>
 
           <div className="mx-auto mt-8 grid max-w-2xl grid-cols-3 gap-3">
@@ -414,7 +419,7 @@ export default function DemoCompleteCelebration({
               Coming next
             </p>
             <p className="mt-3 text-xl font-black text-white sm:text-2xl">
-              {FULL_COURSE_LINE}
+              {fullCourseLine(courseName)}
             </p>
             <p className="mt-2 text-sm text-slate-300">{STAY_TUNED_LINE}</p>
           </div>
@@ -431,7 +436,7 @@ export default function DemoCompleteCelebration({
               }}
             >
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-indigo-200">
-                Full AI Explorers program
+                Full {courseName} program
               </p>
               <p className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl">
                 Launching June 2026
@@ -472,7 +477,7 @@ export default function DemoCompleteCelebration({
               </div>
               <p className="relative my-3 text-7xl drop-shadow-lg">🏅</p>
               <p className="relative text-3xl font-black tracking-tight text-white">
-                AI EXPLORER
+                {courseName}
               </p>
               <p className="relative mt-1 text-[11px] font-semibold tracking-[0.28em] text-cyan-400">
                 DEMO CERTIFICATE OF COMPLETION
@@ -480,10 +485,10 @@ export default function DemoCompleteCelebration({
               <div className="relative mx-auto my-5 h-px w-24 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-80" />
               <p className="relative text-xl font-bold text-slate-100">{childName}</p>
               <p className="relative mt-3 text-xs leading-relaxed text-slate-400">
-                Completed all three demo lessons · {certDate}
+                Completed all three {courseName} demo lessons · {certDate}
               </p>
               <p className="relative mt-4 text-sm font-semibold text-cyan-300">
-                {FULL_COURSE_LINE}
+                {fullCourseLine(courseName)}
               </p>
               <p className="relative mt-1 text-xs text-slate-500">{STAY_TUNED_LINE}</p>
             </div>

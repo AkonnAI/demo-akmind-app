@@ -6,6 +6,18 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 
+/** Course-aware: Builders need 11–13; Explorers, Innovators, and unknown use 1–3. */
+function isCourseDemoComplete(
+  course: DemoUser["course"] | undefined,
+  lessonsComplete: number[]
+): boolean {
+  const done = new Set(lessonsComplete);
+  if (course === "AI Builders") {
+    return [11, 12, 13].every((id) => done.has(id));
+  }
+  return [1, 2, 3].every((id) => done.has(id));
+}
+
 function readCookieToken(): string | null {
   if (typeof document === "undefined") return null;
   const match = /(?:^|; )demo_token=([^;]*)/.exec(document.cookie);
@@ -33,7 +45,7 @@ function CompletePageInner() {
           return;
         }
         const data = (await res.json()) as DemoUser;
-        if (!data.demoCompleted) {
+        if (!isCourseDemoComplete(data.course, data.lessonsComplete ?? [])) {
           setBootStatus("noop");
           router.replace(`/demo${t ? `?token=${encodeURIComponent(t)}` : ""}`);
           return;
@@ -71,7 +83,7 @@ function CompletePageInner() {
     );
   }
 
-  if (!user || !user.demoCompleted) {
+  if (!user || !isCourseDemoComplete(user.course, user.lessonsComplete ?? [])) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-8 text-center">
         <p className="font-semibold text-slate-300">
