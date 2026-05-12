@@ -67,7 +67,8 @@ const LESSONS_BUILDERS = [
     id: 11,
     title: "Variables : Storing What You Know",
     type: "Self-Paced + Game",
-    description: "Placeholder — ML fundamentals for builders.",
+    description:
+      "Learn how Python stores data using variables. The building block of every AI program.",
     duration: "6+ min",
     xpReward: 300,
     color: "purple" as const,
@@ -77,7 +78,8 @@ const LESSONS_BUILDERS = [
     id: 12,
     title: "Decisions : Teaching Code to Choose",
     type: "Self-Paced + Game",
-    description: "Placeholder — train your first model.",
+    description:
+      "Write if-else logic that mirrors how AI classifiers make decisions on real data.",
     duration: "6+ min",
     xpReward: 300,
     color: "cyan" as const,
@@ -87,7 +89,8 @@ const LESSONS_BUILDERS = [
     id: 13,
     title: "Loops : Making Code Work Smarter",
     type: "Self-Paced + Game",
-    description: "Placeholder — neural networks in action.",
+    description:
+      "Use loops to process data automatically — the same way AI models train on thousands of examples.",
     duration: "6+ min",
     xpReward: 300,
     color: "amber" as const,

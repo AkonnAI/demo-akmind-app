@@ -57,13 +57,123 @@ function extractAskedModuleIndex(message: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/** Digits after "lesson" (e.g. lesson 2, lesson 11). */
+function extractAskedLessonNumber(message: string): number | null {
+  const m = message.match(/\blesson\s*(\d+)\b/i);
+  if (!m) return null;
+  const n = Number.parseInt(m[1], 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function wantsLessonRecapFivePoints(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    /\b(summarise|summarize|recap)\s+(this\s+)?lesson\b/.test(m) ||
+    /\b(this\s+)?lesson\b.*\b(summarise|summarize|recap)\b/.test(m) ||
+    /\b(summarise|summarize|recap)\s+lesson\b/i.test(m) ||
+    /\bwhat\s+was\s+(this\s+)?lesson\b/.test(m) ||
+    /\bwhat\s+was\s+lesson\s*\d+\s*(about)?\b/.test(m) ||
+    /\bgive\s+me\s+5\s+points\s+from\s+lesson\b/.test(m) ||
+    /\b5\s+points\s+from\s+lesson\b/.test(m) ||
+    (/\b5\s+points\b/.test(m) && /\blesson\b/.test(m))
+  );
+}
+
+function wantsLessonNotesDocument(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    /\bnotes\s+for\s+(this\s+)?lesson\b/.test(m) ||
+    /\bnotes\s+for\s+lesson\b/.test(m) ||
+    /\blesson\s*\d+\s+notes\b/.test(m) ||
+    /\blesson\s+notes\b/.test(m) ||
+    /\bfull\s+summary\s+of\s+lesson\b/.test(m) ||
+    /\bfull\s+summary\s+of\s+(this\s+)?lesson\b/.test(m) ||
+    /\bgive\s+me\s+notes\b/.test(m) ||
+    /\bdownload\s+notes\b/.test(m) ||
+    /\bcan\s+i\s+download\s+notes\b/.test(m)
+  );
+}
+
+function wantsThisLessonPhrase(message: string): boolean {
+  return /\bthis\s+lesson\b/i.test(message);
+}
+
+function defaultContentLessonId(
+  lessonOrder: number,
+  course: "AI Explorers" | "AI Builders" | "AI Innovators" | undefined
+): number {
+  const lo =
+    typeof lessonOrder === "number" && lessonOrder > 0 ? lessonOrder : 1;
+  if (course === "AI Builders") {
+    if (lo >= 11 && lo <= 13) return lo;
+    if (lo >= 1 && lo <= 3) return 10 + lo;
+    return 11;
+  }
+  if (lo >= 11 && lo <= 13) return lo;
+  if (lo >= 1 && lo <= 3) return Math.min(4, lo + 1);
+  return 2;
+}
+
+function toContentLessonId(
+  asked: number,
+  course: "AI Explorers" | "AI Builders" | "AI Innovators" | undefined
+): number | null {
+  if (course === "AI Builders") {
+    if (asked >= 11 && asked <= 13) return asked;
+    if (asked >= 1 && asked <= 3) return 10 + asked;
+    return null;
+  }
+  if (asked >= 1 && asked <= 3) return Math.min(4, asked + 1);
+  if (asked >= 11 && asked <= 13) return asked;
+  return null;
+}
+
+function resolveTargetContentLessonId(
+  message: string,
+  lessonOrder: number,
+  course: "AI Explorers" | "AI Builders" | "AI Innovators" | undefined
+): number {
+  const explicit = extractAskedLessonNumber(message);
+  if (explicit != null) {
+    const mapped = toContentLessonId(explicit, course);
+    if (mapped != null) return mapped;
+  }
+  if (wantsThisLessonPhrase(message)) {
+    return defaultContentLessonId(lessonOrder, course);
+  }
+  return defaultContentLessonId(lessonOrder, course);
+}
+
+function formatLessonSummaryCanonical(
+  course: "AI Explorers" | "AI Builders" | "AI Innovators" | undefined
+): string {
+  const ids =
+    course === "AI Builders" ? ([11, 12, 13] as const) : ([2, 3, 4] as const);
+  const parts: string[] = [];
+  for (const id of ids) {
+    const s = getLessonSummary(1, id);
+    if (!s) continue;
+    parts.push(
+      `### ${s.title} (canonical id ${id})\n` +
+        `Key points (from curriculum):\n- ${s.keyPoints.join("\n- ")}\n` +
+        `Indian example: ${s.indianExample}\n` +
+        `Next lesson (context): ${s.nextLesson}`
+    );
+  }
+  return parts.join("\n\n---\n\n");
+}
+
 function buildDemoSystemPrompt(
   name: string,
   currentModule: number,
   currentLesson: string,
   live: DemoLiveStats,
   askedModule: number | null,
-  lessonOrder: number
+  lessonOrder: number,
+  course: "AI Explorers" | "AI Builders" | "AI Innovators" | undefined,
+  userMessage: string,
+  lessonRecapFive: boolean,
+  lessonNotesDoc: boolean
 ): string {
   const summaryModuleId = askedModule ?? currentModule;
   const lo =
@@ -107,8 +217,7 @@ Never guess or invent different numbers.
 LESSON CONTENT KNOWLEDGE:
 Current module summary (${askedModule != null ? `module ${askedModule}` : `module ${currentModule}`}): ${moduleSummary}
 ${lessonBlock}
-When the student asks for a summary, give key points in 2-3 short conversational sentences.
-Do not use bullet points in your reply. Weave ideas naturally.
+When the student asks for a quick chat summary (not the SPECIAL recap/notes modes), give key points in 2-3 short conversational sentences without lists.
 End by mentioning what comes in the next lesson when it fits.
 `;
 
@@ -119,10 +228,70 @@ After the demo, students can join the full program — 3 phases, 6 modules each,
 Pricing hint only if they ask: phases around ₹15,999 each or a full bundle around ₹39,999 (give rounded figures, not a sales pitch).
 `;
 
-  return `You are NOVA — a warm and intelligent AI companion 
-for Akmind. You are ${name}'s personal learning guide.
+  const targetContentId = resolveTargetContentLessonId(
+    userMessage,
+    lo,
+    course
+  );
+  const targetSummary = getLessonSummary(1, targetContentId);
+  const targetSummaryBlock = targetSummary
+    ? `Title: ${targetSummary.title}
+Key points (canonical):
+- ${targetSummary.keyPoints.join("\n- ")}
+Indian example: ${targetSummary.indianExample}
+What comes next: ${targetSummary.nextLesson}`
+    : "(No canonical summary found for this lesson id — say so briefly.)";
 
-CRITICAL RULES:
+  const canonicalBundle =
+    lessonRecapFive || lessonNotesDoc
+      ? formatLessonSummaryCanonical(course)
+      : "";
+
+  const specialLessonModesBlock =
+    lessonRecapFive || lessonNotesDoc
+      ? `
+SPECIAL LESSON MODES — these OVERRIDE CRITICAL RULES 1–2 and the usual length limit for THIS reply only when the flag is ACTIVE:
+
+LESSON_RECAP_FIVE: ${lessonRecapFive ? "ACTIVE" : "off"}
+LESSON_NOTES_DOC: ${lessonNotesDoc ? "ACTIVE" : "off"}
+
+If BOTH are ACTIVE, follow LESSON_NOTES_DOC only (full markdown notes).
+
+Resolving which lesson they mean:
+- Client lesson order (demo route id): ${lo}
+- Client currentLesson title string: ${currentLesson || "not provided"}
+- Resolved canonical curriculum id (keys in lesson-content like 1-${targetContentId}): ${targetContentId}
+- If they said "this lesson" / "summarise this lesson" / similar without a number, use the resolved id above (tied to their current lesson on the page).
+- If they said "lesson N", map N to canonical id: Explorers demo 1–3 → curriculum ids 2–4; Builders demo 1–3 slot → 11–13; Builders 11–13 stay as-is.
+
+PRIMARY SOURCE for the target lesson (must not contradict):
+${targetSummaryBlock}
+
+FULL CANONICAL SUMMARIES for this demo track (${course ?? "AI Explorers"}) — source of truth; stay faithful:
+${canonicalBundle}
+
+When LESSON_RECAP_FIVE is ACTIVE:
+- Answer with EXACTLY 5 bullet points (start each line with "- ").
+- Each bullet = one key concept from the PRIMARY SOURCE above, plus one short friendly example suitable for ages 11–14.
+- If the canonical key points are fewer than five, split or combine ideas so there are still five distinct, accurate bullets grounded in the text.
+
+When LESSON_NOTES_DOC is ACTIVE:
+- Answer with structured MARKDOWN using these sections in order:
+  ## What you learned
+  ## Key concepts
+  (Under Key concepts: exactly 5 bullet points "- ")
+  ## Code examples
+  (2–4 short Python fenced code blocks that match the lesson — variables, if/else, or loops as appropriate; beginner-friendly)
+  ## How it connects to AI
+  ## Test yourself
+  (Exactly 3 quiz-style questions; no answer key unless they ask.)
+- Markdown is allowed for this reply only.
+`
+      : "";
+
+  const defaultBrevityRules =
+    !lessonRecapFive && !lessonNotesDoc
+      ? `CRITICAL RULES:
 1. Maximum 1-2 sentences per response. Never more.
 2. No bullet points. No lists. No markdown at all.
 3. Never be sarcastic. Never make fun of the student.
@@ -132,7 +301,30 @@ CRITICAL RULES:
 7. Use Indian examples only when they genuinely help explain.
 8. Never question or doubt what the student says rudely.
 9. VARY responses but always stay warm and helpful.
-10. If student says wrong info gently correct with kindness.
+10. If student says wrong info gently correct with kindness.`
+      : `CRITICAL RULES (STANDARD CHAT — also keep tone 3–10 below; rules 1–2 are suspended when a SPECIAL LESSON MODE is ACTIVE):
+1. Maximum 1-2 sentences per response when NO special lesson mode is active. Never more in normal chat.
+2. No bullet points, lists, or markdown in normal chat. (Exception: active SPECIAL LESSON MODE instructions above.)
+3. Never be sarcastic. Never make fun of the student.
+4. Never say things like "let's not get ahead of ourselves"
+5. Always be encouraging, warm, and supportive.
+6. Sound like a caring smart friend not a comedian.
+7. Use Indian examples only when they genuinely help explain.
+8. Never question or doubt what the student says rudely.
+9. VARY responses but always stay warm and helpful.
+10. If student says wrong info gently correct with kindness.`;
+
+  const closingTone =
+    lessonRecapFive || lessonNotesDoc
+      ? "For SPECIAL LESSON MODES, follow the mode instructions fully — be thorough. Otherwise keep replies warm and concise."
+      : "Keep it warm. Keep it short. Keep it real.";
+
+  return `You are NOVA — a warm and intelligent AI companion 
+for Akmind. You are ${name}'s personal learning guide.
+
+${specialLessonModesBlock}
+
+${defaultBrevityRules}
 
 TONE EXAMPLES:
 Student says wrong XP:
@@ -161,7 +353,7 @@ Current module: ${currentModule}
 Current lesson: ${currentLesson || "exploring the demo"}
 
 Always use ${name} naturally in responses.
-Keep it warm. Keep it short. Keep it real.`;
+${closingTone}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -214,7 +406,11 @@ export async function POST(req: NextRequest) {
     ].slice(-MAX_MEMORY);
 
     const name = childName || userName || "there";
-    const askedModule = extractAskedModuleIndex(message.trim());
+    const trimmed = message.trim();
+    const askedModule = extractAskedModuleIndex(trimmed);
+    const lessonRecapFive = wantsLessonRecapFivePoints(trimmed);
+    const lessonNotesDoc = wantsLessonNotesDocument(trimmed);
+    const longLessonForm = lessonRecapFive || lessonNotesDoc;
 
     const live = buildDemoLiveStats({
       xp,
@@ -233,7 +429,11 @@ export async function POST(req: NextRequest) {
       currentLesson || "",
       live,
       askedModule,
-      typeof lessonOrder === "number" && lessonOrder > 0 ? lessonOrder : 1
+      typeof lessonOrder === "number" && lessonOrder > 0 ? lessonOrder : 1,
+      course,
+      trimmed,
+      lessonRecapFive,
+      lessonNotesDoc
     );
 
     const groq = getGroq();
@@ -263,9 +463,9 @@ export async function POST(req: NextRequest) {
             content: msg.content,
           })
         ),
-        { role: "user", content: message },
+        { role: "user", content: trimmed },
       ],
-      max_tokens: 80,
+      max_tokens: longLessonForm ? 2200 : 80,
       temperature: 0.15,
     });
 
@@ -275,7 +475,7 @@ export async function POST(req: NextRequest) {
 
     const savedMemory = [
       ...fullHistory,
-      { role: "user", content: message },
+      { role: "user", content: trimmed },
       { role: "assistant", content: reply },
     ].slice(-MAX_MEMORY);
     demoMemory.set(memoryKey, savedMemory);
