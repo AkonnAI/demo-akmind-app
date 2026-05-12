@@ -8,12 +8,20 @@ import {
   Award,
   Bot,
   Home,
+  Layers,
   LayoutDashboard,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { normalizeClientDemoToken } from "@/lib/demo-token-client";
+
+function isAdminTester(user: import("@/types/demo").DemoUser | null): boolean {
+  if (!user) return false;
+  return (
+    user.email?.toLowerCase() === "admin@akmind.com" || user.name === "Admin"
+  );
+}
 
 function readCookieToken(): string | null {
   if (typeof document === "undefined") return null;
@@ -100,9 +108,9 @@ function DemoBadgesInner() {
   const [loading, setLoading] = useState(true);
   const [xpModalOpen, setXpModalOpen] = useState(false);
   const [authIssue, setAuthIssue] = useState<string | null>(null);
-  const [bottomActive, setBottomActive] = useState<"home" | "badges" | "nova">(
-    "badges"
-  );
+  const [bottomActive, setBottomActive] = useState<
+    "home" | "badges" | "nova" | "programs"
+  >("badges");
 
   const load = useCallback(async (t: string) => {
     setLoading(true);
@@ -172,9 +180,14 @@ function DemoBadgesInner() {
   const badgesHref = token
     ? `/demo/badges?token=${encodeURIComponent(token)}`
     : "/demo/badges";
+  const programsHref = token
+    ? `/demo/programs?token=${encodeURIComponent(token)}`
+    : "/demo/programs";
 
   const isDemoHome = pathname === "/demo" || pathname === "/demo/";
   const isBadgesRoute = pathname.startsWith("/demo/badges");
+  const isProgramsRoute = pathname.startsWith("/demo/programs");
+  const adminMode = isAdminTester(user);
 
   const showShell = !loading && user && token;
   const displayBadges = useMemo(
@@ -232,6 +245,15 @@ function DemoBadgesInner() {
               <Bot className="h-5 w-5 text-slate-500" />
               NOVA
             </Link>
+            {adminMode && (
+              <Link
+                href={programsHref}
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-slate-200"
+              >
+                <Layers className="h-5 w-5 text-slate-500" />
+                Programs
+              </Link>
+            )}
           </nav>
 
           <div className="mt-auto border-t border-[rgba(99,102,241,0.1)] p-4">
@@ -466,6 +488,25 @@ function DemoBadgesInner() {
               />
               NOVA
             </button>
+            {adminMode && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBottomActive("programs");
+                  router.push(programsHref);
+                }}
+                className={`flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium ${
+                  isProgramsRoute ? "text-[#06B6D4]" : "text-slate-500"
+                }`}
+                aria-label="Programs"
+              >
+                <Layers
+                  className="h-5 w-5"
+                  strokeWidth={isProgramsRoute ? 2.5 : 2}
+                />
+                Programs
+              </button>
+            )}
           </nav>
 
           {xpModalOpen ? (

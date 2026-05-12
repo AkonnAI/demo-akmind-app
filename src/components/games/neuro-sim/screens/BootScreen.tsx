@@ -17,8 +17,22 @@ const LINES = [
   '>> PRESS ANY KEY TO BEGIN',
 ]
 
-export default function BootScreen() {
+export type BootScreenProps = {
+  /** When true, skip global navigation; call `onEmbedDone` after the boot sequence instead. */
+  readonly embed?: boolean
+  readonly onEmbedDone?: () => void
+}
+
+export default function BootScreen({ embed = false, onEmbedDone }: BootScreenProps = {}) {
   const setScreen = useGameStore((s) => s.setScreen)
+
+  const finishBoot = useCallback(() => {
+    if (embed) {
+      onEmbedDone?.()
+    } else {
+      setScreen('mission-select')
+    }
+  }, [embed, onEmbedDone, setScreen])
   const [visible, setVisible] = useState<string[]>([])
   const [doneTyping, setDoneTyping] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -48,13 +62,13 @@ export default function BootScreen() {
 
     const el = containerRef.current
     if (!el) {
-      setScreen('mission-select')
+      finishBoot()
       return
     }
 
     const tl = gsap.timeline({
       onComplete: () => {
-        setScreen('mission-select')
+        finishBoot()
       },
     })
 
@@ -64,7 +78,7 @@ export default function BootScreen() {
       .to(el, { x: 3, duration: 0.06 })
       .to(el, { x: 0, duration: 0.06 })
       .to(el, { opacity: 0, duration: 0.4 })
-  }, [setScreen])
+  }, [finishBoot])
 
   useEffect(() => {
     const go = () => begin()

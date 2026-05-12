@@ -10,6 +10,7 @@ import MissionIntro from '../components/MissionIntro'
 import NovaHUD from '../components/NovaHUD'
 import { LESSONS } from '../data/lessons'
 import { lastPythonErrorLine, stripNovaPrefix } from '../lib/briefUtils'
+import { wrapPyodideStudentCode } from '../lib/pyodideStudentCode'
 import {
   CITY_FAR,
   CITY_LAYER_FILTER,
@@ -22,8 +23,7 @@ import Sim1SceneView from '../sims/Sim1SceneView'
 import Sim2SceneView from '../sims/Sim2SceneView'
 import type { Sim2GraderResult } from '../sims/sim2-grader'
 import {
-  buildSim2PyodideCode,
-  mapOutputToRoute,
+  gradeSim2WithAge,
   SIM2_TEST_CASES,
   staticGradeSim2,
 } from '../sims/sim2-grader'
@@ -166,6 +166,7 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
   const [variableCount, setVariableCount] = useState(0)
   const [executeResult, setExecuteResult] = useState<ExecuteResult>(null)
   const [sim2Result, setSim2Result] = useState<Sim2GraderResult | null>(null)
+  const [sim2SessionKey, setSim2SessionKey] = useState(0)
   const [sim3Result, setSim3Result] = useState<Sim3GraderResult | null>(null)
   const [showIntro, setShowIntro] = useState(true)
 
@@ -177,6 +178,7 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
     setVariableCount(0)
     setExecuteResult(null)
     setSim2Result(null)
+    setSim2SessionKey(0)
     setSim3Result(null)
   }, [activeLesson?.id])
 
@@ -238,29 +240,34 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
     [],
   )
 
-  const handleSim2TestInput = useCallback(
+  const handleSim2Test = useCallback(
     async (age: number) => {
-      if (!activeLesson) return
-      // If Pyodide is already loaded, run the student code with that age for accuracy
-      if (pyodideRef.current) {
-        try {
-          const py = pyodideRef.current
-          await py.runPythonAsync(buildSim2PyodideCode(code, age))
-          const rawOut = py.runPython('_sim2_out')
-          const outStr = typeof rawOut === 'string' ? rawOut : ''
-          const route = mapOutputToRoute(outStr, age)
-          setSim2Result({ route, age, error: null })
-        } catch (e) {
-          const err = lastPythonErrorLine(e instanceof Error ? e.message : String(e))
-          setSim2Result({ route: 'derail', age, error: err })
-        }
-      } else {
-        // Fall back to static analysis before Pyodide is ready
-        setSim2Result(staticGradeSim2(code, age))
+      if (!activeLesson || activeLesson.id !== 2) return
+      const py = pyodideRef.current
+      const stamp = Date.now()
+      if (!py) {
+        setSim2Result({ ...staticGradeSim2(code, age), _timestamp: stamp })
+        return
       }
+      const result = await gradeSim2WithAge(code, age, py)
+      setSim2Result({
+        ...result,
+        age,
+        error: result.error ?? null,
+        _timestamp: stamp,
+      })
     },
     [activeLesson, code],
   )
+
+  const handleSim2Complete = useCallback(() => {
+    if (!activeLesson || activeLesson.id !== 2) return
+    addXP(activeLesson.xpReward)
+    unlockLesson(3)
+    completeLesson(2)
+    setScreen('success')
+    embedOnComplete?.()
+  }, [activeLesson, addXP, unlockLesson, completeLesson, setScreen, embedOnComplete])
 
   /** Sim3: "APPLY TO CODE" — just load the template into the editor */
   const handleSim3TestInput = useCallback(
@@ -287,7 +294,77 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
       const py = await ensurePyodide()
       setStatus('running')
 
-      await py.runPythonAsync(code)
+      if (activeLesson.id === 2) {
+        setSim2SessionKey((k) => k + 1)
+        setSim2Result(null)
+
+        const ages = [67, 20, 35]
+        const runSim2Full = async () => {
+          const bridge = py
+          for (let i = 0; i < ages.length; i++) {
+            const age = ages[i]
+            const stamp = Date.now()
+            try {
+              if (!bridge) {
+                setSim2Result({
+                  ...staticGradeSim2(code, age),
+                  age,
+                  _timestamp: stamp,
+                })
+              } else {
+                const graded = await gradeSim2WithAge(code, age, bridge)
+                setSim2Result({
+                  ...graded,
+                  age,
+                  error: graded.error ?? null,
+                  _timestamp: stamp,
+                })
+              }
+            } catch {
+              setSim2Result({
+                route: 'derail',
+                age,
+                error: null,
+                _timestamp: stamp,
+              })
+            }
+            if (i < ages.length - 1) {
+              await new Promise<void>((resolve) => {
+                window.setTimeout(resolve, 4200)
+              })
+            }
+          }
+          setOutputText(null)
+          setErrorText(null)
+          setStatus('idle')
+        }
+
+        void runSim2Full()
+        setOutputText(null)
+        setErrorText(null)
+        return
+      }
+
+      if (activeLesson.id === 3) {
+        const result3 = await gradeSim3(code, py)
+        setSim3Result(result3)
+
+        if (result3.error) {
+          setStatus('error')
+          setErrorText(result3.error)
+        } else {
+          setStatus('idle')
+          setOutputText(
+            result3.iterations === 0
+              ? 'No output captured — make sure your loop body calls print(). Watch the simulator for challenge progress.'
+              : `Loop ran ${result3.iterations} iteration${result3.iterations !== 1 ? 's' : ''}. Follow the simulator — complete all three loop challenges to finish the mission.`,
+          )
+        }
+        return
+      }
+
+      const safeCode = wrapPyodideStudentCode(code)
+      await py.runPythonAsync(safeCode)
       await py.runPythonAsync(INSPECT)
 
       const raw = py.runPython('import json\njson.dumps(_result)')
@@ -343,64 +420,6 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
             `Partial sync: ${entries.length}/5 variables.\n${summary}`,
           )
         }
-      } else if (activeLesson.id === 2) {
-        // Run all 3 canonical test ages and check correctness
-        const results: Array<{ age: number; route: ReturnType<typeof mapOutputToRoute> }> = []
-
-        for (const tc of SIM2_TEST_CASES) {
-          await py.runPythonAsync(buildSim2PyodideCode(code, tc.age))
-          const rawOut = py.runPython('_sim2_out')
-          const outStr = typeof rawOut === 'string' ? rawOut : ''
-          results.push({ age: tc.age, route: mapOutputToRoute(outStr, tc.age) })
-        }
-
-        // Display the first (senior) result in the sim panel
-        setSim2Result({ route: results[0].route, age: results[0].age, error: null })
-
-        const allCorrect = results.every((r, i) => r.route === SIM2_TEST_CASES[i].expected)
-
-        if (allCorrect) {
-          setStatus('success')
-          setOutputText(
-            results.map((r) => `age ${r.age} → ${r.route}`).join('  |  '),
-          )
-          const t1 = window.setTimeout(() => {
-            Audio.play('confirm')
-            addXP(activeLesson.xpReward)
-            unlockLesson(activeLesson.id + 1)
-            completeLesson(activeLesson.id)
-          }, 1500)
-          const t2 = window.setTimeout(() => {
-            setScreen('success')
-            embedOnComplete?.()
-          }, 3500)
-          successTimersRef.current = [t1, t2]
-        } else {
-          setStatus('idle')
-          const wrongLines = results
-            .map((r, i) => ({ r, expected: SIM2_TEST_CASES[i].expected }))
-            .filter(({ r, expected }) => r.route !== expected)
-            .map(({ r, expected }) => `  age ${r.age}: got ${r.route}, need ${expected}`)
-          setOutputText(
-            ['Check your conditions:', ...wrongLines, '', `All: ${results.map((r) => `age ${r.age}→${r.route}`).join('  ')}`].join('\n'),
-          )
-        }
-      } else if (activeLesson.id === 3) {
-        const py3 = await ensurePyodide()
-        const result3 = await gradeSim3(code, py3)
-        setSim3Result(result3)
-
-        if (result3.error) {
-          setStatus('error')
-          setErrorText(result3.error)
-        } else {
-          setStatus('idle')
-          setOutputText(
-            result3.iterations === 0
-              ? 'No output captured — make sure your loop body calls print(). Watch the simulator for challenge progress.'
-              : `Loop ran ${result3.iterations} iteration${result3.iterations !== 1 ? 's' : ''}. Follow the simulator — complete all three loop challenges to finish the mission.`,
-          )
-        }
       } else {
         setStatus('idle')
         setOutputText(summary || '(no variables captured)')
@@ -413,6 +432,13 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
       setErrorText(errMsg)
       if (activeLesson.id === 1) {
         setExecuteResult({ variables: [], correct: 0, error: errMsg })
+      } else if (activeLesson.id === 2) {
+        setSim2Result({
+          route: 'derail',
+          age: SIM2_TEST_CASES[0].age,
+          error: errMsg,
+          _timestamp: Date.now(),
+        })
       }
     }
   }, [
@@ -709,8 +735,9 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
           <Sim2SceneView
             executeResult={sim2Result}
             liveCode={liveCode}
-            onTestInput={handleSim2TestInput}
-            onComplete={embedOnComplete}
+            sessionKey={sim2SessionKey}
+            onTestInput={handleSim2Test}
+            onComplete={handleSim2Complete}
           />
         )}
         {activeLessonId === 3 && (
@@ -725,7 +752,7 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
 
         {/* Error panel (overlaid on top of sim) */}
         <AnimatePresence>
-          {errorText && (
+          {errorText && activeLessonId !== 2 && (
             <motion.div
               key="err"
               initial={{ y: -10, opacity: 0 }}
@@ -788,7 +815,7 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
 
         {/* Output panel for non-sim-1 lessons */}
         <AnimatePresence>
-          {outputText && activeLessonId !== 1 && (
+          {outputText && activeLessonId !== 1 && activeLessonId !== 2 && (
             <motion.div
               key="out"
               initial={{ y: -10, opacity: 0 }}
@@ -816,6 +843,7 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
           )}
         </AnimatePresence>
 
+        {activeLessonId !== 2 && (
         <NovaHUD
           className="nova-hud"
           text={
@@ -825,6 +853,7 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
           }
           autoHide={6000}
         />
+        )}
       </div>
     </div>
   )

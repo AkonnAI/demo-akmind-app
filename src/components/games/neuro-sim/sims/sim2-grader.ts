@@ -4,41 +4,61 @@ export interface Sim2GraderResult {
   route: Sim2Route | null
   age: number | null
   error: string | null
+  /** Bumped by TerminalScreen each Sim2 run so the scene reruns animations when routes repeat */
+  readonly _timestamp?: number
 }
 
 /**
  * Map Python stdout text + fallback age to a Sim2 route.
  * Called after capturing Pyodide stdout for a test age.
  */
-export function mapOutputToRoute(output: string, fallbackAge: number): Sim2Route {
+export function mapOutputToRoute(output: string): Sim2Route {
   const lo = output.toLowerCase()
 
-  const isSenior =
-    lo.includes('senior') ||
-    lo.includes('elder') ||
-    lo.includes('pension') ||
-    (lo.includes('50') && lo.includes('%'))
-
-  const isStudent =
-    lo.includes('student') ||
-    lo.includes('youth') ||
-    lo.includes('young') ||
-    (lo.includes('30') && lo.includes('%'))
-
-  const isRegular =
-    lo.includes('regular') ||
-    lo.includes('full fare') ||
-    lo.includes('standard') ||
-    lo.includes('normal fare')
-
-  if (isSenior) return 'senior'
-  if (isStudent) return 'student'
-  if (isRegular) return 'regular'
-
-  // Heuristic by age when output gives no clear signal
-  if (fallbackAge >= 60) return 'senior'
-  if (fallbackAge < 25) return 'student'
+  if (lo.includes('senior') || lo.includes('50')) return 'senior'
+  if (lo.includes('student') || lo.includes('30')) return 'student'
   return 'regular'
+}
+
+/** Strip stdin lines and inject the test age for Pyodide (no real input()). */
+export function injectAge(studentCode: string, age: number): string {
+  const lines = studentCode.split('\n')
+  const filtered = lines.filter((line) => !line.includes('input('))
+  return `age = ${age}\n${filtered.join('\n')}`
+}
+
+/** Derive route from if / elif thresholds in source (runs after executing student code once). */
+export function detectSim2Route(codeRaw: string, age: number): Sim2Route {
+  const code = codeRaw.replace(/\r\n/g, '\n').trim()
+  if (!/\bif\b/.test(code) || !/\belif\b/.test(code) || !/\belse\b/.test(code))
+    return 'derail'
+
+  const seniorMatch = /\bif\s+age\s*>=\s*(\d+)/.exec(code)
+  const studentMatch = /\belif\s+age\s*<\s*(\d+)/.exec(code)
+  if (!seniorMatch || !studentMatch) return 'derail'
+
+  const seniorAge = Number.parseInt(seniorMatch[1], 10)
+  const studentMaxAge = Number.parseInt(studentMatch[1], 10)
+  if (Number.isNaN(seniorAge) || Number.isNaN(studentMaxAge)) return 'derail'
+  if (age >= seniorAge) return 'senior'
+  if (age < studentMaxAge) return 'student'
+  return 'regular'
+}
+
+/** Run student code once in Pyodide for a probe age and map to station route (structure-based). */
+export async function gradeSim2WithAge(
+  studentCode: string,
+  testAge: number,
+  py: { runPythonAsync: (code: string) => Promise<void> },
+): Promise<Sim2GraderResult> {
+  try {
+    await py.runPythonAsync(buildSim2PyodideCode(studentCode, testAge))
+    const route = detectSim2Route(studentCode, testAge)
+    return { route, age: testAge, error: null }
+  }
+  catch {
+    return { route: 'derail', age: testAge, error: null }
+  }
 }
 
 /**
@@ -102,18 +122,13 @@ export const SIM2_TEST_CASES = [
 
 /** Pyodide wrapper code — prepend to student code for one test run. */
 export function buildSim2PyodideCode(studentCode: string, testAge: number): string {
-  // Strip any input() call that reads age (scaffold artefact)
-  const stripped = studentCode.replace(
-    /^[^\n]*int\s*\(\s*input\s*\([^)]*\)\s*\)[^\n]*$/m,
-    '',
-  )
+  const body = injectAge(studentCode, testAge)
 
   return `
 import sys as _sys, io as _io
 _old_out = _sys.stdout
 _sys.stdout = _io.StringIO()
-age = ${testAge}
-${stripped}
+${body}
 _sim2_out = _sys.stdout.getvalue()
 _sys.stdout = _old_out
 `.trim()

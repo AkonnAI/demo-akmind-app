@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Flame,
   Home,
+  Layers,
   LayoutDashboard,
   Lock,
   Zap,
@@ -146,9 +147,9 @@ function DemoDashboardInner() {
   const [loading, setLoading] = useState(true);
   const [authIssue, setAuthIssue] = useState<string | null>(null);
   const [xpModalOpen, setXpModalOpen] = useState(false);
-  const [bottomActive, setBottomActive] = useState<"home" | "badges" | "nova">(
-    "home"
-  );
+  const [bottomActive, setBottomActive] = useState<
+    "home" | "badges" | "nova" | "programs"
+  >("home");
 
   const load = useCallback(async (t: string) => {
     setLoading(true);
@@ -225,8 +226,12 @@ function DemoDashboardInner() {
   const badgesHref = token
     ? `/demo/badges?token=${encodeURIComponent(token)}`
     : "/demo/badges";
+  const programsHref = token
+    ? `/demo/programs?token=${encodeURIComponent(token)}`
+    : "/demo/programs";
   const isDemoHome = pathname === "/demo" || pathname === "/demo/";
   const isBadgesRoute = pathname.startsWith("/demo/badges");
+  const isProgramsRoute = pathname.startsWith("/demo/programs");
 
   const heroEarnedBadges = useMemo(() => {
     const slugs = user?.earnedBadges;
@@ -319,6 +324,15 @@ function DemoDashboardInner() {
               <Bot className="h-5 w-5 text-slate-500" />
               NOVA
             </button>
+            {adminMode && (
+              <Link
+                href={programsHref}
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-slate-200"
+              >
+                <Layers className="h-5 w-5 text-slate-500" />
+                Programs
+              </Link>
+            )}
           </nav>
 
           <div className="mt-auto border-t border-[rgba(99,102,241,0.1)] p-4">
@@ -780,6 +794,25 @@ function DemoDashboardInner() {
               />
               NOVA
             </button>
+            {adminMode && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBottomActive("programs");
+                  router.push(programsHref);
+                }}
+                className={`flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium ${
+                  isProgramsRoute ? "text-[#06B6D4]" : "text-slate-500"
+                }`}
+                aria-label="Programs"
+              >
+                <Layers
+                  className="h-5 w-5"
+                  strokeWidth={isProgramsRoute ? 2.5 : 2}
+                />
+                Programs
+              </button>
+            )}
           </nav>
 
           {xpModalOpen ? (

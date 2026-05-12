@@ -395,6 +395,27 @@
 }
 
 @media (max-width: 767px) {
+  .neuro-sim-embed-root .boot-root {
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    overflow: hidden !important;
+  }
+
+  .neuro-sim-embed-root .boot-container {
+    max-width: 100% !important;
+    width: 100% !important;
+    height: 100% !important;
+    padding: 28px 20px !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    font-size: 12px !important;
+  }
+}
+
+@media (max-width: 767px) {
   .neuro-sim-embed-root .sim-panel-left,
   .neuro-sim-embed-root .sim-panel-right,
   .neuro-sim-embed-root .nova-hud {
