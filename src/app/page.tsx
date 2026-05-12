@@ -16,6 +16,20 @@ const STAR_LAYOUT = Array.from({ length: 50 }, (_, i) => ({
   delay: ((i * 0.21) % 2.8) + (i % 3) * 0.15,
 }));
 
+const LANDING_CHIPS_EXPLORERS = [
+  "✅ Welcome to AI",
+  "🎮 History of AI + Game",
+  "🤖 AI vs Humans + Game",
+  "⚡ Types of AI + Game",
+] as const;
+
+const LANDING_CHIPS_BUILDERS = [
+  "🐍 Python Basics",
+  "📦 Variables + Sim",
+  "🔀 Decisions + Sim",
+  "🔁 Loops + Sim",
+] as const;
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
@@ -174,15 +188,15 @@ function HomeContent() {
                   Welcome, {user.childName}!
                 </h2>
                 <p className="mt-1 text-center text-slate-500">
-                  Ready to explore AI?
+                  {user.course === "AI Builders"
+                    ? "Ready to build with AI?"
+                    : "Ready to explore AI?"}
                 </p>
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  {[
-                    "✅ Welcome to AI",
-                    "🎮 History of AI + Game",
-                    "🤖 AI vs Humans + Game",
-                    "⚡ Types of AI + Game",
-                  ].map((label) => (
+                  {(user.course === "AI Builders"
+                    ? LANDING_CHIPS_BUILDERS
+                    : LANDING_CHIPS_EXPLORERS
+                  ).map((label) => (
                     <span
                       key={label}
                       className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700"

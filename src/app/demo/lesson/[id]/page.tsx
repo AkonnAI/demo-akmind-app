@@ -214,56 +214,127 @@ const LESSONS_EXPLORERS: Record<number, LessonContent> = {
   },
 };
 
-const placeholderQuiz = (lessonNum: number): QuizItem[] => [
+const BUILDERS_QUIZ_11: QuizItem[] = [
   {
-    q: `[Builders L${lessonNum}] Placeholder: What is machine learning?`,
+    q: "What is a variable in Python?",
     options: [
-      "Programs that learn from data",
-      "Only hardware upgrades",
-      "Manual rule lists only",
-      "Unrelated to AI",
+      "A fixed number",
+      "A container that stores data",
+      "A type of loop",
+      "A function",
     ],
-    correct: 0,
+    correct: 1,
   },
   {
-    q: `[Builders L${lessonNum}] Placeholder: A model trained on examples is called…`,
-    options: [
-      "Supervised learning",
-      "Random guessing",
-      "Static scripting",
-      "Disk formatting",
-    ],
-    correct: 0,
+    q: "Which symbol is used to assign a value to a variable in Python?",
+    options: ["==", "->", "=", ":"],
+    correct: 2,
   },
   {
-    q: `[Builders L${lessonNum}] Placeholder: Overfitting means…`,
-    options: [
-      "The model memorizes training noise",
-      "The model is too small",
-      "Training is too fast",
-      "Data is always perfect",
-    ],
-    correct: 0,
+    q: "What will print(x) output if x = 42?",
+    options: ["x", "42", '"x"', "Error"],
+    correct: 1,
   },
   {
-    q: `[Builders L${lessonNum}] Placeholder: A prompt is…`,
-    options: [
-      "Input text to guide a model",
-      "A type of CPU",
-      "A video codec",
-      "A database index",
-    ],
-    correct: 0,
+    q: "Which of these is a valid variable name in Python?",
+    options: ["2name", "my-var", "my_var", "my var"],
+    correct: 2,
   },
   {
-    q: `[Builders L${lessonNum}] Placeholder: Responsible AI includes…`,
+    q: "How do AI models use variables?",
     options: [
-      "Fairness, safety, and transparency",
-      "Ignoring errors",
-      "Skipping testing",
-      "Hiding data sources",
+      "To display images",
+      "To store learned parameters",
+      "To connect to internet",
+      "To draw graphics",
     ],
-    correct: 0,
+    correct: 1,
+  },
+];
+
+const BUILDERS_QUIZ_12: QuizItem[] = [
+  {
+    q: "What does an if-else statement do?",
+    options: [
+      "Repeats code",
+      "Stores data",
+      "Makes decisions based on conditions",
+      "Defines a function",
+    ],
+    correct: 2,
+  },
+  {
+    q: 'What is the output of: if 5 > 3: print("Yes") else: print("No")',
+    options: ["No", "Yes", "Error", "Nothing"],
+    correct: 1,
+  },
+  {
+    q: "Which operator checks if two values are equal in Python?",
+    options: ["=", "!=", "==", "=>"],
+    correct: 2,
+  },
+  {
+    q: "What do decision trees in ML have in common with if-else?",
+    options: [
+      "Both use loops",
+      "Both branch based on conditions",
+      "Both store variables",
+      "Both need internet",
+    ],
+    correct: 1,
+  },
+  {
+    q: "What happens when an if condition is False and there is no else?",
+    options: [
+      "Error occurs",
+      "Program crashes",
+      "Nothing happens, code skips",
+      "It runs anyway",
+    ],
+    correct: 2,
+  },
+];
+
+const BUILDERS_QUIZ_13: QuizItem[] = [
+  {
+    q: "What does a for loop do?",
+    options: [
+      "Makes decisions",
+      "Stores data",
+      "Repeats code for each item in a sequence",
+      "Defines variables",
+    ],
+    correct: 2,
+  },
+  {
+    q: "How many times will this run: for i in range(5): print(i)",
+    options: ["4", "6", "1", "5"],
+    correct: 3,
+  },
+  {
+    q: "What type of loop runs while a condition is True?",
+    options: ["for loop", "if loop", "while loop", "repeat loop"],
+    correct: 2,
+  },
+  {
+    q: "How do loops relate to AI training?",
+    options: [
+      "They store model weights",
+      "They process many data examples repeatedly",
+      "They display results",
+      "They connect APIs",
+    ],
+    correct: 1,
+  },
+  {
+    q: "What is the risk of a while loop with a condition that never becomes False?",
+    options: [
+      "It runs once",
+      "It skips",
+      "Infinite loop — program never stops",
+      "It throws a variable error",
+    ],
+    correct: 2,
   },
 ];
 
@@ -281,7 +352,7 @@ const LESSONS_BUILDERS: Record<number, LessonContent> = {
       "Placeholder takeaway three for Builders lesson 11.",
     ],
     hasGame: true,
-    quiz: placeholderQuiz(1),
+    quiz: BUILDERS_QUIZ_11,
   },
   12: {
     title: "AI Builders — Build & iterate (placeholder)",
@@ -296,7 +367,7 @@ const LESSONS_BUILDERS: Record<number, LessonContent> = {
       "Placeholder takeaway three for Builders lesson 12.",
     ],
     hasGame: true,
-    quiz: placeholderQuiz(2),
+    quiz: BUILDERS_QUIZ_12,
   },
   13: {
     title: "AI Builders — Ship responsibly (placeholder)",
@@ -311,7 +382,7 @@ const LESSONS_BUILDERS: Record<number, LessonContent> = {
       "Placeholder takeaway three for Builders lesson 13.",
     ],
     hasGame: true,
-    quiz: placeholderQuiz(3),
+    quiz: BUILDERS_QUIZ_13,
   },
 };
 
