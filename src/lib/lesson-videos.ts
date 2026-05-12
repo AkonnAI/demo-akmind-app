@@ -9,9 +9,9 @@ export const LESSON_VIDEOS: Record<number, LessonVideoMeta> = {
   1: { title: "History of AI", hasCaptions: false },
   2: { title: "AI vs Humans", hasCaptions: false },
   3: { title: "Types of AI", hasCaptions: false },
-  11: { title: "AI Builders — Lesson 1", hasCaptions: false },
-  12: { title: "AI Builders — Lesson 2", hasCaptions: false },
-  13: { title: "AI Builders — Lesson 3", hasCaptions: false },
+  11: { title: "Variables : Storing What You Know", hasCaptions: false },
+  12: { title: "Decisions : Teaching Code to Choose", hasCaptions: false },
+  13: { title: "Loops : Making Code Work Smarter", hasCaptions: false },
 };
 
 /**

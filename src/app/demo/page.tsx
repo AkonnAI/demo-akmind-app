@@ -65,7 +65,7 @@ const LESSONS_EXPLORERS = [
 const LESSONS_BUILDERS = [
   {
     id: 11,
-    title: "ML Fundamentals",
+    title: "Variables : Storing What You Know",
     type: "Self-Paced + Game",
     description: "Placeholder — ML fundamentals for builders.",
     duration: "6+ min",
@@ -75,7 +75,7 @@ const LESSONS_BUILDERS = [
   },
   {
     id: 12,
-    title: "Training Your First Model",
+    title: "Decisions : Teaching Code to Choose",
     type: "Self-Paced + Game",
     description: "Placeholder — train your first model.",
     duration: "6+ min",
@@ -85,7 +85,7 @@ const LESSONS_BUILDERS = [
   },
   {
     id: 13,
-    title: "Neural Networks in Action",
+    title: "Loops : Making Code Work Smarter",
     type: "Self-Paced + Game",
     description: "Placeholder — neural networks in action.",
     duration: "6+ min",
