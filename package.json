@@ -12,8 +12,11 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1019.0",
     "@aws-sdk/lib-dynamodb": "^3.1019.0",
+    "@monaco-editor/react": "^4.7.0",
+    "comlink": "^4.4.2",
     "framer-motion": "^12.38.0",
     "groq-sdk": "^1.1.2",
+    "gsap": "^3.15.0",
     "isomorphic-dompurify": "^3.7.1",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.7.0",
@@ -21,7 +24,8 @@
     "nodemailer": "^8.0.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

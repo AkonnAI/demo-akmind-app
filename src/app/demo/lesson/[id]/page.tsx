@@ -334,6 +334,18 @@ const LandscapeWrapper = dynamic(
   () => import("@/components/games/shared/LandscapeWrapper"),
   { ssr: false }
 );
+const Sim1Scene = dynamic(
+  () => import("@/components/games/neuro-sim/sims/Sim1Scene"),
+  { ssr: false }
+);
+const Sim2Scene = dynamic(
+  () => import("@/components/games/neuro-sim/sims/Sim2Scene"),
+  { ssr: false }
+);
+const Sim3Scene = dynamic(
+  () => import("@/components/games/neuro-sim/sims/Sim3Scene"),
+  { ssr: false }
+);
 
 function readCookieToken(): string | null {
   if (typeof document === "undefined") return null;
@@ -1183,7 +1195,6 @@ function LessonPageInner() {
 
           {gameActive && isBuildersSimulationLesson && (
             <div
-              className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0a1a] px-6 text-center text-white"
               style={{
                 position: "absolute",
                 inset: 0,
@@ -1191,31 +1202,36 @@ function LessonPageInner() {
                 height: "100%",
               }}
             >
-              <p className="text-lg font-semibold text-slate-200 sm:text-xl">
-                AI Builders Simulation — Coming Soon
-              </p>
-              <div className="mt-8 flex flex-wrap justify-center gap-3">
-                <button
-                  type="button"
-                  className="rounded-xl bg-cyan-500 px-6 py-3 text-sm font-bold text-black sm:px-8"
-                  onClick={async () => {
+              {lessonId === 11 && (
+                <Sim1Scene
+                  onComplete={async () => {
                     await exitGame();
                     setGameComplete(true);
                     setPhase("quiz");
                   }}
-                >
-                  Continue to Quiz →
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl border border-slate-500 px-6 py-3 text-sm font-semibold text-slate-200 sm:px-8"
-                  onClick={() => {
-                    void exitGame();
+                  onExit={exitGame}
+                />
+              )}
+              {lessonId === 12 && (
+                <Sim2Scene
+                  onComplete={async () => {
+                    await exitGame();
+                    setGameComplete(true);
+                    setPhase("quiz");
                   }}
-                >
-                  Exit
-                </button>
-              </div>
+                  onExit={exitGame}
+                />
+              )}
+              {lessonId === 13 && (
+                <Sim3Scene
+                  onComplete={async () => {
+                    await exitGame();
+                    setGameComplete(true);
+                    setPhase("quiz");
+                  }}
+                  onExit={exitGame}
+                />
+              )}
             </div>
           )}
 
