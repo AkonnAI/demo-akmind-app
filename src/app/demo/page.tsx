@@ -830,6 +830,7 @@ function DemoDashboardInner() {
             currentModule={1}
             lessonOrder={nextLessonId ?? lessons[0]?.id ?? 1}
             currentLesson="Demo Dashboard"
+            course={user?.course}
           />
         </div>
       ) : null}

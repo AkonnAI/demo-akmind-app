@@ -12,6 +12,8 @@ export type DemoLiveStats = {
   modulesCompleted: number;
   lessonsCompleted: number;
   currentModule: number;
+  /** Human-readable module title for NOVA (Builders vs Explorers-style demo). */
+  moduleDisplayName: string;
   currentLesson: string;
   level: number;
   recentQuizScore: number;
@@ -55,10 +57,44 @@ function lessonsArray(lessonsComplete: number | number[] | undefined): number[] 
   return [];
 }
 
+function isBuildersDemoContext(
+  lessonsComplete: number[],
+  lessonOrder?: number
+): boolean {
+  if (
+    typeof lessonOrder === "number" &&
+    lessonOrder >= 11 &&
+    lessonOrder <= 13
+  ) {
+    return true;
+  }
+  return lessonsComplete.some((id) => id >= 11 && id <= 13);
+}
+
+function moduleDisplayNameForDemo(
+  course: "AI Explorers" | "AI Builders" | "AI Innovators" | undefined,
+  lessonsComplete: number[],
+  lessonOrder?: number
+): string {
+  if (course === "AI Builders") {
+    return "Module 1 — Python and the Internet";
+  }
+  if (course === "AI Explorers" || course === "AI Innovators") {
+    return "Module 1 — Introduction to Artificial Intelligence";
+  }
+  return isBuildersDemoContext(lessonsComplete, lessonOrder)
+    ? "Module 1 — Python and the Internet"
+    : "Module 1 — Introduction to Artificial Intelligence";
+}
+
 export function buildDemoLiveStats(input: {
   xp?: number;
   lessonsComplete?: number | number[];
   currentModule?: number;
+  /** Current demo lesson id (1–3 Explorers, 11–13 Builders); drives curriculum hints. */
+  lessonOrder?: number;
+  /** When set, selects Builders vs Explorers-style module label for NOVA. */
+  course?: "AI Explorers" | "AI Builders" | "AI Innovators";
   currentLesson?: string;
   quizScores?: Record<string, number> | null;
   badgeEarned?: boolean;
@@ -74,6 +110,11 @@ export function buildDemoLiveStats(input: {
     modulesCompleted: n >= 3 ? 1 : 0,
     lessonsCompleted: n,
     currentModule: input.currentModule ?? 1,
+    moduleDisplayName: moduleDisplayNameForDemo(
+      input.course,
+      arr,
+      input.lessonOrder
+    ),
     currentLesson: input.currentLesson || "exploring the demo",
     level: Math.floor(xp / 1000),
     recentQuizScore: averageQuizScore(input.quizScores),

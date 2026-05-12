@@ -58,13 +58,18 @@ export default function DemoCompleteCelebration({
 }) {
   const [badgeDownloading, setBadgeDownloading] = useState(false);
   const courseName = user.course;
+  const demoCompleteBadgeTitle =
+    courseName === "AI Builders"
+      ? "AI Builders Demo Complete"
+      : courseName === "AI Explorers"
+        ? "AI Explorers Demo Complete"
+        : `${courseName} Demo Complete`;
 
   const downloadBadge = async () => {
     if (!user) return;
     setBadgeDownloading(true);
     try {
       const logoData = await fetchWordmarkDataUrl();
-      const courseUpper = courseName.toUpperCase();
 
       const doc = new jsPDF({
         orientation: "landscape",
@@ -108,20 +113,21 @@ export default function DemoCompleteCelebration({
       doc.setFontSize(20);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 41, 59);
-      doc.text(`${courseUpper} — DEMO CERTIFICATE`, 148, yAfterHeader + 18, {
-        align: "center",
-      });
+      const titleLines = doc.splitTextToSize(demoCompleteBadgeTitle, 248);
+      doc.text(titleLines, 148, yAfterHeader + 18, { align: "center" });
+      const yAfterTitle =
+        yAfterHeader + 18 + titleLines.length * 7.5 + 6;
 
       doc.setFontSize(12);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(71, 85, 105);
-      doc.text("This certifies that", 148, yAfterHeader + 36, {
+      doc.text("This certifies that", 148, yAfterTitle + 12, {
         align: "center",
       });
       doc.setFontSize(22);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(79, 70, 229);
-      doc.text(user.childName || "Student", 148, yAfterHeader + 50, {
+      doc.text(user.childName || "Student", 148, yAfterTitle + 26, {
         align: "center",
       });
 
@@ -131,24 +137,32 @@ export default function DemoCompleteCelebration({
       doc.text(
         `Total XP Earned: ${user.xp ?? 0} XP`,
         148,
-        yAfterHeader + 58,
+        yAfterTitle + 34,
         { align: "center" }
       );
 
       doc.text(
         `has successfully completed the AKMIND ${courseName} Demo Program`,
         148,
-        yAfterHeader + 68,
+        yAfterTitle + 44,
         { align: "center" }
       );
       doc.text(
         "covering 3 lessons on Artificial Intelligence fundamentals.",
         148,
-        yAfterHeader + 76,
+        yAfterTitle + 52,
         { align: "center" }
       );
+      if (courseName === "AI Builders") {
+        doc.text(
+          "Module completed: Module 1 — Python and the Internet",
+          148,
+          yAfterTitle + 60,
+          { align: "center" }
+        );
+      }
 
-      let yPos = yAfterHeader + 86;
+      let yPos = yAfterTitle + (courseName === "AI Builders" ? 70 : 62);
       const earnedBadgeLabels = (user.earnedBadges ?? [])
         .map((slug) => DEMO_BADGES.find((b) => b.slug === slug)?.name)
         .filter((n): n is string => Boolean(n));
@@ -337,10 +351,10 @@ export default function DemoCompleteCelebration({
               WebkitTextFillColor: "transparent",
             }}
           >
-            Demo Complete — {courseName}!
+            You&apos;ve completed your {courseName} Demo!
           </h1>
           <p className="mt-3 text-center text-slate-400">
-            {childName} has finished the AKMIND {courseName} demo!
+            {childName}, you finished every lesson in your {courseName} demo — well done!
           </p>
 
           <div className="mx-auto mt-8 grid max-w-2xl grid-cols-3 gap-3">
@@ -477,7 +491,7 @@ export default function DemoCompleteCelebration({
               </div>
               <p className="relative my-3 text-7xl drop-shadow-lg">🏅</p>
               <p className="relative text-3xl font-black tracking-tight text-white">
-                {courseName}
+                {demoCompleteBadgeTitle}
               </p>
               <p className="relative mt-1 text-[11px] font-semibold tracking-[0.28em] text-cyan-400">
                 DEMO CERTIFICATE OF COMPLETION

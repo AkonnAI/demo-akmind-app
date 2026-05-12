@@ -5,6 +5,7 @@ import { X, Send, BrainCircuit } from "lucide-react";
 import NOVACharacter from "./NOVACharacter";
 import { useNOVAVoice } from "@/hooks/useNOVAVoice";
 import NOVAVoiceButton from "@/components/NOVAVoiceButton";
+import type { DemoUser } from "@/types/demo";
 
 interface Message {
   id: string;
@@ -26,6 +27,7 @@ interface NOVAChatProps {
   lessonOrder?: number;
   quizScores?: Record<string, number> | null;
   badgeEarned?: boolean;
+  course?: DemoUser["course"];
 }
 
 const DEMO_STARTERS = [
@@ -46,6 +48,7 @@ export default function NOVAChat({
   lessonOrder = 1,
   quizScores,
   badgeEarned = false,
+  course,
 }: Readonly<NOVAChatProps>) {
   const [isOpen, setIsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -128,6 +131,7 @@ export default function NOVAChat({
             lessonOrder,
             quizScores: quizScores ?? undefined,
             badgeEarned,
+            course,
           }),
         });
 
@@ -230,6 +234,7 @@ export default function NOVAChat({
       lessonOrder,
       quizScores,
       badgeEarned,
+      course,
       speak,
     ]
   );

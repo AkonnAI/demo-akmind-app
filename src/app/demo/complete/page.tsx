@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 
-/** Course-aware: Builders need 11–13; Explorers, Innovators, and unknown use 1–3. */
+/** Builders need 11–13; Explorers need 1–3. Innovators use the Explorers lesson set. */
 function isCourseDemoComplete(
   course: DemoUser["course"] | undefined,
   lessonsComplete: number[]
@@ -14,6 +14,9 @@ function isCourseDemoComplete(
   const done = new Set(lessonsComplete);
   if (course === "AI Builders") {
     return [11, 12, 13].every((id) => done.has(id));
+  }
+  if (course === "AI Explorers") {
+    return [1, 2, 3].every((id) => done.has(id));
   }
   return [1, 2, 3].every((id) => done.has(id));
 }

@@ -55,6 +55,42 @@ export const LESSON_SUMMARIES: Record<
       "Google Pay fraud detection is narrow AI — brilliant at one thing, useless at everything else",
     nextLesson: "AI Around Us — Assistants, Recommendations and Maps",
   },
+  "1-11": {
+    title: "Variables — Storing What You Know",
+    keyPoints: [
+      "Variables are containers that store data in a program",
+      "In Python you create a variable with a name and assign a value using =",
+      "Variables can hold numbers, text, and other data types",
+      "AI models use millions of variables called parameters to store what they have learned",
+    ],
+    indianExample:
+      "A billing app in Bengaluru stores your name and UPI ID in variables before sending a payment — same idea as named boxes in code",
+    nextLesson: "Decisions — Teaching Code to Choose",
+  },
+  "1-12": {
+    title: "Decisions — Teaching Code to Choose",
+    keyPoints: [
+      "If-else statements let programs choose what to do based on conditions",
+      "AI systems classify inputs by checking conditions and picking an output",
+      "Decision trees in machine learning branch left or right based on features in the data",
+      "Clear conditions make programs predictable and easier to debug",
+    ],
+    indianExample:
+      "IRCTC waitlist logic is like an if-else chain: if a seat opens, book it; else try the next train — programs follow the same branching idea",
+    nextLesson: "Loops — Making Code Work Smarter",
+  },
+  "1-13": {
+    title: "Loops — Making Code Work Smarter",
+    keyPoints: [
+      "Loops repeat a block of code many times without writing it again",
+      "For loops walk through a sequence; while loops run until a condition becomes false",
+      "AI training loops over thousands of examples, adjusting parameters each pass to reduce error",
+      "Loops save time and keep code short when work is repetitive",
+    ],
+    indianExample:
+      "SMS OTP spam filters scan millions of messages in a loop each night — similar to how training cycles through rows of data again and again",
+    nextLesson: "Continue with the full AI Builders curriculum when you join the program",
+  },
 };
 
 export function getLessonSummary(moduleId: number, lessonId: number) {

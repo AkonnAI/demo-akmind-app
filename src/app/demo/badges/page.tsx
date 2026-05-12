@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { normalizeClientDemoToken } from "@/lib/demo-token-client";
 
 function readCookieToken(): string | null {
@@ -28,6 +28,66 @@ function streakFromStart(lessonsComplete: number[]): number {
     else break;
   }
   return s;
+}
+
+type DemoBadgeDisplayRow = {
+  slug: string;
+  name: string;
+  description: string;
+  icon: string;
+  earned: boolean;
+};
+
+function demoBadgesForUser(user: DemoUser): DemoBadgeDisplayRow[] {
+  const lc = user.lessonsComplete ?? [];
+  if (user.course === "AI Builders") {
+    const anyLesson = lc.length > 0;
+    const allBuilders = [11, 12, 13].every((id) => lc.includes(id));
+    return [
+      {
+        slug: "first-step",
+        name: "First Step",
+        description: "Complete your first lesson",
+        icon: "🚀",
+        earned: anyLesson,
+      },
+      {
+        slug: "variable-master",
+        name: "Variable Master",
+        description: "Complete the Variables lesson",
+        icon: "📦",
+        earned: lc.includes(11),
+      },
+      {
+        slug: "logic-builder",
+        name: "Logic Builder",
+        description: "Complete the Decisions lesson",
+        icon: "🔀",
+        earned: lc.includes(12),
+      },
+      {
+        slug: "loop-champion",
+        name: "Loop Champion",
+        description: "Complete the Loops lesson",
+        icon: "🔁",
+        earned: lc.includes(13),
+      },
+      {
+        slug: "python-pioneer",
+        name: "Python Pioneer",
+        description: "Complete all 3 AI Builders lessons",
+        icon: "🐍",
+        earned: allBuilders,
+      },
+    ];
+  }
+  return DEMO_BADGES.map((b) => ({
+    slug: b.slug,
+    name: b.name,
+    description: b.description,
+    icon: b.icon,
+    earned: b.condition(user),
+  }));
 }
 
 function DemoBadgesInner() {
@@ -117,10 +177,20 @@ function DemoBadgesInner() {
   const isBadgesRoute = pathname.startsWith("/demo/badges");
 
   const showShell = !loading && user && token;
-  const earnedCount = user
-    ? DEMO_BADGES.filter((b) => b.condition(user)).length
-    : 0;
-  const progressPct = (earnedCount / DEMO_BADGES.length) * 100;
+  const displayBadges = useMemo(
+    () => (user ? demoBadgesForUser(user) : []),
+    [user]
+  );
+  const earnedForProgress = useMemo(() => {
+    if (!user || user.course !== "AI Builders") {
+      return displayBadges.filter((b) => b.earned).length;
+    }
+    return displayBadges
+      .filter((b) => b.slug !== "python-pioneer")
+      .filter((b) => b.earned).length;
+  }, [user, displayBadges]);
+  const badgeTotal = 4;
+  const progressPct = (earnedForProgress / badgeTotal) * 100;
 
   return (
     <div className="min-h-screen pb-20 md:pb-0">
@@ -228,7 +298,7 @@ function DemoBadgesInner() {
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium text-slate-300">Progress</span>
                   <span className="tabular-nums text-slate-400">
-                    {earnedCount} / {DEMO_BADGES.length}
+                    {earnedForProgress} / {badgeTotal}
                   </span>
                 </div>
                 <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-800">
@@ -244,8 +314,8 @@ function DemoBadgesInner() {
                   Demo Badges
                 </h2>
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-                  {DEMO_BADGES.map((badge) => {
-                    const earned = badge.condition(user);
+                  {displayBadges.map((badge) => {
+                    const earned = badge.earned;
                     return (
                       <div
                         key={badge.slug}

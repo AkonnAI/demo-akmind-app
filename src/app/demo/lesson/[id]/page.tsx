@@ -1400,6 +1400,7 @@ function LessonPageInner() {
           currentModule={1}
           lessonOrder={lessonId}
           currentLesson={lesson?.title || ""}
+          course={user?.course}
         />
       ) : null}
     </div>

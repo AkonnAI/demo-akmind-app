@@ -66,8 +66,14 @@ function buildDemoSystemPrompt(
   lessonOrder: number
 ): string {
   const summaryModuleId = askedModule ?? currentModule;
+  const lo =
+    typeof lessonOrder === "number" && lessonOrder > 0 ? lessonOrder : 1;
   const lessonIdForContent =
-    askedModule != null ? 1 : Math.min(4, lessonOrder + 1);
+    askedModule != null
+      ? 1
+      : lo >= 11 && lo <= 13
+        ? lo
+        : Math.min(4, lo + 1);
   const moduleSummary = getModuleSummary(summaryModuleId);
   const lessonSummary = getLessonSummary(summaryModuleId, lessonIdForContent);
 
@@ -89,6 +95,7 @@ Badges earned: ${live.badges}
 Demo modules completed (1 when all 3 lessons done): ${live.modulesCompleted}
 Lessons completed in demo: ${live.lessonsCompleted} of 3
 Current module: ${live.currentModule}
+Module name: ${live.moduleDisplayName}
 Recent average quiz score: ${live.recentQuizScore}%
 Badges list: ${live.badgeList.length ? live.badgeList.join(", ") : "none yet"}
 
@@ -174,6 +181,7 @@ export async function POST(req: NextRequest) {
       lessonOrder = 1,
       quizScores,
       badgeEarned,
+      course,
     } = body as {
       message?: string;
       conversationHistory?: Array<{ role: string; content: string }>;
@@ -187,6 +195,7 @@ export async function POST(req: NextRequest) {
       lessonOrder?: number;
       quizScores?: Record<string, number> | null;
       badgeEarned?: boolean;
+      course?: "AI Explorers" | "AI Builders" | "AI Innovators";
     };
 
     if (!message?.trim()) {
@@ -211,6 +220,8 @@ export async function POST(req: NextRequest) {
       xp,
       lessonsComplete,
       currentModule,
+      lessonOrder,
+      course,
       currentLesson,
       quizScores,
       badgeEarned,
