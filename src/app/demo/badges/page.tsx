@@ -11,6 +11,7 @@ import {
   Layers,
   LayoutDashboard,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
@@ -97,6 +98,16 @@ function demoBadgesForUser(user: DemoUser): DemoBadgeDisplayRow[] {
     earned: b.condition(user),
   }));
 }
+
+const gridVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07 } },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.28, ease: "easeOut" as const } },
+};
 
 function DemoBadgesInner() {
   const router = useRouter();
@@ -209,10 +220,10 @@ function DemoBadgesInner() {
     <div className="min-h-screen pb-20 md:pb-0">
       {showShell ? (
         <aside
-          className="fixed left-0 top-0 z-40 hidden h-screen w-[260px] flex-col border-r border-[rgba(99,102,241,0.12)] bg-[rgba(6,8,15,0.95)] backdrop-blur-[20px] md:flex"
-          style={{ boxShadow: "4px 0 32px rgba(0,0,0,0.5)" }}
+          className="fixed left-0 top-0 z-40 hidden h-screen w-[260px] flex-col border-r border-[rgba(255,255,255,0.08)] backdrop-blur-[20px] md:flex"
+          style={{ background: "var(--cn-surface-container-min)", boxShadow: "1px 0 0 rgba(255,255,255,0.06)" }}
         >
-          <div className="flex w-full min-w-0 flex-col items-center border-b border-[rgba(99,102,241,0.1)] px-4 py-5">
+          <div className="flex w-full min-w-0 flex-col items-center border-b border-[rgba(255,255,255,0.08)] px-4 py-5">
             <AkmindLogo
               variant="wordmark"
               priority
@@ -233,9 +244,9 @@ function DemoBadgesInner() {
             </Link>
             <Link
               href={badgesHref}
-              className="flex items-center gap-3 rounded-lg bg-indigo-500/15 px-3 py-2.5 text-left text-sm font-medium text-white"
+              className="flex items-center gap-3 rounded-lg bg-[#1E2235] px-3 py-2.5 text-left text-sm font-bold text-[#c0c1ff] border-r-2 border-[#c0c1ff]"
             >
-              <Award className="h-5 w-5 text-indigo-400" />
+              <Award className="h-5 w-5 text-[#c0c1ff]" />
               Badges
             </Link>
             <Link
@@ -256,7 +267,7 @@ function DemoBadgesInner() {
             )}
           </nav>
 
-          <div className="mt-auto border-t border-[rgba(99,102,241,0.1)] p-4">
+          <div className="mt-auto border-t border-[rgba(255,255,255,0.08)] p-4">
             <div className="demo-ak-glass-surface rounded-xl p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-500/30 text-sm font-bold text-indigo-100">
@@ -274,7 +285,7 @@ function DemoBadgesInner() {
                 onClick={() => setXpModalOpen(true)}
                 className="mt-3 w-full text-left"
               >
-                <p className="text-lg font-bold text-indigo-300">{xp} XP</p>
+                <p className="font-mono text-lg font-bold text-indigo-300">{xp} XP</p>
               </button>
               <span className="mt-2 inline-flex rounded-full bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-400">
                 {streak}d streak
@@ -288,12 +299,12 @@ function DemoBadgesInner() {
         <main className="relative z-10 min-h-screen px-4 py-5 pb-24 md:px-8 md:py-8 md:pb-10">
           {loading && (
             <div className="mx-auto max-w-4xl space-y-6 animate-pulse">
-              <div className="h-8 rounded-lg bg-[#1a2235]" />
-              <div className="h-6 max-w-md rounded bg-[#1a2235]" />
-              <div className="h-3 max-w-sm rounded-full bg-[#1a2235]" />
+              <div className="h-8 rounded-lg bg-[#1d1f2b]" />
+              <div className="h-6 max-w-md rounded bg-[#1d1f2b]" />
+              <div className="h-3 max-w-sm rounded-full bg-[#1d1f2b]" />
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="h-40 rounded-xl bg-[#1a2235]" />
+                  <div key={i} className="h-40 rounded-xl bg-[#1d1f2b]" />
                 ))}
               </div>
             </div>
@@ -309,7 +320,7 @@ function DemoBadgesInner() {
                 Back to dashboard
               </Link>
 
-              <h1 className="text-3xl font-extrabold tracking-tight text-white md:text-4xl">
+              <h1 className="font-display text-3xl font-extrabold tracking-tight text-white md:text-4xl">
                 Badges
               </h1>
               <p className="mt-2 max-w-xl text-sm text-slate-400 md:text-base">
@@ -319,66 +330,77 @@ function DemoBadgesInner() {
               <div className="mt-8">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium text-slate-300">Progress</span>
-                  <span className="tabular-nums text-slate-400">
+                  <span className="font-mono tabular-nums text-slate-400">
                     {earnedForProgress} / {badgeTotal}
                   </span>
                 </div>
-                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-800">
-                  <div
-                    className="h-full rounded-full bg-indigo-500 transition-all"
-                    style={{ width: `${progressPct}%` }}
+                <div className="h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden mt-2 shadow-inner">
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ background: "linear-gradient(90deg, #22d3ee 0%, #818cf8 50%, #c0c1ff 100%)" }}
+                    initial={{ width: "0%" }}
+                    animate={{ width: `${progressPct}%` }}
+                    transition={{ duration: 0.85, ease: "easeOut", delay: 0.1 }}
                   />
                 </div>
+                {earnedForProgress === badgeTotal && (
+                  <p className="mt-2 text-xs font-semibold text-amber-400">All badges earned!</p>
+                )}
               </div>
 
               <section className="mt-10">
-                <h2 className="demo-ak-section-heading mb-4 text-lg font-bold text-white">
+                <h2 className="font-display demo-ak-section-heading mb-4 text-lg font-bold text-white">
                   Demo Badges
                 </h2>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+                <motion.div
+                  className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4"
+                  variants={gridVariants}
+                  initial="hidden"
+                  animate="show"
+                >
                   {displayBadges.map((badge) => {
                     const earned = badge.earned;
                     return (
-                      <div
+                      <motion.div
                         key={badge.slug}
-                        className={`flex flex-col rounded-xl border p-4 backdrop-blur-[12px] ${
+                        variants={cardVariants}
+                        className={`relative rounded-xl p-6 flex flex-col items-center text-center transition-all duration-200 group ${
                           earned
-                            ? "border-[rgba(99,102,241,0.35)] bg-gradient-to-b from-indigo-500/18 to-[rgba(15,20,50,0.88)] shadow-lg shadow-indigo-950/30"
-                            : "demo-ak-glass-surface"
+                            ? "badge-earned-glow bg-[#161929] border border-[rgba(192,193,255,0.15)] hover:bg-[#1a1d2e] hover:border-[rgba(192,193,255,0.25)]"
+                            : "bg-[#161929] border border-[rgba(255,255,255,0.06)] opacity-45 hover:opacity-55"
                         }`}
                       >
-                        <div
-                          className={`flex select-none justify-center text-4xl md:text-5xl ${
-                            earned ? "" : "opacity-40 grayscale"
-                          }`}
-                        >
+                        {earned && (
+                          <div className="absolute inset-0 rounded-xl pointer-events-none" style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(192,193,255,0.07) 0%, transparent 70%)" }} />
+                        )}
+                        <div className={`badge-icon-glow w-16 h-16 rounded-xl flex items-center justify-center mb-4 text-3xl ${
+                          earned
+                            ? "bg-[rgba(192,193,255,0.1)] border border-[rgba(192,193,255,0.25)]"
+                            : "bg-[#1d1f2b] border border-[rgba(255,255,255,0.05)]"
+                        }`}>
                           {badge.icon}
                         </div>
-                        <p
-                          className={`mt-3 text-center text-sm font-bold leading-snug md:text-base ${
-                            earned ? "text-white" : "text-slate-500"
-                          }`}
-                        >
+                        <p className={`font-display text-sm font-bold leading-snug md:text-base ${earned ? "text-white" : "text-[#c7c4d7]"}`}>
                           {badge.name}
                         </p>
-                        <p className="mt-1 flex-1 text-center text-xs leading-relaxed text-slate-500">
+                        <p className="mt-1 flex-1 text-center text-xs leading-relaxed text-[#908fa0]">
                           {badge.description}
                         </p>
-                        <div className="mt-3 flex justify-center">
+                        <div className="mt-4 flex justify-center">
                           {earned ? (
-                            <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-400">
-                              Earned
+                            <span className="px-3 py-1 rounded-full bg-[rgba(16,185,129,0.1)] border border-[rgba(16,185,129,0.25)] text-[#10B981] font-mono text-[11px] font-bold tracking-wide">
+                              EARNED
                             </span>
                           ) : (
-                            <span className="rounded-full bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                              Locked 🔒
+                            <span className="px-3 py-1 rounded-full bg-[#1d1f2b] border border-[rgba(255,255,255,0.08)] text-[#c7c4d7] font-mono text-[11px]">
+                              LOCKED
                             </span>
                           )}
                         </div>
-                      </div>
+                      </motion.div>
                     );
                   })}
-                </div>
+                </motion.div>
               </section>
             </div>
           )}
@@ -430,8 +452,8 @@ function DemoBadgesInner() {
       {!loading && user && token ? (
         <>
           <nav
-            className="fixed bottom-0 left-0 z-30 flex h-16 w-full items-stretch border-t border-[rgba(99,102,241,0.15)] pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-[20px] md:hidden"
-            style={{ background: "rgba(8,10,22,0.95)" }}
+            className="fixed bottom-0 left-0 z-30 flex h-16 w-full items-stretch border-t border-[rgba(255,255,255,0.08)] pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-[20px] md:hidden"
+            style={{ background: "var(--cn-surface-container-min)" }}
           >
             <button
               type="button"
@@ -440,7 +462,7 @@ function DemoBadgesInner() {
                 router.push(dashboardHref);
               }}
               className={`flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium ${
-                isDemoHome ? "text-[#06B6D4]" : "text-slate-500"
+                isDemoHome ? "text-[#5de6ff]" : "text-slate-500"
               }`}
               aria-label="Dashboard home"
             >
@@ -457,7 +479,7 @@ function DemoBadgesInner() {
                 router.push(badgesHref);
               }}
               className={`flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium ${
-                isBadgesRoute ? "text-[#06B6D4]" : "text-slate-500"
+                isBadgesRoute ? "text-[#5de6ff]" : "text-slate-500"
               }`}
               aria-label="Badges"
             >
@@ -475,7 +497,7 @@ function DemoBadgesInner() {
               }}
               className={`flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium ${
                 bottomActive === "nova" && isDemoHome
-                  ? "text-[#06B6D4]"
+                  ? "text-[#5de6ff]"
                   : "text-slate-500"
               }`}
               aria-label="NOVA"
@@ -496,7 +518,7 @@ function DemoBadgesInner() {
                   router.push(programsHref);
                 }}
                 className={`flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium ${
-                  isProgramsRoute ? "text-[#06B6D4]" : "text-slate-500"
+                  isProgramsRoute ? "text-[#5de6ff]" : "text-slate-500"
                 }`}
                 aria-label="Programs"
               >
@@ -520,8 +542,8 @@ function DemoBadgesInner() {
                 onClick={(e) => e.stopPropagation()}
                 role="presentation"
               >
-                <h3 className="text-lg font-bold text-white">Your XP</h3>
-                <p className="mt-2 text-3xl font-black text-indigo-300">
+                <h3 className="font-display text-lg font-bold text-white">Your XP</h3>
+                <p className="font-mono mt-2 text-3xl font-black text-indigo-300">
                   {user.xp} XP
                 </p>
                 <p className="mt-1 text-sm text-slate-400">
@@ -556,11 +578,11 @@ export default function DemoBadgesPage() {
       fallback={
         <div className="min-h-screen">
           <div className="mx-auto max-w-4xl animate-pulse space-y-6 px-4 py-8">
-            <div className="h-10 rounded-lg bg-[#1a2235]" />
-            <div className="h-6 max-w-sm rounded bg-[#1a2235]" />
+            <div className="h-10 rounded-lg bg-[#1d1f2b]" />
+            <div className="h-6 max-w-sm rounded bg-[#1d1f2b]" />
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-36 rounded-xl bg-[#1a2235]" />
+                <div key={i} className="h-36 rounded-xl bg-[#1d1f2b]" />
               ))}
             </div>
           </div>

@@ -4,6 +4,7 @@ import { DEMO_BADGES } from "@/lib/demo-badges";
 import { BRAND_WORDMARK_PATH } from "@/lib/brand";
 import type { DemoUser } from "@/types/demo";
 import { jsPDF } from "jspdf";
+import { motion } from "framer-motion";
 import Image from "next/image";
 import { Trophy, Zap } from "lucide-react";
 import Link from "next/link";
@@ -344,7 +345,7 @@ export default function DemoCompleteCelebration({
           </div>
 
           <h1
-            className="mt-4 text-center text-4xl font-extrabold sm:text-5xl"
+            className="font-display mt-4 text-center text-4xl font-extrabold sm:text-5xl"
             style={{
               background: "linear-gradient(135deg, #FFFFFF, #67E8F9)",
               WebkitBackgroundClip: "text",
@@ -357,18 +358,25 @@ export default function DemoCompleteCelebration({
             {childName}, you finished every lesson in your {courseName} demo — well done!
           </p>
 
-          <div className="mx-auto mt-8 grid max-w-2xl grid-cols-3 gap-3">
+          <motion.div
+            className="mx-auto mt-8 grid max-w-2xl grid-cols-3 gap-3"
+            initial="hidden"
+            animate="show"
+            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08 } } }}
+          >
             {[
               {
                 big: `${xp}`,
                 label: "Points",
                 icon: <Zap className="h-4 w-4 text-cyan-300" />,
+                mono: true,
               },
-              { big: "3/3", label: "Lessons", icon: <span>📚</span> },
-              { big: certDate, label: "Date", icon: <span>📅</span> },
+              { big: "3/3", label: "Lessons", icon: <span>📚</span>, mono: true },
+              { big: certDate, label: "Date", icon: <span>📅</span>, mono: false },
             ].map((s) => (
-              <div
+              <motion.div
                 key={s.label}
+                variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.3 } } }}
                 className="group rounded-2xl border p-4 text-center transition-all duration-300 hover:-translate-y-0.5"
                 style={{
                   background: "rgba(15,20,50,0.7)",
@@ -382,16 +390,16 @@ export default function DemoCompleteCelebration({
                     {s.icon}
                   </span>
                 </div>
-                <p className="text-base font-bold text-white sm:text-xl">{s.big}</p>
+                <p className={`text-base font-bold text-white sm:text-xl ${s.mono ? "font-mono" : ""}`}>{s.big}</p>
                 <p className="mt-1 text-[10px] uppercase tracking-[0.08em] text-slate-500">
                   {s.label}
                 </p>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           <div className="mx-auto mt-8 max-w-2xl">
-            <h2 className="mb-4 border-l-4 border-indigo-500 pl-3 text-lg font-bold text-white">
+            <h2 className="font-display mb-4 border-l-4 border-indigo-500 pl-3 text-lg font-bold text-white">
               🏅 Your Badges
             </h2>
             {earnedBadgesFromSlugs.length > 0 ? (
@@ -432,7 +440,7 @@ export default function DemoCompleteCelebration({
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">
               Coming next
             </p>
-            <p className="mt-3 text-xl font-black text-white sm:text-2xl">
+            <p className="font-display mt-3 text-xl font-black text-white sm:text-2xl">
               {fullCourseLine(courseName)}
             </p>
             <p className="mt-2 text-sm text-slate-300">{STAY_TUNED_LINE}</p>
@@ -490,7 +498,7 @@ export default function DemoCompleteCelebration({
                 />
               </div>
               <p className="relative my-3 text-7xl drop-shadow-lg">🏅</p>
-              <p className="relative text-3xl font-black tracking-tight text-white">
+              <p className="font-display relative text-3xl font-black tracking-tight text-white">
                 {demoCompleteBadgeTitle}
               </p>
               <p className="relative mt-1 text-[11px] font-semibold tracking-[0.28em] text-cyan-400">

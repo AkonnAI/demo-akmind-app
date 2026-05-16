@@ -6,88 +6,67 @@ This document is the **single source of truth** for **demo-akmind-app**: what it
 
 ## 0. Latest Updates (Apr–May 2026)
 
-Recent production-facing changes implemented in this repository:
+Canonical snapshot of what the demo does today — see later sections for deep dives.
 
-- **Lesson video gates & purchase upsell**
-  - **`VideoPlayer`** (`src/components/lesson/VideoPlayer.tsx`) streams from **`NEXT_PUBLIC_CDN_URL`** (`lesson-videos.ts`). It enforces **real playback** via `video.played` TimeRanges (not scrub-only).
-  - **Lessons 1–3 (non-admin):** **≥ 120 seconds** of actual playback (`MIN_LESSON_VIDEO_PLAY_SECONDS`), capped at video duration if shorter. The player then **pauses** (`pauseVideo` prop); an **amber purchase upsell card** appears (demo preview, link to akmind.com, **Continue to Game →** / quiz). Learners have **no** separate standard Continue until this gate fires.
-  - **Admin testers** (`admin@akmind.com` or display name `Admin`): gates bypassed — immediate standard gradient **Continue** button.
-  - Optional **`minPlayedSeconds`** + **`enforceWatchThrough`**; if `minPlayedSeconds` is omitted but `enforceWatchThrough` is true, legacy behavior uses **~92%** of the timeline played (`WATCH_PLAYED_THRESHOLD`).
+### Dual demo programs (`course`)
 
-- **Demo session cookie & user API rate limit** (`src/lib/demo-session.ts`)
+- **`AI Explorers`** — demo lesson ids **`1`, `2`, `3`**. Full-screen game phase uses **`NeuropolisShell`** inside **`LandscapeWrapper`** (`dynamic(..., { ssr: false })`). **`bootstrapNeuropolisDemo`** wires canvas, **`DeviceManager`**, **`InputManager`**, **`TouchControls`** (`bypassDeviceGate: true`), boot/cinematic/game scenes for **`level`** **`1` \| `2` \| `3`**.
+- **`AI Builders`** — demo lesson ids **`11`, `12`, `13`**. Game phase mounts **`Sim1Scene`**, **`Sim2Scene`**, or **`Sim3Scene`** from **`src/components/games/neuro-sim/sims/`** (Python-teaching simulations + Monaco-backed editing where applicable).
+- **`AI Innovators`** appears on **`DemoUser`** / **`registerSchema`** for schema continuity; landing and admin switches focus on **Explorers vs Builders**.
+- **`src/lib/demo-lesson-scope.ts`** defines valid ids, **`sanitizeDemoLessonsComplete`** (drops legacy ids such as old lesson **`4`**), and **`allDemoLessonsComplete`**: **`true`** when **either** **`[1,2,3]`** or **`[11,12,13]`** is fully complete — matching **`POST /api/demo/progress`** completion / badge logic.
+
+### Registration, admin profile, Programs tab
+
+- **`POST /api/demo/register`** accepts optional **`course`** (defaults **`AI Explorers`**).
+- **`PATCH /api/demo/admin`** with **`{ course: "AI Explorers" \| "AI Builders" }`** updates the **persisted admin demo user** — shared by **`/admin`** (`course` picker + completion preview) and **`/demo/programs`** (cyberpunk shell with sidebar / bottom nav). **`DELETE /api/demo/admin`** resets that admin user’s progress fields.
+- **`/demo/programs`** is **admin testers only** (`admin@akmind.com` or display name **`Admin`**); everyone else is redirected to **`/demo`**. It calls **`GET /api/demo/user?token=…`** and expects a **flat JSON profile** (same shape as **`DemoUser`**), including **`course`** and **`earnedBadges`** (defaults to **`[]`** if missing).
+
+### Lesson video gates & CDN mapping
+
+- **`VideoPlayer`** (`src/components/lesson/VideoPlayer.tsx`) streams MP4 from **`NEXT_PUBLIC_CDN_URL`** when set (**`lesson-videos.ts`**). Explorers ids **`1–3`** map to CDN folders **`lesson-2` … `lesson-4`** via **`cdnLessonFolderNumber`**; Builders **`11–13`** use **`lesson-11` … `lesson-13`**. Optional **`poster.jpg`** / **`captions.vtt`** per **`LESSON_VIDEOS`** meta.
+- **Video gates:** **`MIN_LESSON_VIDEO_PLAY_SECONDS` (120)** real **`played`** time on **Explorers 1–3** and **Builders 11–13** drives **`enforceWatchThrough`** / **`minPlayedSeconds`** → **`pauseVideo`** + **`playbackLocked`** + amber upsell (**Continue to Game →**). **Admin testers** bypass **lesson-lock** screens (sequencing) but follow the same **`VideoPlayer`** props on gated ids unless you change `lesson/[id]/page.tsx`.
+- Optional **`enforceWatchThrough`** without **`minPlayedSeconds`** still supports **`WATCH_PLAYED_THRESHOLD`** (~92%) legacy behavior elsewhere.
+
+### Demo session cookie & user API rate limit (`src/lib/demo-session.ts`)
 
 ```typescript
-/**
- * Demo access cookie — refreshed when users hit any `/demo/*` route (see middleware).
- * Tokens themselves do not expire in the database; persistence is mainly this cookie + URL.
- */
 export const DEMO_TOKEN_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365; // 1 year
-
-/** GET /api/demo/user — generous limit so dashboards / lessons / DevTools do not false-expire sessions */
 export const DEMO_USER_API_RATE_LIMIT_PER_MINUTE = 240;
 ```
 
-  - **`middleware.ts`** sets `demo_token` with **`DEMO_TOKEN_COOKIE_MAX_AGE_SECONDS`** (365 days in production usage).
-  - **`GET /api/demo/user`** imports **`DEMO_USER_API_RATE_LIMIT_PER_MINUTE`** for throttling.
+- **`middleware.ts`** refreshes **`demo_token`** on every **`/demo/*`** hit using **`DEMO_TOKEN_COOKIE_MAX_AGE_SECONDS`**.
+- **`GET /api/demo/user`** rate-limits per IP via **`DEMO_USER_API_RATE_LIMIT_PER_MINUTE`**.
 
-- **Neuropolis as the lesson game (lessons 1–4)**
-  - **`src/app/demo/lesson/[id]/page.tsx`** loads **`NeuropolisShell`** via `dynamic(..., { ssr: false })` inside **`LandscapeWrapper`** when `phase === "game"` and `lessonId` is 1–4.
-  - **`bootstrapNeuropolisDemo`** (`src/neuropolis/bootstrapDemoLevel.ts`) mounts canvas, **`DeviceManager.init`**, **`InputManager`**, **`TouchControls`** (`bypassDeviceGate: true` for demo), and the correct **`GameScene` / `GameScene2`–`GameScene4`** for the level. Returns a **teardown** on unmount or **Exit**.
-  - **`NOVAChat`** floating FAB is **suppressed** while the game is active (`suppressNovaChatFab = phase === "game" && gameActive`) so taps go to the canvas / dialogue.
+### NOVA (Groq) + optional ElevenLabs + browser voice
 
-- **Lesson video playback (S3 CDN)**
-  - Streams MP4 from **`NEXT_PUBLIC_CDN_URL`** using paths `videos/lesson-{n}/1080p.mp4` and optional **`poster.jpg`** / **`captions.vtt`** (when captions are enabled in **`src/lib/lesson-videos.ts`**).
-  - If the CDN URL is missing, the UI shows a clear configuration message instead of crashing.
+- **`POST /api/nova`**: Groq (**`llama-3.3-70b-versatile`** or **`GROQ_MODEL_ID`**), **`demoMemory`** Map, prompts enriched from **`lesson-content.ts`**, **`demo-nova-stats.ts`**. **`GET /api/nova`** returns **`groqConfigured`** / **`elevenConfigured`** hints (no secrets) — useful on Amplify.
+- **`server-env.ts`** + **`next.config.ts` `env`** snapshot **bakes** **`GROQ_*`** and **`ELEVENLABS_*`** into the server bundle so **Amplify Lambda** sees keys at runtime (dynamic `process.env[key]` alone is insufficient).
+- **`POST /api/nova/tts`** + **`GET /api/nova/tts`** — ElevenLabs MP3 when **`ELEVENLABS_API_KEY`** and **`ELEVENLABS_VOICE_ID`** are set.
+- **`NOVAChat`** / **`useNOVAVoice`**: Web Speech API on secure origins; dashboard receives **`course`** for Builders-aware copy.
 
-- **NOVA AI companion (Groq) + voice**
-  - **`POST /api/nova`** (`src/app/api/nova/route.ts`): Groq **`llama-3.3-70b-versatile`**, short warm replies (1–2 sentences), in-memory conversation **`demoMemory`** keyed by `userId` / `userName` for continuity within a server instance.
-  - Lesson summaries and live demo stats are injected via **`src/lib/lesson-content.ts`** and **`src/lib/demo-nova-stats.ts`** so NOVA can answer progress/XP/quiz questions without inventing numbers.
-  - **`src/components/NOVAChat.tsx`**: floating launcher + chat panel; **`src/components/NOVACharacter.tsx`** (dashboard-style avatar, distinct from in-game `games/shared/NovaCharacter.tsx`).
-  - **`src/hooks/useNOVAVoice.ts`** + **`src/components/NOVAVoiceButton.tsx`**: Web Speech API (listen + speak), sentence-chunked TTS, Chrome keep-alive pause/resume, HTTPS check on non-localhost, clearer mic-permission copy, silent retry on `no-speech`, first-tap delay before starting recognition.
-  - **`GROQ_API_KEY`** required at runtime for full replies; ensure it is set in Amplify/hosting env vars.
+### Middleware, polish, infra
 
-- **Mobile layout polish (NOVA + dashboard)**
-  - **`globals.css`**: `.nova-float-button` raises the closed NOVA FAB above the 64px bottom nav on viewports ≤768px (`bottom: 80px`, `right: 16px`).
-  - **`NOVAChat`**: full-screen panel on mobile; closed button position synced with resize; voice error banner only when `error && voiceState === "idle"`.
-  - **`src/app/demo/page.tsx`**: extra **`pb-20`** on main content so lists are not hidden behind bottom nav; hero/stats tuned for small screens (padding, heading size, stacked hero + optional NOVA character hidden below ~380px width).
-
-- **Cyberpunk demo UI**
-  - Dark navy glass aesthetic (`globals.css`), aligned with akmind-dashboard; dashboard, lesson flow, complete page, and NOVA chrome updated accordingly.
-
-- **Mobile-first dashboard and lesson UX (ongoing)**
-  - Bottom nav on mobile, touch-friendly quiz/lesson cards, complete page and modals responsive.
-
-- **Game mobile controls**
-  - Shared touch overlay in `src/components/games/shared/GameTouchControls.tsx`; wired into `GameShell2`–`GameShell4`.
-
-- **Lesson content flow**
-  - Lesson videos use **`VideoPlayer`** + **`lesson-videos.ts`** (S3 URLs); gating rules above apply per lesson id.
-
-- **Admin QA**
-  - Tester identity (`admin@akmind.com` / name `Admin`) can unlock any lesson for testing; admin panel password/session gated.
-  - **`GET /api/demo/user`**: known admin dev token path provisions **`getOrCreateAdminUser()`** so DynamoDB deployments do not show "expired" when the admin row was missing.
-
-- **Security / scale**
-  - Rate limits, Zod + sanitization, timing-safe token compare, CORS + payload limits in middleware, security headers in `next.config.ts`.
-  - **`USE_DYNAMODB=true`** + AWS table env vars for production concurrency (see `demo-db.ts`).
-
-- **Gameplay stability (lesson 2 / History Vault)**
-  - `TimelineStage` ref-based callbacks for stable rAF loops (health, completion, sounds).
+- **`/api/*`**: origin allowlist includes **same-origin** + **`https://akmind.com`** / **`www`** / **`demo.akmind.com`** / **`app.akmind.com`** (+ localhost); rejects oversized bodies (**10 KB** cap).
+- **`MonacoErrorFilter`** (`src/app/layout.tsx`) quiets Monaco worker noise in dev.
+- **`NOVAChat`** FAB **`suppressNovaChatFab`** during fullscreen game / XP overlay so taps reach canvas or sim UI.
+- Cyberpunk glass UI (**`globals.css`**), mobile bottom nav (**`/demo`**, **`/demo/programs`**), **`GameTouchControls`**, DynamoDB (**`USE_DYNAMODB`**), timing-safe token compare, security headers — unchanged themes.
 
 ---
 
 ## 1. What this project is
 
-**demo-akmind-app** is a **Next.js 15** web application for the **AKMIND** brand. It delivers a **guided demo "class"** for kids (parent registers → receives a magic link → child progresses through **4 lessons** with **video**, optional **story games**, **quizzes**, **XP**, and a **completion** experience including badge PDF and upsell UI).
+**demo-akmind-app** is a **Next.js 15** web application for the **AKMIND** brand. It delivers a **guided demo "class"** for kids (parent registers → receives a magic link → child progresses through **one of two three-lesson tracks** — **AI Explorers** or **AI Builders** — with **video**, **embedded games**, **quizzes**, **XP**, badge slugs, and a **completion** experience including certificate PDF and upsell UI).
 
 **Product goals (as implemented):**
 
 - One-time demo per email (enforced at registration).
 - Token-based access to `/demo/**` (no full user accounts in this repo).
+- Each learner carries a **`course`** (**Explorers** vs **Builders**) chosen at registration (and adjustable for the **admin demo user** via **`/admin`** or **`/demo/programs`**).
 - Local JSON "database" for demo users (`data/demo-users.json`), **or** AWS **DynamoDB** when `USE_DYNAMODB=true`.
 - Optional Gmail SMTP to email demo links and notify admins.
-- Four thematic lessons aligned with introductory AI curriculum.
-- Three canvas/React **mini-games** (lessons 2–4) loaded with `dynamic(..., { ssr: false })`.
+- **Explorers:** lessons **1–3** — Neuropolis canvas story levels + quizzes.
+- **Builders:** lessons **11–13** — neuro-sim Python teaching flows + quizzes.
+- Heavy interaction shells load with `dynamic(..., { ssr: false })` (Neuropolis, neuro-sim, landscape wrapper).
 
 ---
 
@@ -103,7 +82,7 @@ export const DEMO_USER_API_RATE_LIMIT_PER_MINUTE = 240;
 | Email | **nodemailer** (Gmail transport) |
 | Language | **TypeScript 5** |
 | Storage | **Node `fs`** + JSON under `data/` **or** **DynamoDB** (`@aws-sdk/*`) |
-| AI | **groq-sdk** — NOVA chat (`/api/nova`) |
+| AI | **groq-sdk** — NOVA chat (`POST /api/nova`); optional **ElevenLabs** HTTP API (`POST /api/nova/tts`) |
 
 ---
 
@@ -120,22 +99,31 @@ demo-akmind-app/
 │   │   ├── page.tsx             # Landing: token entry / validation → demo
 │   │   ├── layout.tsx
 │   │   ├── admin/
-│   │   │   └── page.tsx         # Admin dashboard (view users, progress stats)
+│   │   │   └── page.tsx         # Dev panel: admin demo token, Explorers/Builders picker, completion preview
 │   │   ├── demo/
-│   │   │   ├── page.tsx         # Dashboard: 4 lessons, XP, locks
+│   │   │   ├── page.tsx         # Dashboard: course-aware lesson cards (1–3 or 11–13), XP, locks
+│   │   │   ├── badges/
+│   │   │   │   └── page.tsx     # Earned badges + catalog (DEMO_BADGES)
+│   │   │   ├── programs/
+│   │   │   │   └── page.tsx     # Admin testers: switch AI Explorers vs AI Builders (PATCH /api/demo/admin)
+│   │   │   ├── complete-preview/
+│   │   │   │   └── page.tsx     # Static celebrate preview (marketing / QA)
 │   │   │   ├── complete/
-│   │   │   │   └── page.tsx     # Post-program: badge PDF, payment UI (mock flow)
+│   │   │   │   └── page.tsx     # Post-program: certificate PDF, payment UI (mock flow)
 │   │   │   └── lesson/[id]/
-│   │   │       └── page.tsx     # Per-lesson: VideoPlayer → NeuropolisShell (L1–4) → quiz → results
+│   │   │       └── page.tsx     # VideoPlayer → Neuropolis (Explorers 1–3) OR neuro-sim (Builders 11–13) → quiz
 │   │   └── api/
-│   │       ├── nova/route.ts    # NOVA: Groq chat + server-side memory slice
+│   │       ├── nova/
+│   │       │   ├── route.ts     # POST Groq chat; GET health (env visibility)
+│   │       │   └── tts/route.ts # POST ElevenLabs TTS when configured
 │   │       └── demo/
 │   │           ├── register/route.ts
 │   │           ├── user/route.ts
 │   │           ├── progress/route.ts
 │   │           ├── check/route.ts
-│   │           └── admin/route.ts   # Admin API: list users, reset progress
+│   │           └── admin/route.ts   # GET admin demo token URL; PATCH course; DELETE reset admin progress
 │   ├── components/
+│   │   ├── MonacoErrorFilter.tsx # Dev: suppress Monaco worker console noise
 │   │   ├── NOVAChat.tsx         # Floating NOVA UI + voice controls
 │   │   ├── NOVACharacter.tsx    # Chat/dashboard avatar (distinct from games/shared)
 │   │   ├── NOVAVoiceButton.tsx
@@ -144,6 +132,7 @@ demo-akmind-app/
 │   │   └── games/
 │   │       ├── neuropolis/
 │   │       │   └── NeuropolisShell.tsx  # bootstrapNeuropolisDemo mount + Exit portal
+│   │       ├── neuro-sim/       # Builders embedded sims (Sim1–3 scenes, store, Monaco helpers)
 │   │       ├── shared/          # LandscapeWrapper, AXCharacter, NovaCharacter, …
 │   │       ├── lesson2/         # GameShell2… — legacy/alternate; live flow uses Neuropolis
 │   │       ├── lesson3/
@@ -156,13 +145,16 @@ demo-akmind-app/
 │   ├── lib/
 │   │   ├── demo-session.ts      # Cookie max-age + GET /api/demo/user rate limit constants
 │   │   ├── demo-db.ts           # JSON or DynamoDB persistence
+│   │   ├── demo-lesson-scope.ts # Valid lesson ids 1–3 & 11–13; completion helpers
+│   │   ├── demo-badges.ts       # DEMO_BADGES definitions + unlock conditions
+│   │   ├── server-env.ts        # Amplify-safe env reads + build-time snapshot
 │   │   ├── demo-nova-stats.ts   # Live XP/streak/badge stats for NOVA prompt
-│   │   ├── lesson-content.ts    # Module/lesson summaries for NOVA context
-│   │   ├── lesson-videos.ts     # CDN URLs + lesson video metadata
+│   │   ├── lesson-content.ts    # Module/lesson summaries for NOVA context (Explorers + Builders keys)
+│   │   ├── lesson-videos.ts     # CDN URLs + lesson video metadata + folder mapping
 │   │   ├── email.ts             # sendDemoLink, sendAdminNotification
 │   │   └── api-response.ts
 │   ├── types/demo.ts            # Client-facing DemoUser shape (subset of DB)
-│   └── middleware.ts            # /demo/* token gate + cookie set
+│   └── middleware.ts            # /demo/* token gate + cookie; /api/* origin + payload guards
 ├── .env.local                   # Local secrets (not committed)
 ├── next.config.ts
 ├── tailwind.config.ts
@@ -184,7 +176,11 @@ Typical **`.env.local`** entries (names matter for the code):
 | `GMAIL_USER` | SMTP from-address user. |
 | `GMAIL_APP_PASSWORD` | Gmail app password for nodemailer. |
 | `AKMIND_LOCAL_DB_PATH` | Optional; overrides `./data` root for JSON DB (see `demo-db.ts`). |
-| `GROQ_API_KEY` | Groq API key for **`POST /api/nova`** (set in hosting e.g. Amplify). |
+| `GROQ_API_KEY` | Groq API key for **`POST /api/nova`** (Amplify: add per branch + redeploy). |
+| `GROQ_MODEL_ID` | Optional override for the Groq chat model id. |
+| `ELEVENLABS_API_KEY` | Optional; enables **`POST /api/nova/tts`**. |
+| `ELEVENLABS_VOICE_ID` | ElevenLabs voice id (paired with API key). |
+| `ELEVENLABS_MODEL_ID` | Optional ElevenLabs model id for TTS. |
 | `USE_DYNAMODB` | Set `true` to use DynamoDB instead of local JSON (production). |
 | `AWS_REGION` | AWS region for DynamoDB client. |
 | `DEMO_USERS_TABLE` | DynamoDB table name for demo users. |
@@ -192,7 +188,7 @@ Typical **`.env.local`** entries (names matter for the code):
 
 **Client-exposed:** only variables prefixed with `NEXT_PUBLIC_`.
 
-**Voice:** Web Speech API requires a **secure context** on real devices — use **HTTPS** (e.g. production domain); `http://localhost` is exempt in the hook’s protocol check.
+**Voice:** Browser Web Speech API requires a **secure context** on real devices — use **HTTPS** (e.g. production domain); `http://localhost` is exempt in the hook’s protocol check. Optional server-side speech uses ElevenLabs via **`POST /api/nova/tts`** when configured.
 
 ---
 
@@ -208,7 +204,7 @@ There is **no** session/JWT stack. Access is:
    - If missing → redirect **`/?error=no-token`**.
    - If token present but no cookie → sets **`demo_token`** cookie (**365 days** via `DEMO_TOKEN_COOKIE_MAX_AGE_SECONDS` in `src/lib/demo-session.ts`, path `/`).
 
-**Lesson unlock rule:** Lesson `n > 1` requires **`lessonsComplete` includes `n - 1`** (previous lesson id completed via progress API).
+**Lesson unlock rule (course-aware):** Within a track, lesson **`n`** unlocks only after the previous id in that track is in **`lessonsComplete`** — **`2`** requires **`1`**, **`3`** requires **`2`**, **`12`** requires **`11`**, **`13`** requires **`12`**. **`1`** and **`11`** are always eligible. **`lesson/[id]/page.tsx`** also blocks mismatched ids (e.g. Builders user opening **`/demo/lesson/1`**).
 
 **Middleware cookie refresh** (`src/middleware.ts`): every `/demo/*` hit extends `demo_token` using **`DEMO_TOKEN_COOKIE_MAX_AGE_SECONDS`** from **`src/lib/demo-session.ts`**.
 
@@ -236,14 +232,18 @@ Server-side **`DemoUser`** (persisted):
 | `id` | UUID |
 | `email`, `name`, `childName`, `phone` | Registration payload |
 | `demoToken` | Secret link token |
+| `course` | **`AI Explorers`** \| **`AI Builders`** \| **`AI Innovators`** — drives dashboard + lesson eligibility |
 | `demoStarted`, `demoCompleted` | Flags |
-| `lessonsComplete` | `number[]` of finished lesson ids (e.g. `[1,2,3,4]`) |
+| `lessonsComplete` | Finished lesson ids (**`1–3`** and/or **`11–13`** after sanitization — legacy **`4`** dropped) |
 | `quizScores` | `Record<string, number>` keyed by lesson id string (percentage stored from UI) |
 | `xp` | Running total; **incremented** on each `POST /api/demo/progress` |
-| `badgeEarned` | `true` when all 4 lessons complete |
+| `badgeEarned` | `true` when **`allDemoLessonsComplete`** for the merged lesson list |
+| `earnedBadges` | Slugs satisfied by **`DEMO_BADGES`** (`demo-badges.ts`) |
 | `createdAt` | ISO timestamp |
 
-**Client type** (`src/types/demo.ts`) is a **subset** returned by `/api/demo/user` (no internal `id`, `demoToken`, etc. in the type file — API still maps fields as needed).
+**Client type** (`src/types/demo.ts`): mirrors the **`GET /api/demo/user`** payload (**`course`**, **`earnedBadges`**, progress fields — no internal `id` / `demoToken`).
+
+**Badge definitions (`demo-badges.ts`):** Most slugs still key off Explorers ids **`1–3`**; **`ai-classifier`** (`slug`) uses **`allDemoLessonsComplete`**, so it unlocks when **either** Explorers **or** Builders finishes all three lessons. Add Builders-specific rows here when marketing wants distinct achievements.
 
 **Storage path:** `{AKMIND_LOCAL_DB_PATH or ./data}/demo-users.json`.
 
@@ -257,8 +257,9 @@ Server-side **`DemoUser`** (persisted):
 
 ### `POST /api/demo/register`
 
-**Body:** `{ parentName, email, phone, childName, presetToken? }`
+**Body:** `{ parentName, email, phone, childName, presetToken?, course? }`
 
+- **`course`** optional — **`AI Explorers`** \| **`AI Builders`** \| **`AI Innovators`** (defaults **Explorers** when omitted).
 - Rejects if email already used (**409**).
 - Creates user; optional **`presetToken`** for testing (otherwise random).
 - Sends **demo link email** + **admin notification** (fire-and-forget).
@@ -266,36 +267,54 @@ Server-side **`DemoUser`** (persisted):
 
 ### `GET /api/demo/user?token=...`
 
-Returns sanitized profile: name, childName, optional email/phone, **`lessonsComplete`**, **`quizScores`**, **`xp`**, **`badgeEarned`**, **`demoCompleted`**.
+Returns sanitized profile: **`course`**, **`earnedBadges`**, name, childName, optional email/phone, **`lessonsComplete`**, **`quizScores`**, **`xp`**, **`badgeEarned`**, **`demoCompleted`**.
 
 ### `POST /api/demo/progress`
 
-**Body:** `{ token, lessonId, quizScore?, xp? }`
+**Body:** `{ token, lessonId, quizScore?, xp?, badgesBefore? }`
 
-- Appends **`lessonId`** to **`lessonsComplete`** if not present.
+- **`lessonId`** must be **Explorers `1–3`** or **Builders `11–13`** (see **`progressSchema`**).
+- Appends **`lessonId`** to **`lessonsComplete`** (sanitized + deduped).
 - Stores **`quizScores[String(lessonId)]`** if `quizScore` provided (percent).
 - **`xp`**: adds **`xp`** to existing **`user.xp`** (additive, not replace).
-- If **`lessonsComplete.length >= 4`** → sets **`demoCompleted`** and **`badgeEarned`**.
+- Computes **`demoCompleted`** / **`badgeEarned`** via **`allDemoLessonsComplete`** — **`true`** when **either** full Explorers track **or** full Builders track is complete (**three** lessons each).
+- Updates **`earnedBadges`** from **`DEMO_BADGES`**; optional **`badgesBefore`** lets the UI diff **`newBadges`** for celebrations.
+- When the learner completes the full track for the first time, **`sendDemoCompletionReport`** fires (best-effort email).
 
 ### `GET /api/demo/check?email=...`
 
 Returns **`{ hasUsedDemo: boolean }`** for form validation.
 
-### `GET /api/demo/admin` (admin only)
+### `/api/demo/admin`
 
-Returns full user list (all fields) for the admin dashboard. Protected by admin key header.
+Unauthenticated HTTP surface intended for **local/dev QA** (`src/app/api/demo/admin/route.ts`):
+
+- **`GET`** — provisions **`getOrCreateAdminUser()`** and returns **`token`**, **`accessUrl`**, **`course`** for the shared admin demo profile.
+- **`PATCH`** — JSON **`{ course: "AI Explorers" \| "AI Builders" }`** updates that profile’s active program (same mutation **`/admin`** and **`/demo/programs`** use).
+- **`DELETE`** — resets progress/Xp/quizzes/**`earnedBadges`** on the admin demo user.
+
+**Note:** `/admin` UI adds a separate browser **`NEXT_PUBLIC_ADMIN_PASSWORD`** gate (`sessionStorage`) — not enforced inside these route handlers.
 
 **Response helpers:** `src/lib/api-response.ts` (`ok`, `fail`).
 
+### `GET /api/nova`
+
+Returns **`{ groqConfigured, elevenConfigured, hint }`** — verifies Lambda/build sees Groq/ElevenLabs env flags (**no secrets**).
+
 ### `POST /api/nova`
 
-**Body (typical):** `message`, optional `conversationHistory`, `userName`, `childName`, `userId`, `currentLesson`, `xp`, `lessonsComplete`, `currentModule`, `lessonOrder`, `quizScores`, `badgeEarned`.
+**Body (typical):** `message`, optional `conversationHistory`, `userName`, `childName`, `userId`, `currentLesson`, `xp`, `lessonsComplete`, `currentModule`, `lessonOrder`, `quizScores`, `badgeEarned`, **`course`**.
 
 - Validates non-empty message and max length (~600 chars).
-- Merges **`demoMemory`** (Map) with client history, slices to recent turns, calls Groq with a system prompt built from **`buildDemoLiveStats`** + **`getModuleSummary` / `getLessonSummary`**.
+- Merges **`demoMemory`** (Map) with client history, slices to recent turns, calls Groq with a system prompt built from **`buildDemoLiveStats`** + **`getModuleSummary` / `getLessonSummary`** (includes Builders recap intents — see route helpers).
 - Returns **`{ response: string }`**; on failure returns a friendly string with optional **`error: true`** (see route).
 
 **Note:** In-memory `demoMemory` resets when the serverless instance cold-starts; client `conversationHistory` still supplies continuity.
+
+### `GET /api/nova/tts` / `POST /api/nova/tts`
+
+- **`GET`** → **`{ enabled: boolean }`** when **`ELEVENLABS_API_KEY`** + **`ELEVENLABS_VOICE_ID`** exist.
+- **`POST`** JSON **`{ text, emotion? }`** → streamed/generated audio (**503** if not configured).
 
 ---
 
@@ -312,41 +331,47 @@ Returns full user list (all fields) for the admin dashboard. Protected by admin 
 | Route | Role |
 |-------|------|
 | `/` | Landing: starfield, registration context, manual token entry, validates token |
-| `/demo` | Dashboard: lesson cards, XP, locks, **NOVAChat** launcher |
-| `/demo/lesson/[id]` | Lesson flow: **VideoPlayer** → (≥120s playback → pause → **purchase upsell** for lessons **1–3**, non-admin) → **NeuropolisShell** → quiz → results; **NOVAChat** suppressed during fullscreen game |
-| `/demo/complete` | Requires **`demoCompleted`**; confetti, badge PDF download, payment UI stub; redirects incomplete users to `/demo` |
-| `/admin` | Admin panel: user list, lesson progress, XP, quiz scores |
+| `/demo` | Dashboard: **course-aware** lesson list (**1–3** or **11–13**), XP, locks, **NOVAChat**, nav to badges/programs (programs admin-only) |
+| `/demo/badges` | Badge catalog + earned slugs (**`DEMO_BADGES`**) |
+| `/demo/programs` | **Admin testers only:** switch **AI Explorers** vs **AI Builders** (`PATCH /api/demo/admin`) |
+| `/demo/lesson/[id]` | Video → (**≥120s** learner gate on **1–3** & **11–13**) → upsell pause → **Neuropolis** *(Explorers)* **or** **neuro-sim Sim1–3** *(Builders)* → quiz → **`POST /api/demo/progress`**; **`NOVAChat`** suppressed during fullscreen game / XP overlay |
+| `/demo/complete` | Requires **`demoCompleted`**; confetti, certificate PDF download, payment UI stub; redirects incomplete users to `/demo` |
+| `/demo/complete-preview` | Static completion celebration preview (QA / marketing) |
+| `/admin` | Password-gated dev hub: admin demo **`course`** picker, token shortcuts, completion preview embed |
 
-**Middleware:** All **`/demo/**`** require token (query or cookie).
+**Middleware:** **`/demo/**`** routes require **`token`** query **or** **`demo_token`** cookie (same as §5). **`/api/**`** passes through with origin/size guards (§0).
 
 ---
 
 ## 10. Lesson catalog (content + quiz + game)
 
-Content is primarily defined in **`src/app/demo/lesson/[id]/page.tsx`** (`LESSONS` constant). Dashboard copy is duplicated per lesson in **`src/app/demo/page.tsx`** (`LESSONS` array for UI metadata).
+Lesson payloads live in **`src/app/demo/lesson/[id]/page.tsx`** as **`LESSONS_EXPLORERS`** (**ids `1–3`**) and **`LESSONS_BUILDERS`** (**ids `11–13`**). Dashboard cards duplicate titles/metadata in **`LESSONS_EXPLORERS` / `LESSONS_BUILDERS`** inside **`src/app/demo/page.tsx`**.
 
 ### Shared mechanics
 
-- Lessons **1–4** set **`hasGame: true`**; each opens **`NeuropolisShell`** with `level={lessonId}` (see **§10c**).
-- **`GAME_BONUS_XP`:** `200` — included when posting XP after quiz if the embedded game was completed (`page.tsx`).
-- **`GAME_MECHANICS`:** Neuropolis district blurbs keyed by lesson id.
+- Every shipped lesson sets **`hasGame: true`**.
+- **Explorers (`1–3`):** fullscreen **`NeuropolisShell`** inside **`LandscapeWrapper`** with **`level`=`lessonId`** (**`1` \| `2` \| `3`**).
+- **Builders (`11–13`):** fullscreen **`Sim1Scene` \| `Sim2Scene` \| `Sim3Scene`** (dynamic imports).
+- **`GAME_BONUS_XP`:** `200` — included when posting XP after quiz if the embedded game finished (`page.tsx`).
+- **`GAME_MECHANICS`:** Human-readable blurbs per lesson id (includes placeholders for Builders narrative strings).
 
 ### 10a. Video gates & Continue UX (authoritative excerpts)
 
 Constants and derived flags from **`src/app/demo/lesson/[id]/page.tsx`**:
 
 ```typescript
-/** Lessons 1–3: minimum seconds of actual video playback before upsell + continue unlocks (non-admin). */
+/** Demo lessons 1–3 and 11–13: minimum seconds of video playback before upsell + continue unlocks (non-admin). */
 const MIN_LESSON_VIDEO_PLAY_SECONDS = 120;
 
 const adminMode = isAdminTester(user);
-const minVideoRequired = !adminMode && lessonId >= 1 && lessonId <= 3;
+const minVideoRequired =
+  (lessonId >= 1 && lessonId <= 3) || (lessonId >= 11 && lessonId <= 13);
 const showPurchaseUpsell = minVideoRequired && videoWatchSatisfied;
 ```
 
-After the **120-second** gate, **`VideoPlayer`** receives **`pauseVideo`** so the CDN MP4 stops. Learners see the **purchase upsell card** (amber border); **Continue to Game →** (or quiz) on that card is the **only** non-admin path forward. **Admins** use the standard gradient Continue immediately (no wait).
+After the **120-second** gate fires, **`VideoPlayer`** pauses via **`pauseVideo`** and **`playbackLocked`** disables scrubbing until the learner taps **Continue** on the upsell card (demo CTA). **`Admin testers`** still bypass locked-lesson routing but currently receive the same **`enforceWatchThrough`** wiring on ids **`1–3`** / **`11–13`**.
 
-`<VideoPlayer>` wiring:
+`<VideoPlayer>` wiring (trimmed):
 
 ```tsx
 <VideoPlayer
@@ -355,6 +380,7 @@ After the **120-second** gate, **`VideoPlayer`** receives **`pauseVideo`** so th
   minPlayedSeconds={
     minVideoRequired ? MIN_LESSON_VIDEO_PLAY_SECONDS : undefined
   }
+  playbackLocked={showPurchaseUpsell}
   pauseVideo={pauseVideo}
   onWatchSatisfied={() => {
     setVideoWatchSatisfied(true);
@@ -363,11 +389,11 @@ After the **120-second** gate, **`VideoPlayer`** receives **`pauseVideo`** so th
 />
 ```
 
-While **`phase === "game"`** and **`gameActive`**, **`suppressNovaChatFab`** hides **`NOVAChat`** so taps reach the canvas.
+While **`phase === "game"`** && **`gameActive`** (or XP overlay), **`suppressNovaChatFab`** hides **`NOVAChat`** so taps reach Neuropolis or the neuro-sim canvas.
 
 ### 10b. `VideoPlayer.tsx` (full source — `src/components/lesson/VideoPlayer.tsx`)
 
-Satisfaction is evaluated on **`timeupdate`** and **`ended`**. Props: **`enforceWatchThrough`**, optional **`minPlayedSeconds`** (uses **`video.played`** summed seconds, capped by duration), optional **`onWatchSatisfied`**, optional **`pauseVideo`** (when true, effect pauses the `<video>` element).
+Satisfaction is evaluated on **`timeupdate`** and **`ended`**. Props: **`enforceWatchThrough`**, optional **`minPlayedSeconds`** (uses **`video.played`** summed seconds, capped by duration), optional **`onWatchSatisfied`**, optional **`pauseVideo`**, optional **`playbackLocked`** (disables controls/scrubbing while the upsell overlays the player).
 
 ```tsx
 "use client";
@@ -586,7 +612,9 @@ export default function VideoPlayer({
 }
 ```
 
-### 10c. Neuropolis shell wiring (`page.tsx`)
+### 10c. Game-phase wiring (`lesson/[id]/page.tsx`)
+
+Dynamic imports (trimmed):
 
 ```typescript
 const NeuropolisShell = dynamic(
@@ -597,39 +625,47 @@ const LandscapeWrapper = dynamic(
   () => import("@/components/games/shared/LandscapeWrapper"),
   { ssr: false }
 );
+const Sim1Scene = dynamic(
+  () => import("@/components/games/neuro-sim/sims/Sim1Scene"),
+  { ssr: false }
+);
+const Sim2Scene = dynamic(
+  () => import("@/components/games/neuro-sim/sims/Sim2Scene"),
+  { ssr: false }
+);
+const Sim3Scene = dynamic(
+  () => import("@/components/games/neuro-sim/sims/Sim3Scene"),
+  { ssr: false }
+);
 ```
 
+Fullscreen **`phase === "game"`** branch:
+
 ```tsx
-{phase === "game" && lesson.hasGame && (
-  <div
-    style={{
-      position: "fixed",
-      inset: 0,
-      zIndex: 50,
-      overflow: "hidden",
-      maxWidth: "100vw",
-      maxHeight: "100vh",
-    }}
-  >
-    {gameActive && lessonId >= 1 && lessonId <= 4 && (
-      <LandscapeWrapper>
-        <NeuropolisShell
-          level={lessonId as 1 | 2 | 3 | 4}
-          onComplete={async () => {
-            await exitGame();
-            setGameComplete(true);
-            setPhase("quiz");
-          }}
-          onExit={exitGame}
-        />
-      </LandscapeWrapper>
-    )}
-    {/* … placeholders for lessonId outside 1–4 or post-game UI … */}
-  </div>
+{gameActive && lessonId >= 1 && lessonId <= 3 && (
+  <LandscapeWrapper>
+    <NeuropolisShell
+      level={lessonId as 1 | 2 | 3}
+      onComplete={async () => {
+        await exitGame();
+        setGameComplete(true);
+        setPhase("quiz");
+      }}
+      onExit={exitGame}
+    />
+  </LandscapeWrapper>
+)}
+
+{gameActive && user?.course === "AI Builders" && lessonId >= 11 && lessonId <= 13 && (
+  <>
+    {lessonId === 11 && <Sim1Scene onComplete={...} onExit={exitGame} />}
+    {lessonId === 12 && <Sim2Scene onComplete={...} onExit={exitGame} />}
+    {lessonId === 13 && <Sim3Scene onComplete={...} onExit={exitGame} />}
+  </>
 )}
 ```
 
-**Bootstrap:** `NeuropolisShell` calls **`bootstrapNeuropolisDemo(mountEl, level, onComplete)`** (`src/neuropolis/bootstrapDemoLevel.ts`): **`DeviceManager.init`**, **`Canvas`**, **`InputManager`**, **`TouchControls`** (`bypassDeviceGate: true`), **`GameLoop`**, then **`BootScene`** (lesson 1 only) → **`CinematicScene`** or straight to **`GameScene` / `GameScene2`–`GameScene4`**. Teardown on unmount or **Exit** clears listeners and DOM.
+**Bootstrap:** **`NeuropolisShell`** calls **`bootstrapNeuropolisDemo(mountEl, level, onComplete)`** (`src/neuropolis/bootstrapDemoLevel.ts`) where **`NeuropolisDemoLevel`** is **`1 | 2 | 3`**. Pipeline: **`DeviceManager.init`**, **`Canvas`**, **`InputManager`**, **`TouchControls`** (`bypassDeviceGate: true`), **`GameLoop`**, **`BootScene`** / **`CinematicScene`** as needed → **`GameScene`–`GameScene4`** canvas districts. Builders simulations manage their own teardown via **`onExit`** / **`onComplete`** props.
 
 ### 10d. `NeuropolisShell.tsx` (full source)
 
@@ -756,7 +792,7 @@ export type NeuropolisDemoLevel = 1 | 2 | 3 | 4;
 type IntroPhase = "boot" | "cinematic" | "game";
 
 /**
- * Mount Neuropolis into `root` (cleared first). Runs one demo level (maps to demo lessons 1–4).
+ * Mount Neuropolis into `root` (cleared first). Runs one demo level (`NeuropolisDemoLevel` 1–3 for shipped Explorers lessons).
  * Lesson 1 matches standalone `main.ts`: BootScene (~3s) → CinematicScene → GameScene.
  * Returns idempotent teardown (stop loop, remove listeners, clear root).
  */
@@ -890,34 +926,36 @@ export function bootstrapNeuropolisDemo(
 }
 ```
 
-### Demo lessons 1–3 (`LESSONS` in `lesson/[id]/page.tsx`)
+### AI Explorers — lessons `1–3` (`LESSONS_EXPLORERS`)
 
-The shipped demo has **three** lessons. Each uses **`VideoPlayer`**, **Neuropolis** (`hasGame: true`), then quiz.
+Three conceptual-lesson **`course === "AI Explorers"`** track. Each row uses **`VideoPlayer`** (CDN when configured — mapped folders **`lesson-2` … `lesson-4`**), fullscreen **`NeuropolisShell`** (**`level` `1 | 2 | 3`**), then quiz.
 
-**Video (non-admin):** ≥ **`MIN_LESSON_VIDEO_PLAY_SECONDS` (120)** real playback → player pauses → **purchase upsell card** → continue only via card CTA. **Admin:** standard Continue immediately.
+**Video gate:** **`MIN_LESSON_VIDEO_PLAY_SECONDS`** upsell flow on ids **`1–3`** (see §10a).
 
-- **Lesson 1 — History of AI — From Dreams to Machines** — Neuropolis level **1**; **`xpReward`:** 300; **5** quiz questions.
-- **Lesson 2 — AI vs Humans: What Can AI Do?** — Neuropolis level **2**; **`xpReward`:** 300; **5** quiz questions.
-- **Lesson 3 — Types of AI: Narrow, General & Super** — Neuropolis level **3**; **`xpReward`:** 300; **5** quiz questions.
+- **Lesson `1` — History of AI — From Dreams to Machines** — Neuropolis **`level={1}`**; **`xpReward`:** 300; **5** quiz questions.
+- **Lesson `2` — AI vs Humans: What Can AI Do?** — Neuropolis **`level={2}`**; **`xpReward`:** 300; **5** quiz questions.
+- **Lesson `3` — Types of AI: Narrow, General & Super** — Neuropolis **`level={3}`**; **`xpReward`:** 300; **5** quiz questions.
 
-**Flow (each lesson):** Video → (gate / upsell if learner) → Neuropolis → Quiz → Results → **`POST /api/demo/progress`**.
+### AI Builders — lessons `11–13` (`LESSONS_BUILDERS`)
 
-### Quiz UX
+Python primer track. Copy/titles on the dashboard align with **`lesson-content.ts`** keys **`1-11` … `1-13`**. Video gate mirrors Explorers (**ids `11–13`**). Game phase mounts **`Sim1Scene`**, **`Sim2Scene`**, **`Sim3Scene`** respectively.
+
+### Quiz UX & XP posting
 
 - **Option buttons:** `text-slate-800 font-medium` by default (dark, readable); hover shifts to `indigo-50` background + `indigo-700` text; correct → `green-500` border + `green-50` bg; wrong pick → `red-500` border + `red-50` bg.
 - **`quizXpFromAccuracy`:** 100% → full `xpReward`; ≥80% → 90%; ≥60% → 70%; else 50%.
 - **Total XP posted** on results: **`quizXp + (GAME_BONUS_XP if game complete)`** (200 bonus).
-- **`POST /api/demo/progress`** **adds** that total to stored **`xp`** (cumulative across lessons).
+- **`POST /api/demo/progress`** **adds** that total to stored **`xp`** (cumulative across lessons) and returns **`newBadges`** when slugs flip.
 
-### After lesson 3
+### End-of-track navigation
 
-- **`phase === 'complete'`** on lesson page: after ~3s, redirect **`/demo/complete`** if `lessonId >= 3`, else **`/demo`**.
+After the XP overlay **Continue**, learners route to **`/demo/complete`** when **`lessonId >= 13`** on Builders **or** **`lessonId >= 3`** on Explorers; otherwise back to **`/demo`** (`lesson/[id]/page.tsx`).
 
 ---
 
 ## 11. Shared Character Components
 
-> **Routing note:** The live lesson player mounts **`NeuropolisShell`** (canvas engine under `src/neuropolis/`). The **`GameShell2`–`GameShell4`** trees in **§§11a–13** are **legacy / alternate** React implementations kept in-repo; they are **not** imported by **`lesson/[id]/page.tsx`** today.
+> **Routing note:** Explorers lessons mount **`NeuropolisShell`** (canvas engine under `src/neuropolis/`). Builders lessons mount **`src/components/games/neuro-sim/`** sim scenes. The **`GameShell2`–`GameShell4`** trees in **§§11a–13** are **legacy / alternate** React implementations kept in-repo; they are **not** imported by **`lesson/[id]/page.tsx`** today.
 
 ### AXCharacter (`src/components/games/shared/AXCharacter.tsx`)
 
@@ -1192,14 +1230,18 @@ Missing files fail silently in try/catch. `useSoundEngine` exposes `playSound(ke
 
 ---
 
-## 15. Key UX & pedagogy themes by "district"
+## 15. Key UX & pedagogy themes by track
 
-| Lesson | Theme | Player fantasy |
-|--------|--------|----------------|
-| 1 | What is AI? | Neuropolis L1 + quiz |
-| 2 | History timeline | Neuropolis L2 (demo); legacy `GameShell2` in tree |
-| 3 | Human vs AI | Neuropolis L3 (demo); legacy `GameShell3` |
-| 4 | AI taxonomy | Neuropolis L4 (demo); legacy `GameShell4` |
+| Track | Lesson id | Theme | Interactive surface |
+|--------|-----------|--------|---------------------|
+| AI Explorers | 1 | History of AI timeline | Neuropolis **`level={1}`** |
+| AI Explorers | 2 | AI vs human strengths | Neuropolis **`level={2}`** |
+| AI Explorers | 3 | Taxonomy (Narrow / General / Super) | Neuropolis **`level={3}`** |
+| AI Builders | 11 | Variables & data | **`Sim1Scene`** |
+| AI Builders | 12 | Branching logic / decisions | **`Sim2Scene`** |
+| AI Builders | 13 | Loops & iteration | **`Sim3Scene`** |
+
+Legacy **`GameShell2`–`GameShell4`** sections below retain art/audio notes for archival QA — they do **not** represent the live `/demo/lesson/[id]` wiring.
 
 ---
 
@@ -1208,19 +1250,18 @@ Missing files fail silently in try/catch. `useSoundEngine` exposes `playSound(ke
 **`/demo/complete`** (`src/app/demo/complete/page.tsx`):
 
 - Guard: **`demoCompleted`** must be true else redirect to `/demo`.
-- Confetti, **jsPDF** "badge" certificate download.
+- Confetti, **jsPDF** certificate download (Builders vs Explorers copy adapts per **`course`** where implemented).
 - **Payment UI** (UPI / card / etc.) — presentation-layer flow with local state (`paymentSuccess`), not a live payment processor in-repo.
 
 ---
 
-## 17. Admin panel
+## 17. Admin panel & Programs tab
 
-**Route:** `/admin` (`src/app/admin/page.tsx`)
-**API:** `GET /api/demo/admin` (`src/app/api/demo/admin/route.ts`)
+**`/admin`** (`src/app/admin/page.tsx`): browser password (**`NEXT_PUBLIC_ADMIN_PASSWORD`**, default **`changeme`** via env fallback). Once unlocked, loads **`GET /api/demo/admin`** for the persistent admin demo **`token`** + **`course`**, exposes **AI Explorers vs AI Builders** buttons (**`PATCH /api/demo/admin`**), reset (**`DELETE`**), deep links, and embeds the **`DemoCompleteCelebration`** preview block.
 
-- Displays all registered demo users: name, email, child name, XP, lessons complete, quiz scores, badge status.
-- Protected by admin key (header or env check — see route implementation).
-- Does not require `demoCompleted`; accessible independently from the demo token flow.
+**`/demo/programs`**: Same **`PATCH`** capability inside the polished demo chrome, but **only `admin@akmind.com` / name `Admin`** may view it — everyone else redirects to **`/demo`**.
+
+Neither route lists arbitrary registered families from DynamoDB/JSON; use **`data/demo-users.json`** or AWS console for that operational view.
 
 ---
 
@@ -1256,12 +1297,12 @@ npm run dev
 
 ## 19. Conventions & extension points
 
-- **NOVA:** To teach NOVA new curriculum facts, extend **`src/lib/lesson-content.ts`** (summaries) and/or **`buildDemoLiveStats`** inputs in **`demo-nova-stats.ts`**. Wire additional props into **`NOVAChat`** from **`demo/page.tsx`** and **`lesson/[id]/page.tsx`** so `POST /api/nova` receives consistent `xp`, `lessonsComplete`, `quizScores`, `currentModule`, `lessonOrder`.
-- **New lesson:** Add to **`LESSONS`** in `lesson/[id]/page.tsx` + dashboard **`LESSONS`** in `demo/page.tsx`; wire `gameActive && lessonId === n` → **`NeuropolisShell`** (and extend **`bootstrapDemoLevel.ts`** / scenes if needed); align **`MIN_LESSON_VIDEO_PLAY_SECONDS`** / upsell gate rules if the lesson should mimic **1–3**.
+- **NOVA:** Extend **`lesson-content.ts`** (Explorers **`1-1`–`1-4`** keys, Builders **`1-11`–`1-13`** keys) and **`demo-nova-stats.ts`**. Thread **`course`** into **`NOVAChat`** wherever you surface context (`demo/page.tsx`, `lesson/[id]/page.tsx`).
+- **New lesson:** Add parallel entries to **`LESSONS_EXPLORERS` / `LESSONS_BUILDERS`** in `lesson/[id]/page.tsx`, mirror dashboard arrays in `demo/page.tsx`, register ids in **`demo-lesson-scope.ts`**, extend **`lesson-videos.ts`** + **`validators.ts` `progressSchema`**, then wire the game branch (**`NeuropolisShell`** vs neuro-sim) inside the **`phase === "game"`** block.
 - **New game shell:** Mirror `GameShell3`/`4`; export `onComplete(xp)` and `onExit()`; dynamic import with **`ssr: false`** if using canvas/window keys.
 - **New character:** Add to `src/components/games/shared/`; import via `@/components/games/shared/CharacterName`.
 - **XP:** Lesson results should remain consistent with **additive** `POST /api/demo/progress` behavior.
-- **Unlock:** Tied to **`lessonsComplete`** containing previous id; progress endpoint currently pushes ids on each completion — ensure ordering matches product rules.
+- **Unlock:** Sequential within a track (**`1→2→3`** or **`11→12→13`**). Crossing tracks is prevented in the lesson page when **`user.course`** disagrees with the requested id.
 - **AX in canvas games:** Use HTML overlay div + `ref.style.transform` for zero-re-render positioning; never draw AX as a canvas `fillRect`. Track `axAnim`/`axFacing` with refs + `queueMicrotask` guards.
 
 ---
@@ -1275,11 +1316,12 @@ npm run dev
 - **Token:** `demoToken` string; not a JWT.
 - **GAME_BONUS_XP:** Flat +200 for finishing embedded game before quiz (lessons with games).
 - **NeuropolisShell:** React wrapper that mounts **`bootstrapNeuropolisDemo`** and portals an **Exit** control to `document.body`.
-- **bootstrapNeuropolisDemo:** Function in **`src/neuropolis/bootstrapDemoLevel.ts`** that constructs canvas, loop, input, touch controls, and the active **`GameScene`** for lessons 1–4.
+- **Neuro-sim (`Sim1–3`):** Builders-only React/Python lesson surfaces under **`src/components/games/neuro-sim/`**, dynamically imported from **`lesson/[id]/page.tsx`**.
+- **bootstrapNeuropolisDemo:** Function in **`src/neuropolis/bootstrapDemoLevel.ts`** that constructs canvas, loop, input, touch controls, and the active **`GameScene`** bundle for **`NeuropolisDemoLevel` `1 | 2 | 3`**.
 - **Crumbling platform:** Platform that shakes then falls when AX stands on it, respawning after 150 frames.
 - **Time Bubble:** Floating enemy in TimelineStage showing a wrong year; contact freezes + destroys it.
 - **Moving platform:** Oscillating horizontal platform that carries AX when stood on.
 
 ---
 
-*Last updated: May 2026 — **`demo-session`** (365-day `demo_token`, **`GET /api/demo/user`** rate limit 240/min); lesson **video gates** (lessons **1–3**, non-admin: ≥120s playback → pause → purchase upsell); **`NeuropolisShell`** / **`bootstrapNeuropolisDemo`** as live lesson games; **`VideoPlayer`** `minPlayedSeconds` + `enforceWatchThrough` + **`pauseVideo`**; legacy **`GameShell2`–`GameShell4`** documented separately.*
+*Last updated: May 2026 — dual tracks (**AI Explorers `1–3` · Neuropolis** vs **AI Builders `11–13` · neuro-sim**); **`course`** on users + **`/admin`** / **`/demo/programs`** switches; **`demo-lesson-scope`** completion rules; **`GET /api/demo/user`** returns **`earnedBadges`**; **`POST /api/demo/progress`** + **`badgesBefore`** / **`newBadges`**; **`GET`/`POST /api/nova`** + **`/api/nova/tts`** + Amplify **`server-env`/`next.config` env** baking; **`middleware`** API origins; **`MonacoErrorFilter`**; CDN folder remap via **`cdnLessonFolderNumber`**; legacy **`GameShell2`–`GameShell4`** archived here for reference.*

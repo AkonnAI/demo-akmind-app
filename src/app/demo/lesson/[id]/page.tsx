@@ -7,6 +7,7 @@ import { DEMO_BADGES } from "@/lib/demo-badges";
 import { normalizeClientDemoToken } from "@/lib/demo-token-client";
 import dynamic from "next/dynamic";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Suspense,
@@ -484,6 +485,10 @@ function LessonPageInner() {
     return LESSONS_EXPLORERS[lessonId] ?? LESSONS_BUILDERS[lessonId];
   }, [lessonId]);
 
+  // Hoisted early so countdown useEffect deps don't hit temporal dead zone
+  const minVideoRequired =
+    (lessonId >= 1 && lessonId <= 3) || (lessonId >= 11 && lessonId <= 13);
+
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<DemoUser | null>(null);
   const [userLoading, setUserLoading] = useState(true);
@@ -507,6 +512,7 @@ function LessonPageInner() {
     newBadges: string[];
   } | null>(null);
   const [xpCounterDisplay, setXpCounterDisplay] = useState(0);
+  const [watchElapsed, setWatchElapsed] = useState(0);
   const progressPosted = useRef(false);
   const resultsInitialized = useRef(false);
   const xpOverlayTimerRef = useRef<ReturnType<
@@ -587,7 +593,24 @@ function LessonPageInner() {
   useEffect(() => {
     setVideoWatchSatisfied(false);
     setPauseVideo(false);
+    setWatchElapsed(0);
   }, [lessonId]);
+
+  // Approximate watch-gate countdown (independent of VideoPlayer internals)
+  useEffect(() => {
+    if (!minVideoRequired || videoWatchSatisfied || phase !== "video") return;
+    const id = window.setInterval(() => {
+      setWatchElapsed((s) => {
+        if (s >= MIN_LESSON_VIDEO_PLAY_SECONDS) {
+          window.clearInterval(id);
+          return s;
+        }
+        return s + 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minVideoRequired, videoWatchSatisfied, phase, lessonId]);
 
   const stepMeta = useMemo(() => {
     if (!lesson) return [];
@@ -867,8 +890,6 @@ function LessonPageInner() {
   }
 
   const adminMode = isAdminTester(user);
-  const minVideoRequired =
-    (lessonId >= 1 && lessonId <= 3) || (lessonId >= 11 && lessonId <= 13);
   const isBuildersSimulationLesson =
     user?.course === "AI Builders" && lessonId >= 11 && lessonId <= 13;
   const showPurchaseUpsell = minVideoRequired && videoWatchSatisfied;
@@ -908,8 +929,8 @@ function LessonPageInner() {
       <header
         className="sticky top-0 z-20 border-b"
         style={{
-          background: "rgba(6,8,20,0.9)",
-          borderColor: "rgba(99,102,241,0.15)",
+          background: "rgba(13,15,30,0.9)",
+          borderColor: "rgba(255,255,255,0.08)",
           backdropFilter: "blur(20px)",
           display: isGameFullscreen ? "none" : undefined,
         }}
@@ -927,70 +948,45 @@ function LessonPageInner() {
             {lesson.title}
           </h1>
           <div
-            className="shrink-0 rounded-full border px-2 py-1 text-xs font-bold sm:px-3 sm:text-sm"
+            className="font-mono shrink-0 rounded-full border px-2 py-1 text-xs font-bold sm:px-3 sm:text-sm"
             style={{
-              background: "rgba(245,158,11,0.15)",
-              borderColor: "rgba(245,158,11,0.3)",
-              color: "#FCD34D",
+              background: "rgba(255,185,95,0.12)",
+              borderColor: "rgba(255,185,95,0.3)",
+              color: "var(--cn-tertiary)",
             }}
           >
             ⚡ {headerXp} XP
           </div>
         </div>
 
-        <div className="border-t border-indigo-300/10 px-3 py-3 sm:px-4">
-          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2 sm:gap-4">
-            {stepMeta.map((step, i) => {
-              const done = i < activeStepIndex;
-              const current = i === activeStepIndex;
-              return (
-                <div key={step.label} className="flex items-center gap-2">
+        {/* Phase tabs — segmented control */}
+        <div className="border-t border-[rgba(255,255,255,0.08)] px-3 py-2.5 sm:px-4">
+          <div className="flex items-center justify-center">
+            <div className="bg-[#1d1f2b] border border-[rgba(255,255,255,0.08)] p-1 rounded-lg flex gap-1">
+              {stepMeta.map((step, i) => {
+                const done = i < activeStepIndex;
+                const current = i === activeStepIndex;
+                return (
                   <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-base sm:h-9 sm:w-9 ${
+                    key={step.label}
+                    className={`flex items-center gap-1.5 px-5 py-2 rounded-md text-sm font-medium transition-colors ${
                       current
-                        ? "text-indigo-300"
+                        ? "bg-[#c0c1ff] text-[#0d0096]"
                         : done
-                          ? "text-emerald-300"
-                          : "text-slate-600"
+                          ? "bg-[rgba(16,185,129,0.15)] text-[#10B981]"
+                          : "text-[#c7c4d7] hover:bg-[#1E2235]"
                     }`}
-                    style={
-                      current
-                        ? {
-                            background: "rgba(99,102,241,0.2)",
-                            border: "2px solid #6366F1",
-                          }
-                        : done
-                          ? {
-                              background: "rgba(16,185,129,0.2)",
-                              border: "2px solid #10B981",
-                            }
-                          : {
-                              background: "rgba(255,255,255,0.04)",
-                              border: "1px solid rgba(99,102,241,0.15)",
-                            }
-                    }
-                    title={step.label}
                   >
                     {done ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-400" />
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                     ) : (
-                      <span>{step.icon}</span>
+                      <span className="text-sm leading-none">{step.icon}</span>
                     )}
+                    <span>{step.label}</span>
                   </div>
-                  <span
-                    className={`hidden text-xs font-semibold sm:inline sm:text-sm ${
-                      current
-                        ? "text-indigo-300"
-                        : done
-                          ? "text-emerald-300"
-                          : "text-slate-600"
-                    }`}
-                  >
-                    {step.label}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       </header>
@@ -1001,14 +997,15 @@ function LessonPageInner() {
       >
         {phase === "video" && (
           <div
-            className="overflow-hidden rounded-[20px] border shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
+            className="overflow-hidden rounded-2xl border shadow-[0_10px_30px_rgba(0,0,0,0.3)]"
             style={{
-              background: "rgba(15,20,50,0.7)",
-              borderColor: "rgba(99,102,241,0.15)",
+              background: "var(--cn-surface)",
+              borderColor: "var(--cn-border)",
               backdropFilter: "blur(20px)",
             }}
           >
-            <div className="relative w-full">
+            <div className="w-full">
+              <div className="relative w-full">
               <VideoPlayer
                 lessonId={lessonId}
                 enforceWatchThrough={minVideoRequired}
@@ -1022,52 +1019,85 @@ function LessonPageInner() {
                   setPauseVideo(true);
                 }}
               />
-              {showPurchaseUpsell ? (
-                <div
-                  className="absolute inset-0 z-20 flex items-center justify-center overflow-y-auto rounded-xl bg-black/75 p-4 backdrop-blur-md sm:p-6"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-labelledby="demo-preview-upsell-title"
-                >
-                  <div className="my-auto w-full max-w-lg rounded-xl border border-amber-400/40 bg-[rgba(15,20,40,0.95)] px-5 py-5 shadow-[0_8px_32px_rgba(245,158,11,0.15)] sm:px-6 sm:py-6">
-                    <p
-                      id="demo-preview-upsell-title"
-                      className="font-semibold text-amber-300"
+              <AnimatePresence>
+                {showPurchaseUpsell && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute inset-0 z-20 flex items-center justify-center overflow-y-auto rounded-xl bg-black/75 p-4 backdrop-blur-md sm:p-6"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="demo-preview-upsell-title"
+                  >
+                    <motion.div
+                      initial={{ scale: 0.95, opacity: 0, y: 8 }}
+                      animate={{ scale: 1, opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25, ease: "easeOut" }}
+                      className="my-auto w-full max-w-lg rounded-xl border border-amber-400/40 bg-[rgba(15,20,40,0.95)] px-5 py-5 shadow-[0_8px_32px_rgba(245,158,11,0.15)] sm:px-6 sm:py-6"
                     >
-                      You&apos;ve reached the 2-minute point
-                    </p>
-                    <p className="mt-2 text-sm text-slate-300">
-                      Purchase the full program to continue your AI journey — or keep
-                      going with this demo lesson.
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <a
-                        href="https://www.akmind.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex rounded-lg bg-amber-500 px-5 py-2 text-sm font-semibold text-black transition hover:bg-amber-400"
+                      <p
+                        id="demo-preview-upsell-title"
+                        className="font-display font-semibold text-amber-300"
                       >
-                        Purchase full program
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          lesson.hasGame ? setPhase("game") : setPhase("quiz")
-                        }
-                        className="rounded-lg border border-indigo-500/50 px-5 py-2 text-sm text-indigo-300 transition hover:bg-indigo-500/10"
-                      >
-                        {lesson.hasGame
-                          ? "Continue to Game →"
-                          : "Continue to Quiz →"}
-                      </button>
+                        You&apos;ve reached the 2-minute point
+                      </p>
+                      <p className="mt-2 text-sm text-slate-300">
+                        Purchase the full program to continue your AI journey — or keep
+                        going with this demo lesson.
+                      </p>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <a
+                          href="https://www.akmind.com"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex rounded-lg bg-amber-500 px-5 py-2 text-sm font-semibold text-black transition hover:bg-amber-400"
+                        >
+                          Purchase full program
+                        </a>
+                        <motion.button
+                          type="button"
+                          initial={{ scale: 0.95, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ duration: 0.2, delay: 0.1, ease: "easeOut" }}
+                          onClick={() =>
+                            lesson.hasGame ? setPhase("game") : setPhase("quiz")
+                          }
+                          className="rounded-lg border border-indigo-500/50 px-5 py-2 text-sm text-indigo-300 transition hover:bg-indigo-500/10"
+                        >
+                          {lesson.hasGame
+                            ? "Continue to Game →"
+                            : "Continue to Quiz →"}
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              </div>
+              {minVideoRequired && !videoWatchSatisfied && phase === "video" && (() => {
+                const remaining = Math.max(0, MIN_LESSON_VIDEO_PLAY_SECONDS - watchElapsed);
+                const mm = Math.floor(remaining / 60);
+                const ss = String(remaining % 60).padStart(2, "0");
+                return (
+                  <div className="mt-3 flex items-start gap-3 rounded-xl bg-[rgba(255,185,95,0.1)] border border-[rgba(255,185,95,0.3)] p-4">
+                    <span className="text-[#ffb95f] text-lg">⏱</span>
+                    <div>
+                      <p className="text-[#ffb95f] font-bold text-sm">
+                        Watch a bit more to continue — <span className="font-mono">{mm}:{ss}</span> remaining
+                      </p>
+                      <p className="text-[#c7c4d7] text-xs mt-1">
+                        The interactive {lesson.hasGame ? "game" : "quiz"} unlocks after the lecture phase is complete.
+                      </p>
                     </div>
                   </div>
-                </div>
-              ) : null}
+                );
+              })()}
             </div>
 
             <div className="p-6 sm:p-7">
-              <h2 className="text-[22px] font-bold tracking-tight text-white">{lesson.title}</h2>
+              <h2 className="font-display text-[22px] font-bold tracking-tight text-white">{lesson.title}</h2>
               <p className="mt-2 text-sm text-slate-400">{lesson.description}</p>
               <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-relaxed text-slate-300 marker:text-indigo-400">
                 {lesson.summaryBullets.map((line) => (
@@ -1090,12 +1120,12 @@ function LessonPageInner() {
           <div
             className="mx-auto max-w-2xl rounded-[20px] border p-6 sm:p-7"
             style={{
-              background: "rgba(15,20,50,0.7)",
-              borderColor: "rgba(99,102,241,0.15)",
+              background: "var(--cn-surface-container)",
+              borderColor: "var(--cn-border)",
               backdropFilter: "blur(16px)",
             }}
           >
-            <h2 className="text-[28px] font-bold tracking-tight text-white">Knowledge Check</h2>
+            <h2 className="font-display text-[28px] font-bold tracking-tight text-white">Knowledge Check</h2>
             <p className="text-sm text-cyan-400">{lesson.title}</p>
 
             <div className="mt-4 flex items-center gap-1.5">
@@ -1131,7 +1161,7 @@ function LessonPageInner() {
                   "min-h-[56px] w-full rounded-xl border p-4 text-left text-sm transition duration-200 hover:-translate-y-0.5";
                 let style: CSSProperties = {
                   background: "rgba(255,255,255,0.04)",
-                  borderColor: "rgba(99,102,241,0.15)",
+                  borderColor: "var(--cn-border)",
                   color: "#CBD5E1",
                 };
                 if (show) {
@@ -1207,7 +1237,7 @@ function LessonPageInner() {
             }}
           >
             <h2
-              className="text-[34px] font-bold tracking-tight"
+              className="font-display text-[34px] font-bold tracking-tight"
               style={{
                 background: "linear-gradient(135deg, #FFFFFF, #67E8F9)",
                 WebkitBackgroundClip: "text",
@@ -1216,7 +1246,7 @@ function LessonPageInner() {
             >
               Results
             </h2>
-            <p className="mt-2 text-slate-400">
+            <p className="font-mono mt-2 text-slate-400">
               Score: {quizScoreCorrect}/{totalQs}
             </p>
             <p className="mt-8 text-sm text-slate-500">

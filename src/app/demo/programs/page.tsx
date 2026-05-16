@@ -11,6 +11,8 @@ import {
   Home,
   Layers,
   LayoutDashboard,
+  Telescope,
+  Wrench,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -33,7 +35,9 @@ const PROGRAMS = [
   {
     id: "AI Explorers",
     title: "AI Explorers",
-    emoji: "🔭",
+    Icon: Telescope,
+    iconColor: "text-indigo-400",
+    iconBg: "bg-indigo-500/15",
     tagline: "Ages 8–12 · No coding required",
     description:
       "A story-driven journey through AI history and concepts. Students explore how AI works through games, timelines, and interactive challenges.",
@@ -42,7 +46,9 @@ const PROGRAMS = [
   {
     id: "AI Builders",
     title: "AI Builders",
-    emoji: "🏗️",
+    Icon: Wrench,
+    iconColor: "text-cyan-400",
+    iconBg: "bg-cyan-500/15",
     tagline: "Ages 12+ · Intro to Python",
     description:
       "Hands-on Python coding lessons where students build real logic and train AI models. Ideal for curious learners ready to write their first programs.",
@@ -80,11 +86,14 @@ function DemoProgramsInner() {
         setAuthIssue((j as { error?: string }).error ?? "Access denied");
         return;
       }
-      const j = (await res.json()) as { user: DemoUser };
-      setUser(j.user);
-      setSavedCourse(j.user.course ?? null);
+      const data = (await res.json()) as DemoUser;
+      setUser({
+        ...data,
+        earnedBadges: data.earnedBadges ?? [],
+      });
+      setSavedCourse(data.course ?? null);
     } catch {
-      setAuthIssue("Network error");
+      setAuthIssue("Network error — check that the dev server is running.");
     } finally {
       setLoading(false);
     }
@@ -300,18 +309,20 @@ function DemoProgramsInner() {
                           p.id as "AI Explorers" | "AI Builders"
                         )
                       }
-                      className={`group relative flex flex-col items-start rounded-2xl border p-6 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                      className={`cursor-pointer group relative flex flex-col items-start rounded-2xl border p-6 text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                         isActive
-                          ? "border-indigo-500/60 bg-indigo-500/10 shadow-[0_0_24px_rgba(99,102,241,0.15)]"
-                          : "border-white/10 bg-white/[0.03] hover:border-indigo-500/30 hover:bg-indigo-500/5"
+                          ? "border-indigo-500/60 bg-[#1a1d2e] shadow-[0_0_32px_rgba(99,102,241,0.18),0_0_0_1px_rgba(99,102,241,0.12)]"
+                          : "border-white/10 bg-white/[0.03] hover:border-indigo-500/30 hover:bg-[#181b2a] hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
                       } ${saving && !isSaving ? "opacity-50 cursor-not-allowed" : ""}`}
                     >
                       {isActive && (
-                        <span className="absolute right-4 top-4 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500 text-white">
+                        <span className="absolute right-4 top-4 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.5)] text-white">
                           <Check className="h-3.5 w-3.5" strokeWidth={3} />
                         </span>
                       )}
-                      <span className="text-3xl">{p.emoji}</span>
+                      <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${p.iconBg} mb-1`}>
+                        <p.Icon className={`h-5 w-5 ${p.iconColor}`} />
+                      </div>
                       <h2 className="mt-3 text-lg font-bold text-white">
                         {p.title}
                       </h2>

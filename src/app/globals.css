@@ -9,27 +9,96 @@
 }
 
 :root {
-  --bg-space: #080c1e;
-  --bg-deep: #0a0f24;
-  --bg-navy: #0d1230;
-  --bg-glass: rgba(15, 20, 50, 0.6);
+  /* ─── Font CSS vars (next/font injects --font-* at runtime) ─── */
+  --font-sans: var(--font-inter), Inter, sans-serif;
+  --font-display: var(--font-space-grotesk), "Space Grotesk", sans-serif;
+  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
+
+  /* ─── Stitch Cognitive Nexus — exact design tokens ─── */
+
+  /* Surfaces */
+  --cn-bg:                      #11131e;
+  --cn-surface:                 #161929;
+  --cn-surface-dim:             #11131e;
+  --cn-surface-bright:          #373845;
+  --cn-surface-raised:          #1E2235;
+  --cn-surface-container-lo:    #191b26;
+  --cn-surface-container:       #1d1f2b;
+  --cn-surface-container-hi:    #272935;
+  --cn-surface-container-max:   #323440;
+  --cn-surface-container-min:   #0c0e18;
+
+  /* On-surface */
+  --cn-on-surface:              #e1e1f2;
+  --cn-on-surface-variant:      #c7c4d7;
+  --cn-inverse-surface:         #e1e1f2;
+  --cn-inverse-on-surface:      #2e303c;
+
+  /* Outline */
+  --cn-outline:                 #908fa0;
+  --cn-outline-variant:         #464554;
+  --cn-border:                  rgba(255, 255, 255, 0.08);
+
+  /* Primary — indigo (light value for dark bg) */
+  --cn-primary:                 #c0c1ff;
+  --cn-on-primary:              #1000a9;
+  --cn-primary-container:       #8083ff;
+  --cn-on-primary-container:    #0d0096;
+  --cn-inverse-primary:         #494bd6;
+  --cn-primary-fixed:           #e1e0ff;
+  --cn-primary-fixed-dim:       #c0c1ff;
+
+  /* Secondary — cyan */
+  --cn-secondary:               #5de6ff;
+  --cn-on-secondary:            #00363e;
+  --cn-secondary-container:     #00cbe6;
+  --cn-on-secondary-container:  #00515d;
+  --cn-secondary-fixed:         #a2eeff;
+  --cn-secondary-fixed-dim:     #2fd9f4;
+
+  /* Tertiary — gold / XP system */
+  --cn-tertiary:                #ffb95f;
+  --cn-on-tertiary:             #472a00;
+  --cn-tertiary-container:      #ca8100;
+  --cn-on-tertiary-container:   #3e2400;
+
+  /* Semantic */
+  --cn-success:                 #10B981;
+  --cn-error:                   #ffb4ab;
+  --cn-error-container:         #93000a;
+
+  /* Text aliases */
+  --cn-text-primary:            #F1F5F9;
+  --cn-text-secondary:          #94A3B8;
+  --cn-text-muted:              #475569;
+
+  /* Brand overrides (button fills, glows) */
+  --cn-brand-primary:           #6366f1;
+  --cn-brand-secondary:         #22d3ee;
+  --cn-brand-tertiary:          #f59e0b;
+
+  /* ─── Legacy vars (kept for game / NOVA components) ─── */
+  --bg-space:       var(--cn-bg);
+  --bg-deep:        #0a0f24;
+  --bg-navy:        #0d1230;
+  --bg-glass:       rgba(15, 20, 50, 0.6);
   --bg-glass-light: rgba(255, 255, 255, 0.03);
-  --bg-card: rgba(15, 20, 50, 0.7);
-  --bg-elevated: rgba(22, 30, 65, 0.8);
-  --border-glass: rgba(139, 148, 255, 0.18);
-  --border-glow: rgba(6, 182, 212, 0.35);
-  --text-bright: #ffffff;
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --cyan: #06b6d4;
-  --indigo: #6366f1;
-  --amber: #f59e0b;
-  --green: #10b981;
-  --glow-sm-cyan: 0 0 12px rgba(6, 182, 212, 0.3);
+  --bg-card:        rgba(15, 20, 50, 0.7);
+  --bg-elevated:    rgba(22, 30, 65, 0.8);
+  --border-glass:   rgba(139, 148, 255, 0.18);
+  --border-glow:    rgba(6, 182, 212, 0.35);
+  --text-bright:    #ffffff;
+  --text-primary:   var(--cn-text-primary);
+  --text-secondary: var(--cn-text-secondary);
+  --text-muted:     var(--cn-text-muted);
+  --cyan:           var(--cn-brand-secondary);
+  --indigo:         var(--cn-brand-primary);
+  --amber:          var(--cn-brand-tertiary);
+  --green:          var(--cn-success);
+  --glow-sm-cyan:   0 0 12px rgba(34, 211, 238, 0.3);
   --glow-sm-indigo: 0 0 12px rgba(99, 102, 241, 0.3);
-  --glow-cyan: 0 0 20px rgba(6, 182, 212, 0.3);
-  --glow-indigo: 0 0 20px rgba(99, 102, 241, 0.3);
+  --glow-cyan:      0 0 20px rgba(34, 211, 238, 0.3);
+  --glow-indigo:    0 0 20px rgba(99, 102, 241, 0.3);
 }
 
 html {
@@ -37,66 +106,123 @@ html {
 }
 
 body {
-  background: var(--bg-space);
+  background: var(--cn-bg);
   background-image:
-    radial-gradient(
-      ellipse at 15% 15%,
-      rgba(99, 102, 241, 0.15) 0%,
-      transparent 45%
-    ),
-    radial-gradient(
-      ellipse at 85% 85%,
-      rgba(6, 182, 212, 0.12) 0%,
-      transparent 45%
-    ),
-    radial-gradient(
-      ellipse at 85% 15%,
-      rgba(139, 92, 246, 0.08) 0%,
-      transparent 35%
-    ),
-    radial-gradient(
-      ellipse at 15% 85%,
-      rgba(6, 182, 212, 0.06) 0%,
-      transparent 35%
-    );
+    radial-gradient(ellipse at 15% 15%, rgba(99, 102, 241, 0.07) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 85%, rgba(93, 230, 255, 0.04) 0%, transparent 50%);
   background-attachment: fixed;
   color: var(--text-primary);
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
   min-height: 100vh;
 }
 
-/* Demo shell — glass surfaces aligned with akmind-dashboard */
+/* Demo shell — exact Stitch Cognitive Nexus surface values */
 .demo-ak-glass-surface {
-  background: rgba(15, 20, 50, 0.65);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(99, 102, 241, 0.12);
+  background: #161929;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .demo-ak-glass-elevated {
-  background: rgba(15, 20, 50, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(139, 148, 255, 0.18);
+  background: #1E2235;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .demo-ak-hero-panel {
-  background: rgba(15, 20, 50, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(139, 148, 255, 0.18);
-  background-image: linear-gradient(
-    180deg,
-    rgba(99, 102, 241, 0.06) 0%,
-    transparent 40%
-  );
-  background-repeat: no-repeat;
+  background: #1d1f2b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .demo-ak-section-heading {
-  border-left: 3px solid #06b6d4;
-  padding-left: 12px;
+  font-family: var(--font-display);
+  color: var(--cn-on-surface);
+}
+
+/* Stitch progress bar — 4 px, cyan→indigo gradient, no rounding */
+.stitch-progress-track {
+  height: 4px;
+  background: var(--cn-outline-variant);
+  overflow: hidden;
+}
+
+.stitch-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--cn-brand-secondary), var(--cn-brand-primary));
+}
+
+.lesson-card-active {
+  border-left: 2px solid var(--cn-brand-primary) !important;
+}
+
+.lesson-card-complete {
+  border-left: 2px solid var(--cn-success) !important;
+}
+
+.lesson-card-locked {
+  border-left: 2px solid transparent !important;
+}
+
+.badge-card-earned {
+  border-top: 2px solid var(--cn-tertiary);
+}
+
+.xp-chip {
+  color: var(--cn-tertiary);
+  background: rgba(255, 185, 95, 0.1);
+  border: 1px solid rgba(255, 185, 95, 0.22);
+}
+
+.phase-tab-group {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+/* Pill tabs — match Stitch lesson page screenshot */
+.phase-tab {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.375rem 0.875rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--cn-outline);
+  cursor: default;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+/* Active tab: solid primary-container fill, white text */
+.phase-tab-active {
+  color: #ffffff;
+  border-color: transparent;
+  background: var(--cn-primary-container);
+}
+
+/* Completed tab: success green tint */
+.phase-tab-complete {
+  color: var(--cn-success);
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+/* Future/locked tab: muted, no interaction */
+.phase-tab-locked {
+  color: var(--cn-outline-variant);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.watch-gate-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  background: rgba(255, 185, 95, 0.07);
+  border-top: 1px solid rgba(255, 185, 95, 0.2);
+  color: var(--cn-tertiary);
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 @keyframes float {
@@ -229,6 +355,22 @@ body {
   }
 }
 
+/* Root page star field */
+@keyframes star-twinkle {
+  0%, 100% { opacity: 0.15; transform: scale(1); }
+  50%       { opacity: 0.7;  transform: scale(1.4); }
+}
+
+.star-field-dot {
+  position: absolute;
+  border-radius: 9999px;
+  background: #ffffff;
+  opacity: 0.2;
+  animation-name: star-twinkle;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
 .complete-confetti-layer {
   pointer-events: none;
   position: absolute;
@@ -324,5 +466,72 @@ body {
   .nova-float-button {
     bottom: 80px !important;
     right: 16px !important;
+  }
+}
+
+/* ─── Glassmorphism card with depth layers ─── */
+.glass-card {
+  background: rgba(13, 15, 30, 0.82);
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.06) inset,
+    0 24px 80px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(99, 102, 241, 0.06);
+}
+
+/* ─── Interactive element cursor ─── */
+button, [role="button"], a, label[for], select, [tabindex]:not([tabindex="-1"]) {
+  cursor: pointer;
+}
+
+/* ─── Focus ring system ─── */
+:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.7);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─── Stat card icon hover glow ─── */
+.stat-card-icon {
+  transition: filter 0.2s ease;
+}
+.stat-card:hover .stat-card-icon {
+  filter: drop-shadow(0 0 8px currentColor);
+}
+
+/* ─── Enhanced lesson card ─── */
+.lesson-card-hover {
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+.lesson-card-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── Badge earned glow ─── */
+.badge-earned-glow {
+  box-shadow: 0 0 22px rgba(192, 193, 255, 0.12), 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.badge-earned-glow:hover {
+  box-shadow: 0 0 32px rgba(192, 193, 255, 0.22), 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.badge-icon-glow {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.badge-earned-glow:hover .badge-icon-glow {
+  transform: scale(1.12) translateY(-2px);
+  box-shadow: 0 0 20px rgba(192, 193, 255, 0.35);
+}
+
+/* ─── Respect prefers-reduced-motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  .star-field-dot,
+  .complete-confetti-piece {
+    animation: none !important;
+  }
+  * {
+    transition-duration: 0.01ms !important;
   }
 }

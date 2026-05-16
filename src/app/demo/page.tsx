@@ -19,6 +19,7 @@ import {
   Lock,
   Zap,
 } from "lucide-react";
+import { animate, motion, useMotionValue } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -136,6 +137,35 @@ function isAdminTester(user: DemoUser | null): boolean {
     user.email?.toLowerCase() === "admin@akmind.com" || user.name === "Admin"
   );
 }
+
+// Count-up animation using useMotionValue
+function AnimatedNumber({ value, className }: { value: number; className?: string }) {
+  const mv = useMotionValue(0);
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    const controls = animate(mv, value, {
+      duration: 0.9,
+      ease: "easeOut",
+      onUpdate: (v) => setDisplay(Math.round(v)),
+    });
+    return controls.stop;
+  }, [mv, value]);
+
+  return <span className={className}>{display}</span>;
+}
+
+const lessonContainerVariants = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.07 },
+  },
+};
+
+const lessonCardVariants = {
+  hidden: { opacity: 0, y: 8 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.28, ease: "easeOut" as const } },
+};
 
 function DemoDashboardInner() {
   const router = useRouter();
@@ -274,10 +304,10 @@ function DemoDashboardInner() {
     <div className="min-h-screen pb-20 md:pb-0">
       {showShell ? (
         <aside
-          className="fixed left-0 top-0 z-40 hidden h-screen w-[260px] flex-col border-r border-[rgba(99,102,241,0.12)] bg-[rgba(6,8,15,0.95)] backdrop-blur-[20px] md:flex"
-          style={{ boxShadow: "4px 0 32px rgba(0,0,0,0.5)" }}
+          className="fixed left-0 top-0 z-40 hidden h-screen w-[260px] flex-col border-r border-[rgba(255,255,255,0.08)] backdrop-blur-[20px] md:flex"
+          style={{ background: "var(--cn-surface-container-min)", boxShadow: "1px 0 0 rgba(255,255,255,0.06)" }}
         >
-          <div className="flex w-full min-w-0 flex-col items-center border-b border-[rgba(99,102,241,0.1)] px-4 py-5">
+          <div className="flex w-full min-w-0 flex-col items-center border-b border-[rgba(255,255,255,0.08)] px-4 py-5">
             <AkmindLogo
               variant="wordmark"
               priority
@@ -291,7 +321,7 @@ function DemoDashboardInner() {
           <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
             <Link
               href={dashboardHref}
-              className="flex items-center gap-3 rounded-lg bg-indigo-500/15 px-3 py-2.5 text-sm font-medium text-white"
+              className="flex items-center gap-3 rounded-lg bg-[#1E2235] px-3 py-2.5 text-sm font-bold text-[#c0c1ff] border-r-2 border-[#c0c1ff]"
               scroll={pathname === "/demo" || pathname === "/demo/" ? false : undefined}
               onClick={() => {
                 if (pathname === "/demo" || pathname === "/demo/") {
@@ -299,14 +329,14 @@ function DemoDashboardInner() {
                 }
               }}
             >
-              <LayoutDashboard className="h-5 w-5 text-indigo-400" />
+              <LayoutDashboard className="h-5 w-5 text-[#c0c1ff]" />
               Dashboard
             </Link>
             <Link
               href={badgesHref}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-slate-200"
+              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#c7c4d7] transition hover:bg-[#1E2235]"
             >
-              <Award className="h-5 w-5 shrink-0 text-slate-500" />
+              <Award className="h-5 w-5 shrink-0 text-[#908fa0]" />
               <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
                 <span>Badges</span>
                 {badgesEarnedCount > 0 ? (
@@ -319,7 +349,7 @@ function DemoDashboardInner() {
             <button
               type="button"
               onClick={() => scrollToSection("demo-nova")}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-slate-200"
+              className="cursor-pointer flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-[#c7c4d7] transition hover:bg-[#1E2235]"
             >
               <Bot className="h-5 w-5 text-slate-500" />
               NOVA
@@ -327,7 +357,7 @@ function DemoDashboardInner() {
             {adminMode && (
               <Link
                 href={programsHref}
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-slate-200"
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#c7c4d7] transition hover:bg-[#1E2235]"
               >
                 <Layers className="h-5 w-5 text-slate-500" />
                 Programs
@@ -335,7 +365,7 @@ function DemoDashboardInner() {
             )}
           </nav>
 
-          <div className="mt-auto border-t border-[rgba(99,102,241,0.1)] p-4">
+          <div className="mt-auto border-t border-[rgba(255,255,255,0.08)] p-4">
             <div className="demo-ak-glass-surface rounded-xl p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-500/30 text-sm font-bold text-indigo-100">
@@ -353,7 +383,7 @@ function DemoDashboardInner() {
                 onClick={() => setXpModalOpen(true)}
                 className="mt-3 w-full text-left"
               >
-                <p className="text-lg font-bold text-indigo-300">{xp} XP</p>
+                <p className="font-display text-lg font-bold text-indigo-300">{xp} XP</p>
               </button>
               <span className="mt-2 inline-flex rounded-full bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-400">
                 {streak}d streak
@@ -367,14 +397,14 @@ function DemoDashboardInner() {
         <main className="relative z-10 min-h-screen px-4 py-5 pb-24 md:px-8 md:py-8 md:pb-10">
         {loading && (
           <div className="mx-auto max-w-4xl space-y-6 animate-pulse">
-            <div className="h-10 rounded-lg bg-[#1a2235]" />
-            <div className="h-40 rounded-xl bg-[#1a2235]" />
+            <div className="h-10 rounded-lg bg-[#1d1f2b]" />
+            <div className="h-40 rounded-xl bg-[#1d1f2b]" />
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-24 rounded-xl bg-[#1a2235]" />
+                <div key={i} className="h-24 rounded-xl bg-[#1d1f2b]" />
               ))}
             </div>
-            <div className="h-56 rounded-xl bg-[#1a2235]" />
+            <div className="h-56 rounded-xl bg-[#1d1f2b]" />
           </div>
         )}
 
@@ -382,7 +412,8 @@ function DemoDashboardInner() {
           <>
             <header
               id="dashboard-top"
-              className="sticky top-0 z-20 -mx-4 mb-6 flex items-center justify-between border-b border-[rgba(99,102,241,0.1)] bg-[rgba(6,8,15,0.8)] px-4 py-3.5 backdrop-blur-[16px] md:-mx-8 md:px-6"
+              className="sticky top-0 z-20 -mx-4 mb-6 flex items-center justify-between border-b border-[rgba(255,255,255,0.08)] px-4 py-3.5 backdrop-blur-[20px] md:-mx-8 md:px-6"
+              style={{ background: "rgba(13,15,30,0.88)" }}
             >
               <nav
                 className="flex items-center gap-3 text-sm text-slate-300"
@@ -402,13 +433,13 @@ function DemoDashboardInner() {
                 >
                   <Bell className="h-5 w-5" />
                 </button>
-                <span className="rounded-full border border-indigo-500/40 bg-indigo-500/15 px-3 py-1 text-xs font-bold text-indigo-300">
+                <span className="font-mono rounded-full border border-indigo-500/40 bg-indigo-500/15 px-3 py-1 text-xs font-bold text-indigo-300">
                   {xp} XP
                 </span>
               </div>
             </header>
 
-            <section className="demo-ak-hero-panel relative mx-auto max-w-4xl overflow-hidden rounded-xl p-6 md:p-8">
+            <section className="relative mx-auto max-w-4xl overflow-hidden rounded-xl p-6 md:p-8 bg-[#1d1f2b] border border-[rgba(255,255,255,0.08)]" style={{ backgroundImage: "radial-gradient(ellipse at 80% 20%, rgba(99,102,241,0.06) 0%, transparent 60%), radial-gradient(ellipse at 20% 80%, rgba(6,182,212,0.04) 0%, transparent 60%)" }}>
               <div className="pointer-events-none absolute right-4 top-4 sm:pointer-events-auto md:right-8 md:top-6">
                 <div className="drop-shadow-[0_0_14px_rgba(99,102,241,0.35)]">
                   <NOVACharacter size="sm" emotion="happy" animate />
@@ -418,18 +449,25 @@ function DemoDashboardInner() {
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" />
                 {user.course.toUpperCase()} PROGRAM · DEMO
               </p>
-              <h1 className="mt-3 max-w-[85%] text-2xl font-extrabold tracking-tight text-white md:text-3xl lg:max-w-xl">
+              <h1 className="font-display mt-3 max-w-[85%] text-2xl font-extrabold tracking-tight text-white md:text-3xl lg:max-w-xl">
                 {user.childName}&apos;s Learning Journey
               </h1>
               <p className="mt-1 text-sm text-slate-400">
                 {user.course} · Demo
               </p>
-              <div className="mt-6 h-2 max-w-md overflow-hidden rounded-full bg-slate-800/80">
-                <div
-                  className="h-full rounded-full bg-indigo-500"
-                  style={{ width: `${xpHeroPct}%` }}
-                />
+
+              {/* Animated XP bar — 4px, Stitch spec */}
+              <div className="max-w-sm">
+                <div className="stitch-progress-track mt-6">
+                  <motion.div
+                    className="stitch-progress-fill"
+                    initial={{ width: "0%" }}
+                    animate={{ width: `${xpHeroPct}%` }}
+                    transition={{ duration: 0.9, ease: "easeOut", delay: 0.15 }}
+                  />
+                </div>
               </div>
+
               {heroEarnedBadges.length > 0 ? (
                 <div className="mt-4 flex flex-wrap gap-2">
                   {heroEarnedBadges.map((b) => (
@@ -443,51 +481,53 @@ function DemoDashboardInner() {
                   ))}
                 </div>
               ) : null}
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="font-mono mt-2 text-xs text-slate-500">
                 {xp} XP · Level {heroLevel}
               </p>
             </section>
 
+            {/* Stats grid with count-up */}
             <div className="mx-auto mt-6 grid max-w-4xl grid-cols-2 gap-3 md:grid-cols-4">
-              <div className="demo-ak-glass-surface rounded-xl p-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/15">
-                  <Zap className="h-5 w-5 text-indigo-400" />
+              <div className="stat-card group bg-[#161929] border border-[rgba(255,255,255,0.08)] rounded-xl p-5 flex flex-col justify-between transition-all duration-200 hover:border-indigo-500/25 hover:bg-[#1a1d2e]">
+                <div className="stat-card-icon flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-400">
+                  <Zap className="h-5 w-5" />
                 </div>
-                <p className="mt-3 text-xl font-bold tabular-nums text-white sm:text-2xl">
-                  {xp}
+                <p className="font-mono mt-3 text-xl font-bold tabular-nums text-white sm:text-2xl">
+                  <AnimatedNumber value={xp} />
                 </p>
                 <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                   POINTS EARNED
                 </p>
               </div>
-              <div className="demo-ak-glass-surface rounded-xl p-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500/15">
-                  <Flame className="h-5 w-5 text-orange-400" />
+              <div className="stat-card group bg-[#161929] border border-[rgba(255,255,255,0.08)] rounded-xl p-5 flex flex-col justify-between transition-all duration-200 hover:border-orange-500/25 hover:bg-[#1a1d2e]">
+                <div className="stat-card-icon flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500/15 text-orange-400">
+                  <Flame className="h-5 w-5" />
                 </div>
-                <p className="mt-3 text-xl font-bold tabular-nums text-white sm:text-2xl">
-                  {streak}
+                <p className="font-mono mt-3 text-xl font-bold tabular-nums text-white sm:text-2xl">
+                  <AnimatedNumber value={streak} />
                 </p>
                 <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                   LESSON STREAK
                 </p>
               </div>
-              <div className="demo-ak-glass-surface rounded-xl p-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/15">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+              <div className="stat-card group bg-[#161929] border border-[rgba(255,255,255,0.08)] rounded-xl p-5 flex flex-col justify-between transition-all duration-200 hover:border-emerald-500/25 hover:bg-[#1a1d2e]">
+                <div className="stat-card-icon flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
+                  <CheckCircle2 className="h-5 w-5" />
                 </div>
-                <p className="mt-3 text-xl font-bold tabular-nums text-white sm:text-2xl">
-                  {lessonsDone}/{lessons.length}
+                <p className="font-mono mt-3 text-xl font-bold tabular-nums text-white sm:text-2xl">
+                  <AnimatedNumber value={lessonsDone} />
+                  <span className="text-slate-500">/{lessons.length}</span>
                 </p>
                 <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                   LESSONS DONE
                 </p>
               </div>
-              <div className="demo-ak-glass-surface rounded-xl p-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/15">
-                  <Award className="h-5 w-5 text-amber-400" />
+              <div className="stat-card group bg-[#161929] border border-[rgba(255,255,255,0.08)] rounded-xl p-5 flex flex-col justify-between transition-all duration-200 hover:border-amber-500/25 hover:bg-[#1a1d2e]">
+                <div className="stat-card-icon flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400">
+                  <Award className="h-5 w-5" />
                 </div>
-                <p className="mt-3 text-xl font-bold tabular-nums text-white sm:text-2xl">
-                  {badgesEarnedCount}
+                <p className="font-mono mt-3 text-xl font-bold tabular-nums text-white sm:text-2xl">
+                  <AnimatedNumber value={badgesEarnedCount} />
                 </p>
                 <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                   BADGES EARNED
@@ -499,7 +539,7 @@ function DemoDashboardInner() {
               id="demo-badges"
               className="mx-auto mt-10 max-w-4xl scroll-mt-28"
             >
-              <h2 className="demo-ak-section-heading mb-4 text-lg font-bold text-white">
+              <h2 className="font-display demo-ak-section-heading mb-4 text-lg font-bold text-white">
                 Badges
               </h2>
               <div className="demo-ak-glass-surface rounded-xl p-5">
@@ -519,10 +559,17 @@ function DemoDashboardInner() {
               id="demo-lessons"
               className="mx-auto mt-10 max-w-4xl scroll-mt-28"
             >
-              <h2 className="demo-ak-section-heading mb-4 text-lg font-bold text-white">
+              <h2 className="font-display demo-ak-section-heading mb-4 text-lg font-bold text-white">
                 Your Learning Path
               </h2>
-              <div className="flex flex-col gap-4">
+
+              {/* Staggered lesson cards */}
+              <motion.div
+                className="flex flex-col gap-4"
+                variants={lessonContainerVariants}
+                initial="hidden"
+                animate="show"
+              >
                 {lessons.map((lesson) => {
                   const done = user.lessonsComplete.includes(lesson.id);
                   const unlocked =
@@ -533,25 +580,35 @@ function DemoDashboardInner() {
                   const quizScore = user.quizScores[String(lesson.id)];
 
                   return (
-                    <div
+                    <motion.div
                       key={lesson.id}
-                      className={`relative rounded-xl p-5 demo-ak-glass-surface transition hover:border-[rgba(6,182,212,0.28)] ${
-                        unlocked ? "" : "opacity-80"
+                      variants={lessonCardVariants}
+                      className={`lesson-card-hover relative rounded-xl p-5 transition-colors duration-200 ${
+                        done
+                          ? "bg-[#161929] border border-[rgba(255,255,255,0.08)] border-l-2 border-l-[#10B981] hover:bg-[#1b1d2d] hover:border-[rgba(255,255,255,0.12)]"
+                          : active
+                            ? "bg-[#1E2235] border border-[rgba(192,193,255,0.4)] border-l-2 border-l-[#c0c1ff] hover:bg-[#222540] hover:border-[rgba(192,193,255,0.55)] hover:shadow-[0_0_28px_rgba(99,102,241,0.12)]"
+                            : "bg-[#161929] border border-[rgba(255,255,255,0.08)] opacity-60"
                       }`}
                     >
-                      <span className="absolute right-4 top-4 rounded-lg bg-indigo-500/15 px-2 py-1 text-xs font-bold text-indigo-300">
+                      {/* XP chip — Stitch tertiary/gold */}
+                      <span
+                        className="font-mono absolute right-4 top-4 rounded px-2 py-0.5 text-[10px] font-bold"
+                        style={{ color: '#ffb95f', background: 'rgba(255,185,95,0.1)', border: '1px solid rgba(255,185,95,0.2)' }}
+                      >
                         +{lesson.xpReward} XP
                       </span>
 
                       <div className="flex gap-4 pr-16">
                         <div
-                          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                          style={
                             done
-                              ? "bg-indigo-600 text-white"
+                              ? { background: "var(--cn-primary-container)", color: "#fff" }
                               : unlocked
-                                ? "border-2 border-indigo-500 text-white"
-                                : "border-2 border-slate-600 text-slate-500"
-                          }`}
+                                ? { border: "2px solid var(--cn-primary-container)", color: "#fff" }
+                                : { border: "2px solid var(--cn-outline-variant)", color: "var(--cn-outline)" }
+                          }
                         >
                           {done ? (
                             <Check className="h-6 w-6" strokeWidth={3} />
@@ -564,12 +621,12 @@ function DemoDashboardInner() {
 
                         <div className="min-w-0 flex-1">
                           <span
-                            className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                            className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold ${
                               done
-                                ? "bg-emerald-500/15 text-emerald-400"
+                                ? "bg-[rgba(255,185,95,0.1)] text-[#ffb95f] border border-[rgba(255,185,95,0.2)]"
                                 : active
-                                  ? "bg-amber-500/15 text-amber-300"
-                                  : "bg-slate-800 text-slate-500"
+                                  ? "bg-[rgba(93,230,255,0.1)] text-[#5de6ff] border border-[rgba(93,230,255,0.2)]"
+                                  : "bg-[#323440] text-[#c7c4d7] border border-[rgba(255,255,255,0.08)] uppercase"
                             }`}
                           >
                             {done
@@ -578,14 +635,14 @@ function DemoDashboardInner() {
                                 ? "In Progress"
                                 : "Locked"}
                           </span>
-                          <h3 className="mt-2 text-base font-bold text-white md:text-lg">
+                          <h3 className="font-display mt-2 text-base font-bold text-white md:text-lg">
                             {lesson.title}
                           </h3>
                           <p className="mt-1 line-clamp-2 text-sm text-slate-500">
                             {lesson.description}
                           </p>
                           <div className="mt-3 flex flex-wrap gap-2">
-                            <span className="rounded-full bg-slate-800/80 px-2.5 py-1 text-xs text-slate-400">
+                            <span className="font-mono rounded-full bg-slate-800/80 px-2.5 py-1 text-xs text-slate-400">
                               {lesson.duration}
                             </span>
                             {lesson.hasGame ? (
@@ -594,7 +651,7 @@ function DemoDashboardInner() {
                               </span>
                             ) : null}
                             {done && quizScore != null ? (
-                              <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-400">
+                              <span className="font-mono rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-400">
                                 Quiz: {quizScore}%
                               </span>
                             ) : null}
@@ -618,7 +675,7 @@ function DemoDashboardInner() {
                                     `/demo/lesson/${lesson.id}?token=${encodeURIComponent(token)}`
                                   )
                                 }
-                                className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 hover:underline"
+                                className="cursor-pointer text-xs font-semibold text-indigo-400 hover:text-indigo-300 hover:underline transition-colors duration-150"
                               >
                                 Review →
                               </button>
@@ -631,7 +688,7 @@ function DemoDashboardInner() {
                                   `/demo/lesson/${lesson.id}?token=${encodeURIComponent(token)}`
                                 )
                               }
-                              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-900/30 transition hover:bg-indigo-500"
+                              className="cursor-pointer px-4 py-1.5 bg-[#c0c1ff] text-[#0d0096] rounded-lg font-bold text-[12px] flex items-center gap-2 hover:bg-[#d4d5ff] active:scale-95 transition-all duration-150 shadow-[0_0_16px_rgba(192,193,255,0.2)]"
                             >
                               Continue →
                             </button>
@@ -656,7 +713,7 @@ function DemoDashboardInner() {
                                   `/demo/lesson/${lesson.id}?token=${encodeURIComponent(token)}`
                                 )
                               }
-                              className="w-full rounded-lg border border-indigo-500/30 py-2 text-sm font-semibold text-indigo-400"
+                              className="cursor-pointer w-full rounded-lg border border-indigo-500/30 py-2 text-sm font-semibold text-indigo-400 hover:bg-indigo-500/10 transition-colors duration-150"
                             >
                               Review →
                             </button>
@@ -669,16 +726,16 @@ function DemoDashboardInner() {
                                 `/demo/lesson/${lesson.id}?token=${encodeURIComponent(token)}`
                               )
                             }
-                            className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white"
+                            className="cursor-pointer w-full px-4 py-2.5 bg-[#c0c1ff] text-[#0d0096] rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#d4d5ff] active:scale-95 transition-all duration-150 shadow-[0_0_16px_rgba(192,193,255,0.2)]"
                           >
                             Continue →
                           </button>
                         )}
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })}
-              </div>
+              </motion.div>
             </section>
 
           </>
@@ -688,7 +745,7 @@ function DemoDashboardInner() {
           <div className="flex min-h-[60vh] items-center justify-center py-16">
             <div className="demo-ak-glass-elevated w-full max-w-sm rounded-xl p-8 text-center">
               <div className="text-5xl">{authIssue ? "⚠️" : "🔑"}</div>
-              <h2 className="mt-4 text-xl font-bold text-white">
+              <h2 className="font-display mt-4 text-xl font-bold text-white">
                 {authIssue ? "Could not load demo" : "Session Expired"}
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-slate-400">
@@ -732,8 +789,8 @@ function DemoDashboardInner() {
       {!loading && user && token ? (
         <>
           <nav
-            className="fixed bottom-0 left-0 z-30 flex h-16 w-full items-stretch border-t border-[rgba(99,102,241,0.15)] pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-[20px] md:hidden"
-            style={{ background: "rgba(8,10,22,0.95)" }}
+            className="fixed bottom-0 left-0 z-30 flex h-16 w-full items-stretch border-t border-[rgba(255,255,255,0.08)] pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-[20px] md:hidden"
+            style={{ background: "var(--cn-surface-container-min)" }}
           >
             <button
               type="button"
@@ -746,7 +803,7 @@ function DemoDashboardInner() {
                 }
               }}
               className={`flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium ${
-                isDemoHome ? "text-[#06B6D4]" : "text-slate-500"
+                isDemoHome ? "text-[#5de6ff]" : "text-slate-500"
               }`}
               aria-label="Dashboard home"
             >
@@ -763,7 +820,7 @@ function DemoDashboardInner() {
                 router.push(badgesHref);
               }}
               className={`flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium ${
-                isBadgesRoute ? "text-[#06B6D4]" : "text-slate-500"
+                isBadgesRoute ? "text-[#5de6ff]" : "text-slate-500"
               }`}
               aria-label="Badges"
             >
@@ -781,7 +838,7 @@ function DemoDashboardInner() {
               }}
               className={`flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium ${
                 bottomActive === "nova" && isDemoHome
-                  ? "text-[#06B6D4]"
+                  ? "text-[#5de6ff]"
                   : "text-slate-500"
               }`}
               aria-label="NOVA"
@@ -802,7 +859,7 @@ function DemoDashboardInner() {
                   router.push(programsHref);
                 }}
                 className={`flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium ${
-                  isProgramsRoute ? "text-[#06B6D4]" : "text-slate-500"
+                  isProgramsRoute ? "text-[#5de6ff]" : "text-slate-500"
                 }`}
                 aria-label="Programs"
               >
@@ -826,8 +883,8 @@ function DemoDashboardInner() {
                 onClick={(e) => e.stopPropagation()}
                 role="presentation"
               >
-                <h3 className="text-lg font-bold text-white">Your XP</h3>
-                <p className="mt-2 text-3xl font-black text-indigo-300">
+                <h3 className="font-display text-lg font-bold text-white">Your XP</h3>
+                <p className="font-mono mt-2 text-3xl font-black text-indigo-300">
                   {user.xp} XP
                 </p>
                 <p className="mt-1 text-sm text-slate-400">
@@ -839,7 +896,7 @@ function DemoDashboardInner() {
                 </p>
                 <button
                   type="button"
-                  className="mt-6 w-full rounded-xl bg-indigo-600 py-3 font-semibold text-white transition hover:bg-indigo-500"
+                  className="cursor-pointer mt-6 w-full rounded-xl bg-indigo-600 py-3 font-semibold text-white transition hover:bg-indigo-500 active:scale-95"
                   onClick={() => {
                     setXpModalOpen(false);
                     setBottomActive("home");
