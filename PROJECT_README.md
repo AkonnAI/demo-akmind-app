@@ -10,7 +10,7 @@ Canonical snapshot of what the demo does today — see later sections for deep d
 
 ### Dual demo programs (`course`)
 
-- **`AI Explorers`** — demo lesson ids **`1`, `2`, `3`**. Full-screen game phase uses **`NeuropolisShell`** inside **`LandscapeWrapper`** (`dynamic(..., { ssr: false })`). **`bootstrapNeuropolisDemo`** wires canvas, **`DeviceManager`**, **`InputManager`**, **`TouchControls`** (`bypassDeviceGate: true`), boot/cinematic/game scenes for **`level`** **`1` \| `2` \| `3`**.
+- **`AI Explorers`** — demo lesson ids **`1`, `2`, `3`**. Full-screen game phase uses **`AkmindSignalShell`** (iframe loading **`/akmind-signal/signal.html?level=…&embedded=1`**) inside **`LandscapeWrapper`**. Completed lessons **`postMessage`** back to **`AKMIND_SIGNAL_LESSON_COMPLETE`** (`src/components/games/akmind-signal/AkmindSignalShell.tsx`).
 - **`AI Builders`** — demo lesson ids **`11`, `12`, `13`**. Game phase mounts **`Sim1Scene`**, **`Sim2Scene`**, or **`Sim3Scene`** from **`src/components/games/neuro-sim/sims/`** (Python-teaching simulations + Monaco-backed editing where applicable).
 - **`AI Innovators`** appears on **`DemoUser`** / **`registerSchema`** for schema continuity; landing and admin switches focus on **Explorers vs Builders**.
 - **`src/lib/demo-lesson-scope.ts`** defines valid ids, **`sanitizeDemoLessonsComplete`** (drops legacy ids such as old lesson **`4`**), and **`allDemoLessonsComplete`**: **`true`** when **either** **`[1,2,3]`** or **`[11,12,13]`** is fully complete — matching **`POST /api/demo/progress`** completion / badge logic.
@@ -49,7 +49,7 @@ export const DEMO_USER_API_RATE_LIMIT_PER_MINUTE = 240;
 - **`/api/*`**: origin allowlist includes **same-origin** + **`https://akmind.com`** / **`www`** / **`demo.akmind.com`** / **`app.akmind.com`** (+ localhost); rejects oversized bodies (**10 KB** cap).
 - **`MonacoErrorFilter`** (`src/app/layout.tsx`) quiets Monaco worker noise in dev.
 - **`NOVAChat`** FAB **`suppressNovaChatFab`** during fullscreen game / XP overlay so taps reach canvas or sim UI.
-- Cyberpunk glass UI (**`globals.css`**), mobile bottom nav (**`/demo`**, **`/demo/programs`**), **`GameTouchControls`**, DynamoDB (**`USE_DYNAMODB`**), timing-safe token compare, security headers — unchanged themes.
+- Cyberpunk glass UI (**`globals.css`**), mobile bottom nav (**`/demo`**, **`/demo/programs`**), DynamoDB (**`USE_DYNAMODB`**), timing-safe token compare, security headers — unchanged themes.
 
 ---
 
@@ -64,9 +64,9 @@ export const DEMO_USER_API_RATE_LIMIT_PER_MINUTE = 240;
 - Each learner carries a **`course`** (**Explorers** vs **Builders**) chosen at registration (and adjustable for the **admin demo user** via **`/admin`** or **`/demo/programs`**).
 - Local JSON "database" for demo users (`data/demo-users.json`), **or** AWS **DynamoDB** when `USE_DYNAMODB=true`.
 - Optional Gmail SMTP to email demo links and notify admins.
-- **Explorers:** lessons **1–3** — Neuropolis canvas story levels + quizzes.
+- **Explorers:** lessons **1–3** — **AKMIND SIGNAL** iframe games (**`public/akmind-signal/`**) + quizzes.
 - **Builders:** lessons **11–13** — neuro-sim Python teaching flows + quizzes.
-- Heavy interaction shells load with `dynamic(..., { ssr: false })` (Neuropolis, neuro-sim, landscape wrapper).
+- Heavy interaction shells load with `dynamic(..., { ssr: false })` (SIGNAL iframe host, neuro-sim, landscape wrapper).
 
 ---
 

@@ -1,0 +1,3539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AKMIND SIGNAL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #05050f;
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+    }
+    #game-canvas {
+      position: absolute;
+      display: block;
+      image-rendering: crisp-edges;
+    }
+    #ui-layer {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+<div id="rotate-msg" style="display:none;position:fixed;inset:0;background:#05050f;z-index:9999;flex-direction:column;align-items:center;justify-content:center;font-family:Orbitron,sans-serif;color:#00e5ff;font-size:20px;text-align:center;padding:40px;">
+  <div style="font-size:60px;margin-bottom:20px;">📱</div>
+  <div style="font-weight:700;margin-bottom:12px;">ROTATE YOUR DEVICE</div>
+  <div style="font-size:14px;color:#8892b0;">This game plays best in landscape mode</div>
+</div>
+<canvas id="game-canvas"></canvas>
+<div id="ui-layer"></div>
+<script>
+// ============================================================
+// AKMIND SIGNAL — Game Engine
+// ============================================================
+
+// --- CONFIG ---
+const CONFIG = {
+  W: 1920, H: 1080,
+  BG: '#05050f',
+  CYAN: '#00e5ff',
+  GOLD: '#ffd700',
+  NOVA_DIM: '#3d3069',
+  NOVA_MID: '#a29bfe',
+  NOVA_FULL: '#ffd700',
+  FONT_MAIN: 'Orbitron',
+  FONT_BODY: 'Inter',
+}
+
+// --- CANVAS SETUP + SCALING ---
+const canvas = document.getElementById('game-canvas')
+const ctx = canvas.getContext('2d')
+let scale = 1, offsetX = 0, offsetY = 0
+
+function resize() {
+  const ww = window.innerWidth
+  const wh = window.innerHeight
+  const scaleX = ww / CONFIG.W
+  const scaleY = wh / CONFIG.H
+  scale = Math.min(scaleX, scaleY)
+  const dw = Math.floor(CONFIG.W * scale)
+  const dh = Math.floor(CONFIG.H * scale)
+  offsetX = Math.floor((ww - dw) / 2)
+  offsetY = Math.floor((wh - dh) / 2)
+  canvas.style.width = dw + 'px'
+  canvas.style.height = dh + 'px'
+  canvas.style.left = offsetX + 'px'
+  canvas.style.top = offsetY + 'px'
+  canvas.width = CONFIG.W
+  canvas.height = CONFIG.H
+  ctx.imageSmoothingEnabled = false
+}
+window.addEventListener('resize', () => {
+  resize()
+  checkOrientation()
+})
+resize()
+
+// Minimum durations (accessibility)
+const FAIL_PAUSE_MIN = 2.5
+const PULSE_SLOW = Math.PI
+
+// Crisp text: no shadow blur (causes softness on canvas). Use heavier font weights instead.
+function prepTextRender(ctx) {
+  ctx.imageSmoothingEnabled = false
+}
+function doneTextRender(ctx) {
+  ctx.imageSmoothingEnabled = true
+}
+
+function vibrateCorrect() {
+  try { if (navigator.vibrate) navigator.vibrate(50) } catch (_) {}
+}
+function vibrateWrong() {
+  try { if (navigator.vibrate) navigator.vibrate([100, 50, 100]) } catch (_) {}
+}
+function vibrateRoundComplete() {
+  try { if (navigator.vibrate) navigator.vibrate([50, 30, 50, 30, 200]) } catch (_) {}
+}
+
+function checkOrientation() {
+  const msg = document.getElementById('rotate-msg')
+  if (!msg) return
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  if (isMobile && window.innerHeight > window.innerWidth) {
+    msg.style.display = 'flex'
+  } else {
+    msg.style.display = 'none'
+  }
+}
+window.addEventListener('resize', checkOrientation)
+window.addEventListener('orientationchange', checkOrientation)
+checkOrientation()
+
+// Sprite assets (optional — draw only when loaded)
+const gameSprites = {
+  robot: new Image(),
+  human: new Image(),
+  brain: new Image(),
+  bg: new Image(),
+}
+gameSprites.robot.src = 'game/sprites/robot.png'
+gameSprites.human.src = 'game/sprites/human.png'
+gameSprites.brain.src = 'game/sprites/brain (2).png'
+gameSprites.bg.src = 'game/sprites/space_bg.jpg'
+
+// --- POINTER INPUT (mouse + touch unified) ---
+const pointer = { x: 0, y: 0, down: false, justDown: false, justUp: false }
+
+function toCanvas(cx, cy) {
+  return {
+    x: (cx - offsetX) / scale,
+    y: (cy - offsetY) / scale
+  }
+}
+
+window.addEventListener('pointerdown', e => {
+  const p = toCanvas(e.clientX, e.clientY)
+  pointer.x = p.x; pointer.y = p.y
+  pointer.down = true; pointer.justDown = true
+})
+window.addEventListener('pointermove', e => {
+  const p = toCanvas(e.clientX, e.clientY)
+  pointer.x = p.x; pointer.y = p.y
+})
+window.addEventListener('pointerup', e => {
+  const p = toCanvas(e.clientX, e.clientY)
+  pointer.x = p.x; pointer.y = p.y
+  pointer.down = false; pointer.justUp = true
+})
+
+// --- AUDIO ---
+const Audio = {
+  ctx: null,
+  buffers: {},
+  musicSource: null,
+  musicGain: null,
+  muted: false,
+
+  init() {
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)()
+    this.masterGain = this.ctx.createGain()
+    this.masterGain.connect(this.ctx.destination)
+    this.musicGain = this.ctx.createGain()
+    this.musicGain.gain.value = 0.4
+    this.musicGain.connect(this.masterGain)
+  },
+
+  async load(key, url) {
+    try {
+      const res = await fetch(url)
+      const buf = await res.arrayBuffer()
+      this.buffers[key] = await this.ctx.decodeAudioData(buf)
+    } catch(e) {
+      console.warn('Audio load failed:', key, e)
+    }
+  },
+
+  play(key, volume = 0.7) {
+    if (this.muted || !this.buffers[key]) return
+    if (this.ctx.state === 'suspended') this.ctx.resume()
+    const src = this.ctx.createBufferSource()
+    const gain = this.ctx.createGain()
+    src.buffer = this.buffers[key]
+    gain.gain.value = volume
+    src.connect(gain)
+    gain.connect(this.masterGain)
+    src.start()
+  },
+
+  playMusic(key) {
+    if (!this.buffers[key]) return
+    if (this.musicSource) { try { this.musicSource.stop() } catch{} }
+    if (this.ctx.state === 'suspended') this.ctx.resume()
+    const src = this.ctx.createBufferSource()
+    src.buffer = this.buffers[key]
+    src.loop = true
+    src.connect(this.musicGain)
+    src.start()
+    this.musicSource = src
+  },
+
+  stopMusic() {
+    if (this.musicSource) { try { this.musicSource.stop() } catch{} this.musicSource = null }
+  },
+
+  toggle() {
+    this.muted = !this.muted
+    this.masterGain.gain.value = this.muted ? 0 : 1
+    return this.muted
+  }
+}
+
+// --- PARTICLES ---
+const Particles = {
+  list: [],
+
+  spawn(x, y, count, colors, options = {}) {
+    const { speed = 200, size = 6, life = 0.8, gravity = 300, spread = Math.PI * 2 } = options
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.random() * spread) - spread / 2
+      const spd = speed * (0.5 + Math.random() * 0.8)
+      const col = Array.isArray(colors) ? colors[Math.floor(Math.random() * colors.length)] : colors
+      this.list.push({
+        x, y,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd - speed * 0.3,
+        life: 1, maxLife: life * (0.7 + Math.random() * 0.6),
+        size: size * (0.6 + Math.random() * 0.8),
+        color: col, gravity,
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 8
+      })
+    }
+  },
+
+  confetti(x, y) {
+    this.spawn(x, y, 60,
+      ['#ffd700','#00e5ff','#a29bfe','#ff6b6b','#55efc4','#fd79a8'],
+      { speed: 480, size: 12, life: 2.2, gravity: 420, spread: Math.PI * 2 }
+    )
+  },
+
+  correct(x, y) {
+    this.spawn(x, y, 24,
+      ['#00e5ff','#55efc4','#ffd700'],
+      { speed: 280, size: 7, life: 0.9, gravity: 220 }
+    )
+  },
+
+  wrong(x, y) {
+    this.spawn(x, y, 12,
+      ['#ff6b6b','#ff4444'],
+      { speed: 160, size: 6, life: 0.5, gravity: 320 }
+    )
+  },
+
+  burst(x, y, color) {
+    this.spawn(x, y, 30,
+      Array.isArray(color) ? color : [color],
+      { speed: 360, size: 8, life: 1.0, gravity: 260 }
+    )
+  },
+
+  update(dt) {
+    for (let i = this.list.length - 1; i >= 0; i--) {
+      const p = this.list[i]
+      p.life -= dt / p.maxLife
+      if (p.life <= 0) { this.list.splice(i, 1); continue }
+      p.x += p.vx * dt
+      p.y += p.vy * dt
+      p.vy += p.gravity * dt
+      p.vx *= 0.97
+      p.rotation += p.rotSpeed * dt
+    }
+  },
+
+  render(ctx) {
+    ctx.save()
+    for (const p of this.list) {
+      ctx.globalAlpha = Math.max(0, p.life)
+      ctx.fillStyle = p.color
+      ctx.save()
+      ctx.translate(p.x, p.y)
+      ctx.rotate(p.rotation)
+      ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size)
+      ctx.restore()
+    }
+    ctx.globalAlpha = 1
+    ctx.restore()
+  }
+}
+
+// --- UTILS ---
+function lerpColor(a, b, t) {
+  t = Math.max(0, Math.min(1, t))
+  const ah = a.replace('#',''), bh = b.replace('#','')
+  const ar = parseInt(ah.slice(0,2),16), ag = parseInt(ah.slice(2,4),16), ab = parseInt(ah.slice(4,6),16)
+  const br = parseInt(bh.slice(0,2),16), bg = parseInt(bh.slice(2,4),16), bb = parseInt(bh.slice(4,6),16)
+  const r = Math.round(ar+(br-ar)*t), g = Math.round(ag+(bg-ag)*t), b2 = Math.round(ab+(bb-ab)*t)
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b2.toString(16).padStart(2,'0')}`
+}
+
+function rectHit(rx, ry, rw, rh, px, py) {
+  return px >= rx && px <= rx + rw && py >= ry && py <= ry + rh
+}
+
+function circleHit(cx, cy, r, px, py) {
+  return Math.hypot(px - cx, py - cy) <= r
+}
+
+function drawRoundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath()
+  ctx.roundRect(x, y, w, h, r)
+}
+
+function wrapText(ctx, text, maxW) {
+  const words = text.split(' ')
+  const rows = []
+  let row = ''
+  for (const w of words) {
+    const test = row + (row ? ' ' : '') + w
+    if (ctx.measureText(test).width > maxW && row) { rows.push(row); row = w }
+    else row = test
+  }
+  if (row) rows.push(row)
+  return rows
+}
+
+// Easing
+function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3) }
+function easeOutBack(t) {
+  const c1 = 1.70158, c3 = c1 + 1
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
+}
+
+// --- BACKGROUND (per-scene atmosphere) ---
+class Background {
+  constructor(mode = 'menu') {
+    this.mode = mode
+    this.time = 0
+    this.stars = Array.from({length: 160}, () => ({
+      x: Math.random() * CONFIG.W,
+      y: Math.random() * CONFIG.H,
+      size: 0.5 + Math.random() * 2.2,
+      twinkle: Math.random() * Math.PI * 2,
+      speed: 0.3 + Math.random() * 0.8
+    }))
+    // Precompute constellation pairs for lesson2
+    this.constellation = []
+    for (let i = 0; i < this.stars.length; i++) {
+      const s1 = this.stars[i]
+      for (let j = i + 1; j < this.stars.length; j++) {
+        const s2 = this.stars[j]
+        const d = Math.hypot(s1.x - s2.x, s1.y - s2.y)
+        if (d < 180) this.constellation.push([i, j, d])
+        if (this.constellation.length > 90) break
+      }
+      if (this.constellation.length > 90) break
+    }
+    this.shootingStars = []
+    this.shootTimer = 3
+  }
+
+  update(dt) {
+    this.time += dt
+    if (this.mode === 'lesson2') {
+      this.shootTimer -= dt
+      if (this.shootTimer <= 0) {
+        this.shootTimer = 3
+        const fromLeft = Math.random() < 0.5
+        this.shootingStars.push({
+          x: fromLeft ? -50 : CONFIG.W + 50,
+          y: 50 + Math.random() * (CONFIG.H * 0.4),
+          vx: (fromLeft ? 1 : -1) * (450 + Math.random() * 300),
+          vy: 120 + Math.random() * 140,
+          life: 1
+        })
+      }
+      for (let i = this.shootingStars.length - 1; i >= 0; i--) {
+        const s = this.shootingStars[i]
+        s.x += s.vx * dt
+        s.y += s.vy * dt
+        s.life -= dt / 0.8
+        if (s.life <= 0 || s.x < -200 || s.x > CONFIG.W + 200) this.shootingStars.splice(i, 1)
+      }
+    }
+  }
+
+  render(ctx) {
+    const W = CONFIG.W, H = CONFIG.H
+
+    if (gameSprites.bg.complete && gameSprites.bg.naturalWidth > 0) {
+      ctx.drawImage(gameSprites.bg, 0, 0, W, H)
+    }
+
+    // Base atmospheric layer
+    if (this.mode === 'lesson2') {
+      const g = ctx.createLinearGradient(0, 0, 0, H)
+      g.addColorStop(0, '#0a0830')
+      g.addColorStop(0.5, '#06061e')
+      g.addColorStop(1, '#100835')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, W, H)
+    } else if (this.mode === 'lesson3') {
+      // Split arena
+      const gl = ctx.createLinearGradient(0, 0, W * 0.45, 0)
+      gl.addColorStop(0, 'rgba(0, 60, 100, 0.45)')
+      gl.addColorStop(1, 'rgba(5,5,15,0)')
+      ctx.fillStyle = '#05050f'
+      ctx.fillRect(0, 0, W, H)
+      ctx.fillStyle = gl
+      ctx.fillRect(0, 0, W, H)
+
+      const gr = ctx.createLinearGradient(W * 0.55, 0, W, 0)
+      gr.addColorStop(0, 'rgba(5,5,15,0)')
+      gr.addColorStop(1, 'rgba(120, 70, 0, 0.45)')
+      ctx.fillStyle = gr
+      ctx.fillRect(0, 0, W, H)
+
+      // Cyan circuit pattern (left)
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.08)'
+      ctx.lineWidth = 1
+      for (let x = 40; x < W * 0.32; x += 90) {
+        for (let y = 100; y < H; y += 90) {
+          ctx.beginPath()
+          ctx.moveTo(x, y); ctx.lineTo(x + 50, y)
+          ctx.moveTo(x + 25, y); ctx.lineTo(x + 25, y + 50)
+          ctx.stroke()
+          ctx.beginPath()
+          ctx.arc(x + 25, y, 2, 0, Math.PI * 2)
+          ctx.fillStyle = 'rgba(0, 229, 255, 0.12)'
+          ctx.fill()
+        }
+      }
+
+      // Warm amber glow (right)
+      const ar = ctx.createRadialGradient(W * 0.85, H * 0.5, 50, W * 0.85, H * 0.5, 500)
+      ar.addColorStop(0, 'rgba(255, 180, 60, 0.10)')
+      ar.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = ar
+      ctx.fillRect(W * 0.55, 0, W * 0.45, H)
+    } else if (this.mode === 'lesson4') {
+      ctx.fillStyle = '#05050f'
+      ctx.fillRect(0, 0, W, H)
+      const zones = [
+        { cx: W * 0.22, color: 'rgba(107, 203, 255, 0.18)', pulse: 0 },
+        { cx: W * 0.50, color: 'rgba(255, 215, 0, 0.14)', pulse: 1 },
+        { cx: W * 0.78, color: 'rgba(255, 107, 107, 0.18)', pulse: 2 },
+      ]
+      for (const z of zones) {
+        const p = 0.85 + Math.sin(this.time * 1.2 + z.pulse) * 0.15
+        const g = ctx.createRadialGradient(z.cx, H * 0.45, 60, z.cx, H * 0.45, 380 * p)
+        g.addColorStop(0, z.color)
+        g.addColorStop(1, 'rgba(0,0,0,0)')
+        ctx.fillStyle = g
+        ctx.fillRect(0, 0, W, H)
+      }
+    } else {
+      if (!gameSprites.bg.complete || gameSprites.bg.naturalWidth <= 0) {
+        ctx.fillStyle = CONFIG.BG
+        ctx.fillRect(0, 0, W, H)
+      }
+    }
+
+    // Constellation (Lesson 2) — slow rotation
+    if (this.mode === 'lesson2') {
+      ctx.save()
+      ctx.translate(W/2, H/2)
+      ctx.rotate(this.time * 0.012)
+      ctx.translate(-W/2, -H/2)
+      ctx.strokeStyle = 'rgba(162, 155, 254, 0.18)'
+      ctx.lineWidth = 0.7
+      for (const [i, j, d] of this.constellation) {
+        const s1 = this.stars[i], s2 = this.stars[j]
+        ctx.globalAlpha = (1 - d / 180) * 0.4
+        ctx.beginPath()
+        ctx.moveTo(s1.x, s1.y); ctx.lineTo(s2.x, s2.y)
+        ctx.stroke()
+      }
+      ctx.globalAlpha = 1
+      ctx.restore()
+    }
+
+    // Stars
+    ctx.save()
+    for (const s of this.stars) {
+      const a = 0.2 + Math.sin(this.time * s.speed + s.twinkle) * 0.35
+      ctx.globalAlpha = Math.max(0, a)
+      ctx.fillStyle = '#ffffff'
+      ctx.beginPath()
+      ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.globalAlpha = 1
+    ctx.restore()
+
+    // Shooting stars
+    for (const s of this.shootingStars) {
+      ctx.save()
+      ctx.globalAlpha = Math.max(0, s.life)
+      const tx = s.x - s.vx * 0.08, ty = s.y - s.vy * 0.08
+      const g = ctx.createLinearGradient(tx, ty, s.x, s.y)
+      g.addColorStop(0, 'rgba(255,255,255,0)')
+      g.addColorStop(1, '#ffffff')
+      ctx.strokeStyle = g
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(tx, ty); ctx.lineTo(s.x, s.y)
+      ctx.stroke()
+      ctx.fillStyle = '#ffffff'
+      ctx.beginPath()
+      ctx.arc(s.x, s.y, 2, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+    }
+  }
+}
+
+// --- NOVA ORB ---
+class Nova {
+  constructor(x, y, power = 0.15) {
+    this.x = x; this.y = y
+    this.tx = x; this.ty = y
+    this.power = power
+    this.expression = 'idle'
+    this.time = 0
+    this.pulseT = 0
+    this.bounceY = 0
+    this.bounceVel = 0
+    this.shakeT = 0
+    this.showName = true
+  }
+
+  moveTo(x, y) { this.tx = x; this.ty = y }
+  setPower(p) { this.power = Math.max(0, Math.min(1, p)) }
+  setExpression(e) { this.expression = e }
+
+  bounce() {
+    this.bounceVel = -380
+    this.setExpression('happy')
+  }
+
+  shake() {
+    this.shakeT = 0.4
+    this.setExpression('worried')
+  }
+
+  update(dt) {
+    this.time += dt
+    this.pulseT += dt
+    if (this.pulseT > 1.5) this.pulseT = 0
+    const lf = 1 - Math.exp(-4 * dt)
+    this.x += (this.tx - this.x) * lf
+    this.y += (this.ty - this.y) * lf
+
+    // Bounce physics
+    if (this.bounceY !== 0 || this.bounceVel !== 0) {
+      this.bounceY += this.bounceVel * dt
+      this.bounceVel += 1400 * dt
+      if (this.bounceY > 0) { this.bounceY = 0; this.bounceVel = 0 }
+    }
+
+    if (this.shakeT > 0) this.shakeT = Math.max(0, this.shakeT - dt)
+  }
+
+  color() {
+    const p = this.power
+    if (p < 0.5) return lerpColor('#3d3069', '#a29bfe', p * 2)
+    return lerpColor('#a29bfe', '#ffd700', (p - 0.5) * 2)
+  }
+
+  render(ctx) {
+    const shakeX = this.shakeT > 0 ? Math.sin(this.shakeT * 60) * 14 : 0
+    const cx = this.x + shakeX
+    const cy = this.y + Math.sin(this.time * 1.8) * 8 + this.bounceY
+    const r = 45 + this.power * 25
+    const col = this.color()
+
+    ctx.save()
+
+    // Outer glow rings
+    for (let i = 3; i >= 1; i--) {
+      ctx.beginPath()
+      ctx.arc(cx, cy, r + i * 18, 0, Math.PI * 2)
+      ctx.strokeStyle = col
+      ctx.globalAlpha = 0.05 + this.power * 0.06
+      ctx.lineWidth = 2
+      ctx.stroke()
+    }
+
+    // Pulse ring
+    const pr = r + (this.pulseT / 1.5) * 100
+    ctx.beginPath()
+    ctx.arc(cx, cy, pr, 0, Math.PI * 2)
+    ctx.strokeStyle = col
+    ctx.globalAlpha = (1 - this.pulseT / 1.5) * 0.35 * this.power
+    ctx.lineWidth = 1.8
+    ctx.stroke()
+    ctx.globalAlpha = 1
+
+    // Core fill
+    ctx.beginPath()
+    ctx.arc(cx, cy, r, 0, Math.PI * 2)
+    ctx.fillStyle = col
+    ctx.globalAlpha = 0.14 + this.power * 0.10
+    ctx.fill()
+    ctx.globalAlpha = 1
+    ctx.strokeStyle = col
+    ctx.lineWidth = 3
+    ctx.stroke()
+
+    // Face
+    const eyeR = 5 + this.power * 2.5
+    const eyeX = r * 0.32
+    const eyeY = -r * 0.08
+    ctx.fillStyle = col
+    ctx.globalAlpha = 0.5 + this.power * 0.5
+
+    if (this.expression === 'happy' || this.expression === 'excited') {
+      ctx.beginPath(); ctx.arc(cx - eyeX, cy + eyeY, eyeR, Math.PI, 0); ctx.fill()
+      ctx.beginPath(); ctx.arc(cx + eyeX, cy + eyeY, eyeR, Math.PI, 0); ctx.fill()
+      ctx.beginPath(); ctx.arc(cx, cy + r * 0.24, r * 0.24, 0.2, Math.PI - 0.2)
+      ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.stroke()
+    } else if (this.expression === 'worried' || this.expression === 'sad') {
+      ctx.beginPath(); ctx.arc(cx - eyeX, cy + eyeY, eyeR * 0.7, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.arc(cx + eyeX, cy + eyeY, eyeR * 0.7, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.arc(cx, cy + r * 0.38, r * 0.22, Math.PI + 0.2, -0.2)
+      ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.stroke()
+    } else {
+      ctx.beginPath(); ctx.arc(cx - eyeX, cy + eyeY, eyeR, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.arc(cx + eyeX, cy + eyeY, eyeR, 0, Math.PI * 2); ctx.fill()
+    }
+    ctx.globalAlpha = 1
+
+    // Name label below
+    if (this.showName) {
+      ctx.font = `700 13px ${CONFIG.FONT_MAIN}`
+      prepTextRender(ctx)
+      ctx.fillStyle = col
+      ctx.globalAlpha = 0.7
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('NOVA', cx, cy + r + 22)
+      doneTextRender(ctx)
+      ctx.globalAlpha = 1
+    }
+
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+    ctx.restore()
+  }
+}
+
+// Helper to draw a mini-Nova for dialogue avatar
+function drawMiniNova(ctx, x, y, r, time, power = 0.4) {
+  const col = power < 0.5 ? lerpColor('#3d3069', '#a29bfe', power * 2) : lerpColor('#a29bfe', '#ffd700', (power - 0.5) * 2)
+  ctx.save()
+  // glow
+  ctx.beginPath(); ctx.arc(x, y, r + 8, 0, Math.PI * 2)
+  ctx.strokeStyle = col; ctx.globalAlpha = 0.2; ctx.lineWidth = 2; ctx.stroke()
+  // core
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2)
+  ctx.fillStyle = col; ctx.globalAlpha = 0.15; ctx.fill()
+  ctx.globalAlpha = 1
+  ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.stroke()
+  // eyes
+  const eyeR = r * 0.14
+  const eyeX = r * 0.32
+  ctx.fillStyle = col
+  ctx.globalAlpha = 0.85
+  ctx.beginPath(); ctx.arc(x - eyeX, y - r * 0.08, eyeR, 0, Math.PI * 2); ctx.fill()
+  ctx.beginPath(); ctx.arc(x + eyeX, y - r * 0.08, eyeR, 0, Math.PI * 2); ctx.fill()
+  ctx.globalAlpha = 1
+  ctx.restore()
+}
+
+// --- DIALOGUE BOX ---
+class DialogueBox {
+  constructor() {
+    this.visible = false
+    this.lines = []
+    this.idx = 0
+    this.displayed = ''
+    this.typeT = 0
+    this.SPEED = 0.015
+    this.done = false
+    this.onDone = null
+    this.time = 0
+    this.position = 'bottom'
+  }
+
+  show(lines, onDone) {
+    this.lines = lines
+    this.idx = 0
+    this.displayed = ''
+    this.typeT = 0
+    this.done = false
+    this.visible = true
+    this.onDone = onDone || null
+    this.time = 0
+  }
+
+  hide() { this.visible = false }
+  isVisible() { return this.visible }
+  setPosition(pos) { this.position = pos }
+
+  advance() {
+    if (!this.visible) return
+    if (!this.done) { this.displayed = this.lines[this.idx]?.text || ''; this.done = true; return }
+    this.idx++
+    if (this.idx >= this.lines.length) {
+      this.visible = false
+      if (this.onDone) this.onDone()
+      return
+    }
+    this.displayed = ''; this.typeT = 0; this.done = false
+  }
+
+  update(dt) {
+    if (!this.visible) return
+    this.time += dt
+    if (this.done) return
+    const target = this.lines[this.idx]?.text || ''
+    this.typeT += dt
+    while (this.typeT >= this.SPEED && this.displayed.length < target.length) {
+      this.typeT -= this.SPEED
+      this.displayed += target[this.displayed.length]
+    }
+    if (this.displayed.length >= target.length) this.done = true
+  }
+
+  render(ctx) {
+    if (!this.visible) return
+    const line = this.lines[this.idx]
+    if (!line) return
+
+    const W = CONFIG.W, H = CONFIG.H
+    const COLORS = { NOVA: '#a29bfe', SYSTEM: '#00e5ff', NARRATOR: '#94a3b8' }
+    const col = COLORS[line.speaker] || '#00e5ff'
+    const BH = Math.max(160, Math.round(200))
+    const BY = this.position === 'top' ? Math.round(100) : H - BH
+    const isNova = line.speaker === 'NOVA'
+    const avatarSize = Math.round(50)
+    const pad = Math.round(40)
+    const textStart = isNova ? pad + avatarSize * 2 + 20 : pad
+
+    ctx.save()
+
+    // Background
+    ctx.fillStyle = 'rgba(8, 8, 26, 0.96)'
+    ctx.fillRect(0, BY, W, BH)
+
+    // Subtle inner glow
+    const g = ctx.createLinearGradient(0, BY, 0, BY + BH)
+    g.addColorStop(0, `${col}22`)
+    g.addColorStop(0.5, 'rgba(0,0,0,0)')
+    g.addColorStop(1, `${col}11`)
+    ctx.fillStyle = g
+    ctx.fillRect(0, BY, W, BH)
+
+    // Border line
+    ctx.strokeStyle = col
+    ctx.globalAlpha = 0.55
+    ctx.lineWidth = 2.5
+    ctx.beginPath()
+    ctx.moveTo(0, this.position === 'top' ? BY + BH : BY)
+    ctx.lineTo(W, this.position === 'top' ? BY + BH : BY)
+    ctx.stroke()
+    ctx.globalAlpha = 1
+
+    // Left accent
+    ctx.fillStyle = col
+    ctx.fillRect(0, BY, 6, BH)
+
+    // NOVA mini-orb avatar
+    if (isNova) {
+      drawMiniNova(ctx, pad + avatarSize, BY + BH / 2, avatarSize, this.time, 0.45)
+    }
+
+    // Speaker name
+    ctx.font = `700 26px ${CONFIG.FONT_MAIN}`
+    prepTextRender(ctx)
+    ctx.fillStyle = col
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(line.speaker, textStart, BY + 46)
+
+    // Body text
+    ctx.font = `600 28px ${CONFIG.FONT_BODY}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#f1f5f9'
+    const rows = wrapText(ctx, this.displayed, W - textStart - pad - Math.round(120))
+    let ty = BY + 92
+    for (const r of rows) {
+      if (ty > BY + BH - 20) break
+      ctx.fillText(r, textStart, ty)
+      ty += Math.max(36, 40)
+    }
+    doneTextRender(ctx)
+
+    // Advance prompt
+    if (this.done) {
+      const pulse = 0.5 + Math.sin(this.time * PULSE_SLOW) * 0.4
+      ctx.globalAlpha = pulse
+      ctx.font = `600 19px ${CONFIG.FONT_BODY}`
+      prepTextRender(ctx)
+      ctx.fillStyle = col
+      ctx.fillText('▶ TAP TO CONTINUE', textStart, BY + BH - 20)
+      doneTextRender(ctx)
+      ctx.globalAlpha = 1
+    }
+
+    // Counter
+    if (this.lines.length > 1) {
+      ctx.font = `400 17px ${CONFIG.FONT_BODY}`
+      prepTextRender(ctx)
+      ctx.fillStyle = col
+      ctx.globalAlpha = 0.5
+      ctx.textAlign = 'right'
+      ctx.fillText(`${this.idx + 1}/${this.lines.length}`, W - pad, BY + BH - 20)
+      doneTextRender(ctx)
+      ctx.globalAlpha = 1
+    }
+
+    ctx.textAlign = 'left'
+    ctx.restore()
+  }
+}
+
+// --- HUD ---
+class HUD {
+  constructor() {
+    this.worldName = ''
+    this.objective = ''
+    this.message = ''
+    this.msgTimer = 0
+    this.msgColor = '#00e5ff'
+    this.xp = 0
+    this.xpDisplay = 0
+    this.novaPower = 0
+    this.time = 0
+    this.muted = false
+    this.muteBtn = { x: 0, y: 0, w: 44, h: 44 }
+    this.round = 0
+    this.totalRounds = 0
+  }
+
+  setWorld(name) { this.worldName = name }
+  setObjective(s) { this.objective = s }
+  setNovaPower(p) { this.novaPower = p }
+  setMuted(m) { this.muted = m }
+  setRound(n, total) { this.round = n; this.totalRounds = total }
+  addXP(n) { this.xp += n; this.showMessage(`+${n} XP`, 1.5, '#ffd700') }
+  showMessage(msg, dur = 3, col = '#00e5ff') {
+    this.message = msg; this.msgTimer = dur; this.msgColor = col
+  }
+
+  update(dt) {
+    this.time += dt
+    if (this.msgTimer > 0) { this.msgTimer -= dt; if (this.msgTimer <= 0) this.message = '' }
+    if (this.xpDisplay < this.xp) this.xpDisplay = Math.min(this.xp, this.xpDisplay + Math.max(3, (this.xp - this.xpDisplay) * 0.08))
+  }
+
+  hitMuteBtn(x, y) {
+    const b = this.muteBtn
+    return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h
+  }
+
+  render(ctx) {
+    const W = CONFIG.W
+    const ROW = Math.round(80)
+    const OBJ_H = Math.max(Math.round(36), 28)
+
+    ctx.save()
+    ctx.textBaseline = 'middle'
+
+    ctx.fillStyle = 'rgba(5,5,20,0.94)'
+    ctx.fillRect(0, 0, W, ROW)
+    ctx.strokeStyle = 'rgba(0,229,255,0.18)'
+    ctx.lineWidth = 1
+    ctx.beginPath(); ctx.moveTo(0, ROW); ctx.lineTo(W, ROW); ctx.stroke()
+
+    // World name — 600 16px
+    ctx.font = `600 16px ${CONFIG.FONT_MAIN}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#00e5ff'
+    ctx.textAlign = 'left'
+    ctx.fillText(this.worldName, 32, ROW / 2)
+    doneTextRender(ctx)
+
+    // Nova power bar (320 x 10)
+    const bw = 320, bh = 10
+    const bx = (W - bw) / 2, by = (ROW - bh) / 2 + 4
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'
+    drawRoundRect(ctx, bx, by, bw, bh, 5)
+    ctx.fill()
+    const pc = lerpColor('#3d3069', this.novaPower < 0.5 ? '#a29bfe' : '#ffd700',
+      this.novaPower < 0.5 ? this.novaPower * 2 : (this.novaPower - 0.5) * 2)
+    ctx.fillStyle = pc
+    drawRoundRect(ctx, bx, by, bw * this.novaPower, bh, 5)
+    ctx.fill()
+
+    // Animated dot travelling along filled portion
+    if (this.novaPower > 0.02) {
+      const fillW = bw * this.novaPower
+      const dotPos = (Math.sin(this.time * 1.5) * 0.5 + 0.5) * fillW
+      ctx.beginPath()
+      ctx.arc(bx + dotPos, by + bh/2, 5, 0, Math.PI * 2)
+      ctx.fillStyle = '#ffffff'
+      ctx.globalAlpha = 0.9
+      ctx.fill()
+      ctx.beginPath()
+      ctx.arc(bx + dotPos, by + bh/2, 9, 0, Math.PI * 2)
+      ctx.fillStyle = pc
+      ctx.globalAlpha = 0.35
+      ctx.fill()
+      ctx.globalAlpha = 1
+    }
+
+    ctx.font = `400 13px ${CONFIG.FONT_MAIN}`
+    prepTextRender(ctx)
+    ctx.fillStyle = pc
+    ctx.textAlign = 'center'
+    ctx.fillText(`NOVA ${Math.round(this.novaPower * 100)}%`, W / 2, by - 12)
+    doneTextRender(ctx)
+
+    // XP
+    ctx.font = `700 18px ${CONFIG.FONT_MAIN}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#ffd700'
+    ctx.textAlign = 'right'
+    ctx.fillText(`${Math.round(this.xpDisplay)} XP`, W - 110, ROW / 2)
+    doneTextRender(ctx)
+
+    // Mute button — tap-target inside HUD, 60x60 (HUD is 80, sits centered)
+    const muteSize = Math.max(44, Math.round(60))
+    const bx2 = W - 80, by2 = (ROW - muteSize) / 2
+    this.muteBtn = { x: bx2 - 10, y: 0, w: muteSize + 20, h: ROW } // generous 80x80 tap target
+    ctx.fillStyle = 'rgba(255,255,255,0.06)'
+    ctx.beginPath()
+    ctx.roundRect(bx2, by2, muteSize, muteSize, 10)
+    ctx.fill()
+    ctx.font = '26px sans-serif'
+    prepTextRender(ctx)
+    ctx.textAlign = 'center'
+    ctx.fillText(this.muted ? '🔇' : '🔊', bx2 + muteSize/2, by2 + muteSize/2)
+    doneTextRender(ctx)
+
+    // Objective + Round indicator
+    const OBJ_Y = ROW
+    ctx.fillStyle = 'rgba(3,3,14,0.9)'
+    ctx.fillRect(0, OBJ_Y, W, OBJ_H)
+
+    ctx.globalAlpha = 0.7 + Math.sin(this.time * 1.5) * 0.2
+    ctx.font = `600 16px ${CONFIG.FONT_BODY}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#cbd5e1'
+    ctx.textAlign = 'center'
+    ctx.fillText(this.objective, W / 2, OBJ_Y + OBJ_H / 2)
+    doneTextRender(ctx)
+    ctx.globalAlpha = 1
+
+    if (this.totalRounds > 0) {
+      ctx.font = `700 16px ${CONFIG.FONT_MAIN}`
+      ctx.fillStyle = '#ffd700'
+      ctx.textAlign = 'right'
+      ctx.fillText(`ROUND ${this.round}/${this.totalRounds}`, W - 24, OBJ_Y + OBJ_H / 2)
+    }
+
+    // Flash message
+    if (this.message) {
+      const a = this.msgTimer > 0.5 ? 1 : this.msgTimer * 2
+      ctx.save()
+      ctx.globalAlpha = a
+      ctx.font = `700 30px ${CONFIG.FONT_MAIN}`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      const mw = ctx.measureText(this.message).width + 56
+      const mh = 70
+      const mx = W/2 - mw/2, my = CONFIG.H/2 - mh/2 - 100
+      ctx.fillStyle = 'rgba(0,0,0,0.88)'
+      ctx.fillRect(mx, my, mw, mh)
+      ctx.strokeStyle = this.msgColor
+      ctx.lineWidth = 2
+      ctx.strokeRect(mx, my, mw, mh)
+      ctx.fillStyle = this.msgColor
+      prepTextRender(ctx)
+      ctx.fillText(this.message, W/2, my + mh/2)
+      doneTextRender(ctx)
+      ctx.restore()
+    }
+
+    ctx.textAlign = 'left'
+    ctx.restore()
+  }
+}
+
+// --- MISSION CARD (mandatory 10s briefing) ---
+class MissionCard {
+  constructor() {
+    this.visible = false
+    this.title = ''
+    this.description = ''
+    this.objective = ''
+    this.duration = 10
+    this.timer = 0
+    this.ready = false
+    this.onDone = null
+    this.nova = new Nova(0, 0, 0.4)
+    this.nova.showName = false
+    this.time = 0
+    this.btnHover = false
+    this.fadeIn = 0
+  }
+
+  show(title, description, objective, onDone) {
+    this.title = title
+    this.description = description
+    this.objective = objective
+    this.timer = this.duration
+    this.ready = false
+    this.onDone = onDone || null
+    this.visible = true
+    this.time = 0
+    this.fadeIn = 0
+    this.btnHover = false
+    this.nova.setExpression('idle')
+    this.nova.x = CONFIG.W / 2
+    this.nova.y = 340
+    this.nova.tx = CONFIG.W / 2
+    this.nova.ty = 340
+  }
+
+  isVisible() { return this.visible }
+
+  update(dt) {
+    if (!this.visible) return
+    this.time += dt
+    this.fadeIn = Math.min(1, this.fadeIn + dt * 2.5)
+    if (this.timer > 0) {
+      this.timer = Math.max(0, this.timer - dt)
+      if (this.timer === 0 && !this.ready) {
+        this.ready = true
+        this.nova.setExpression('happy')
+        Audio.play('click', 0.4)
+        Particles.burst(CONFIG.W/2, CONFIG.H - 180, ['#55efc4', '#00e5ff'])
+      }
+    }
+
+    this.nova.update(dt)
+    this.nova.moveTo(CONFIG.W / 2, 340 + Math.sin(this.time * 1.2) * 14)
+
+    const bx = CONFIG.W/2 - 240, by = CONFIG.H - 200, bw = 480, bh = 100
+    this.btnHover = this.ready && rectHit(bx, by, bw, bh, pointer.x, pointer.y)
+
+    if (pointer.justDown) {
+      if (this.ready && this.btnHover) {
+        Audio.play('click')
+        this.visible = false
+        if (this.onDone) this.onDone()
+      }
+      // else: pointer is consumed (do nothing — can't skip)
+    }
+  }
+
+  render(ctx) {
+    if (!this.visible) return
+    const W = CONFIG.W, H = CONFIG.H
+
+    ctx.save()
+    ctx.textBaseline = 'middle'
+
+    // Heavy dark overlay — rgba(0,0,8,0.95)
+    ctx.fillStyle = 'rgba(0, 0, 8, 0.95)'
+    ctx.globalAlpha = this.fadeIn
+    ctx.fillRect(0, 0, W, H)
+    ctx.globalAlpha = 1
+
+    // Grid pattern
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.05)'
+    ctx.lineWidth = 1
+    for (let x = 0; x <= W; x += 100) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke()
+    }
+    for (let y = 0; y <= H; y += 100) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
+    }
+
+    // Header banner
+    ctx.fillStyle = 'rgba(0, 229, 255, 0.10)'
+    ctx.fillRect(0, 80, W, 60)
+    ctx.font = `700 22px ${CONFIG.FONT_MAIN}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#00e5ff'
+    ctx.textAlign = 'center'
+    ctx.fillText('▣ MISSION BRIEFING — INCOMING TRANSMISSION ▣', W/2, 110)
+    doneTextRender(ctx)
+
+    // Timer ring (top center under header) — 80px radius, 6px stroke
+    const tcx = W/2, tcy = 240, tcr = 80
+    const progress = 1 - this.timer / this.duration
+
+    // Background ring
+    ctx.beginPath()
+    ctx.arc(tcx, tcy, tcr, 0, Math.PI * 2)
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)'
+    ctx.lineWidth = 6
+    ctx.stroke()
+
+    // Progress arc — depleting clockwise
+    ctx.beginPath()
+    ctx.arc(tcx, tcy, tcr, -Math.PI/2, -Math.PI/2 + progress * Math.PI * 2)
+    ctx.strokeStyle = this.ready ? '#55efc4' : '#00e5ff'
+    ctx.lineWidth = 6
+    ctx.lineCap = 'round'
+    ctx.stroke()
+    ctx.lineCap = 'butt'
+
+    // Timer number — large in center
+    ctx.font = `900 56px ${CONFIG.FONT_MAIN}`
+    prepTextRender(ctx)
+    ctx.fillStyle = this.ready ? '#55efc4' : '#00e5ff'
+    ctx.fillText(this.ready ? 'GO!' : Math.ceil(this.timer).toString(), tcx, tcy)
+    doneTextRender(ctx)
+
+    // Nova
+    this.nova.render(ctx)
+
+    // Title — 900 72px Orbitron
+    ctx.font = `900 72px ${CONFIG.FONT_MAIN}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#ffd700'
+    ctx.fillText(this.title, W/2, 490)
+    doneTextRender(ctx)
+
+    // Divider
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(W/2 - 220, 540); ctx.lineTo(W/2 + 220, 540)
+    ctx.stroke()
+
+    // Description — 600 24px Inter
+    ctx.font = `600 24px ${CONFIG.FONT_BODY}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#f1f5f9'
+    const descRows = wrapText(ctx, this.description, W - 500)
+    let dy = 600
+    for (const row of descRows) {
+      ctx.fillText(row, W/2, dy)
+      dy += 40
+    }
+    doneTextRender(ctx)
+
+    // Objective header — 700 24px Orbitron
+    dy += 24
+    ctx.font = `700 24px ${CONFIG.FONT_MAIN}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#00e5ff'
+    ctx.fillText('▶ MISSION OBJECTIVE', W/2, dy)
+    doneTextRender(ctx)
+    dy += 40
+
+    // Objective (cyan) — 600 24px Inter
+    ctx.font = `600 24px ${CONFIG.FONT_BODY}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#00e5ff'
+    const objRows = wrapText(ctx, this.objective, W - 500)
+    for (const row of objRows) {
+      ctx.fillText(row, W/2, dy)
+      dy += 36
+    }
+    doneTextRender(ctx)
+
+    // Button or wait text
+    const bx = W/2 - 240, by = H - 200, bw = 480, bh = Math.max(Math.round(80), Math.round(100))
+
+    if (this.ready) {
+      const pulse = 0.75 + Math.sin(this.time * PULSE_SLOW) * 0.25
+      ctx.fillStyle = this.btnHover ? 'rgba(85, 239, 196, 0.30)' : 'rgba(85, 239, 196, 0.12)'
+      drawRoundRect(ctx, bx, by, bw, bh, 20)
+      ctx.fill()
+      ctx.strokeStyle = '#55efc4'
+      ctx.lineWidth = this.btnHover ? 4 : 3
+      ctx.globalAlpha = pulse
+      drawRoundRect(ctx, bx, by, bw, bh, 20)
+      ctx.stroke()
+      ctx.globalAlpha = 1
+
+      ctx.font = `900 30px ${CONFIG.FONT_MAIN}`
+      prepTextRender(ctx)
+      ctx.fillStyle = '#55efc4'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('TAP TO BEGIN', W/2, by + bh/2)
+      doneTextRender(ctx)
+    } else {
+      ctx.font = `600 24px ${CONFIG.FONT_BODY}`
+      prepTextRender(ctx)
+      ctx.fillStyle = 'rgba(203, 213, 225, 0.6)'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(`▣ READ THE BRIEFING — UNLOCKING IN ${Math.ceil(this.timer)}s ▣`, W/2, by + bh/2)
+      doneTextRender(ctx)
+    }
+
+    ctx.textAlign = 'left'
+    ctx.restore()
+  }
+}
+
+// --- ROUND COMPLETE BANNER ---
+class RoundBanner {
+  constructor() {
+    this.visible = false
+    this.timer = 0
+    this.duration = 2.5
+    this.roundNum = 0
+    this.xpEarned = 0
+    this.xpDisplay = 0
+    this.onDone = null
+    this.time = 0
+    this.fired = false
+  }
+
+  show(roundNum, xpEarned, onDone) {
+    this.visible = true
+    this.timer = this.duration
+    this.roundNum = roundNum
+    this.xpEarned = xpEarned
+    this.xpDisplay = 0
+    this.onDone = onDone || null
+    this.time = 0
+    this.fired = false
+    Particles.confetti(CONFIG.W * 0.3, CONFIG.H * 0.5)
+    Particles.confetti(CONFIG.W * 0.7, CONFIG.H * 0.5)
+    Audio.play('victory', 0.6)
+  }
+
+  isVisible() { return this.visible }
+
+  update(dt) {
+    if (!this.visible) return
+    this.time += dt
+    this.timer -= dt
+
+    // XP count up
+    const elapsed = this.duration - this.timer
+    if (elapsed > 0.5 && this.xpDisplay < this.xpEarned) {
+      this.xpDisplay = Math.min(this.xpEarned, this.xpDisplay + this.xpEarned * dt * 0.8)
+    }
+
+    if (this.timer <= 0 && !this.fired) {
+      this.fired = true
+      this.visible = false
+      vibrateRoundComplete()
+      if (this.onDone) this.onDone()
+    }
+  }
+
+  render(ctx) {
+    if (!this.visible) return
+    const W = CONFIG.W, H = CONFIG.H
+    const elapsed = this.duration - this.timer
+
+    const fadeIn = Math.min(1, elapsed * 3)
+    const fadeOut = this.timer < 0.5 ? this.timer * 2 : 1
+    const alpha = Math.min(fadeIn, fadeOut)
+
+    ctx.save()
+    ctx.fillStyle = 'rgba(3, 3, 12, 0.86)'
+    ctx.globalAlpha = alpha
+    ctx.fillRect(0, 0, W, H)
+    ctx.globalAlpha = 1
+
+    // Scale in
+    const sIn = Math.min(1, elapsed * 4)
+    const scale = easeOutBack(sIn)
+
+    ctx.translate(W/2, H/2 - 60)
+    ctx.scale(scale, scale)
+
+    ctx.globalAlpha = alpha
+    ctx.font = `900 72px ${CONFIG.FONT_MAIN}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#ffd700'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(`ROUND ${this.roundNum}`, 0, -60)
+    doneTextRender(ctx)
+
+    ctx.font = `700 52px ${CONFIG.FONT_MAIN}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#00e5ff'
+    ctx.fillText('COMPLETE', 0, 20)
+    doneTextRender(ctx)
+
+    ctx.font = `700 38px ${CONFIG.FONT_MAIN}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#55efc4'
+    ctx.fillText(`+${Math.floor(this.xpDisplay)} XP`, 0, 110)
+    doneTextRender(ctx)
+
+    // Tiny hint
+    if (this.timer < 1.5) {
+      ctx.font = `400 16px ${CONFIG.FONT_BODY}`
+      prepTextRender(ctx)
+      ctx.fillStyle = 'rgba(203, 213, 225, 0.6)'
+      ctx.fillText('NEXT ROUND STARTING…', 0, 180)
+      doneTextRender(ctx)
+    }
+
+    ctx.globalAlpha = 1
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+    ctx.restore()
+  }
+}
+
+// --- TRANSITION ---
+class Transition {
+  constructor() { this.active = false; this.t = 0; this.dur = 0.5; this.phase = 'out'; this.onMid = null; this.onDone = null; this.midFired = false }
+
+  trigger(dur = 0.5, onMid, onDone) {
+    this.active = true; this.t = 0; this.dur = dur / 2
+    this.phase = 'out'; this.onMid = onMid; this.onDone = onDone; this.midFired = false
+  }
+
+  update(dt) {
+    if (!this.active) return
+    this.t += dt
+    if (this.phase === 'out' && this.t >= this.dur) {
+      if (!this.midFired) { this.midFired = true; if (this.onMid) this.onMid() }
+      this.phase = 'in'; this.t = 0
+    }
+    if (this.phase === 'in' && this.t >= this.dur) {
+      this.active = false; if (this.onDone) this.onDone()
+    }
+  }
+
+  render(ctx) {
+    if (!this.active) return
+    const a = this.phase === 'out' ? Math.min(this.t / this.dur, 1) : 1 - Math.min(this.t / this.dur, 1)
+    ctx.save()
+    ctx.fillStyle = '#05050f'
+    ctx.globalAlpha = a
+    ctx.fillRect(0, 0, CONFIG.W, CONFIG.H)
+    ctx.globalAlpha = 1
+    ctx.restore()
+  }
+}
+
+// --- GAME STATE ---
+let currentScene = null
+let gameTime = 0
+
+// --- MAIN LOOP ---
+let lastTime = performance.now()
+
+function loop(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05)
+  lastTime = now
+  gameTime += dt
+
+  Particles.update(dt)
+  if (currentScene) currentScene.update(dt)
+
+  ctx.clearRect(0, 0, CONFIG.W, CONFIG.H)
+  if (currentScene) currentScene.render(ctx)
+  Particles.render(ctx)
+
+  pointer.justDown = false
+  pointer.justUp = false
+
+  requestAnimationFrame(loop)
+}
+
+// --- BOOT ---
+/** When iframe is embedded in the demo (?embedded=1), lesson finished → notify parent instead of SIGNAL menu. */
+function isEmbeddedDemo() {
+  try {
+    const p = new URLSearchParams(window.location.search)
+    return (
+      typeof window.parent !== 'undefined' &&
+      window.parent !== window &&
+      p.get('embedded') === '1'
+    )
+  } catch (_) {
+    return false
+  }
+}
+function embeddedLessonDone() {
+  if (!isEmbeddedDemo()) return false
+  try {
+    window.parent.postMessage(
+      { type: 'AKMIND_SIGNAL_LESSON_COMPLETE' },
+      window.location.origin
+    )
+  } catch (_) {}
+  return true
+}
+
+/** Map URL → starting scene. Lesson 2–4 = canvas lessons; game 1–3 = same (after video track). Old Neuropolis used ?level=1|2|3 — same mapping. */
+function initialSceneFromURL() {
+  const p = new URLSearchParams(window.location.search)
+  let lesson = Number.parseInt(p.get('lesson') || '', 10)
+  if (!Number.isFinite(lesson) || lesson < 2 || lesson > 4) {
+    const game = Number.parseInt(p.get('game') || '', 10)
+    if (game === 1) lesson = 2
+    else if (game === 2) lesson = 3
+    else if (game === 3) lesson = 4
+  }
+  if (!Number.isFinite(lesson) || lesson < 2 || lesson > 4) {
+    const level = Number.parseInt(p.get('level') || '', 10)
+    if (level === 1) lesson = 2
+    else if (level === 2) lesson = 3
+    else if (level === 3) lesson = 4
+  }
+  if (lesson === 2) return new Lesson2Scene()
+  if (lesson === 3) return new Lesson3Scene()
+  if (lesson === 4) return new Lesson4Scene()
+  return new MenuScene()
+}
+
+async function boot() {
+  Audio.init()
+  await Promise.all([
+    Audio.load('correct', 'game/sounds/correct.mp3'),
+    Audio.load('wrong', 'game/sounds/wrong.mp3'),
+    Audio.load('whoosh', 'game/sounds/whoosh.mp3'),
+    Audio.load('victory', 'game/sounds/victory.mp3'),
+    Audio.load('click', 'game/sounds/click.mp3'),
+    Audio.load('flip', 'game/sounds/flip.mp3'),
+    Audio.load('bg', 'game/sounds/bg_music.mp3'),
+  ])
+  currentScene = initialSceneFromURL()
+  Audio.playMusic('bg')
+  requestAnimationFrame(loop)
+}
+
+// ============================================================
+// MENU SCENE
+// ============================================================
+class MenuScene {
+  constructor() {
+    this.time = 0
+    this.bg = new Background('menu')
+    this.nova = new Nova(CONFIG.W * 0.5, CONFIG.H * 0.36, 0.35)
+    this.nova.showName = false
+    this.buttons = [
+      { label: 'LESSON 2 — HISTORY OF AI', lesson: 2, y: 620 },
+      { label: 'LESSON 3 — AI VS HUMANS',  lesson: 3, y: 720 },
+      { label: 'LESSON 4 — TYPES OF AI',   lesson: 4, y: 820 },
+    ]
+    this.hoveredBtn = -1
+  }
+
+  update(dt) {
+    this.time += dt
+    this.bg.update(dt)
+    this.nova.update(dt)
+    this.nova.moveTo(CONFIG.W / 2, 380 + Math.sin(this.time * 0.8) * 22)
+
+    this.hoveredBtn = -1
+    for (let i = 0; i < this.buttons.length; i++) {
+      const b = this.buttons[i]
+      if (rectHit(CONFIG.W/2 - 380, b.y - 40, 760, 80, pointer.x, pointer.y)) {
+        this.hoveredBtn = i
+      }
+    }
+
+    if (pointer.justDown) {
+      for (let i = 0; i < this.buttons.length; i++) {
+        const b = this.buttons[i]
+        if (rectHit(CONFIG.W/2 - 380, b.y - 40, 760, 80, pointer.x, pointer.y)) {
+          Audio.play('click')
+          this.launchLesson(b.lesson)
+        }
+      }
+    }
+  }
+
+  launchLesson(n) {
+    if (n === 2) currentScene = new Lesson2Scene()
+    else if (n === 3) currentScene = new Lesson3Scene()
+    else if (n === 4) currentScene = new Lesson4Scene()
+  }
+
+  render(ctx) {
+    const W = CONFIG.W
+    this.bg.render(ctx)
+
+    ctx.save()
+    const ta = 0.6 + Math.sin(this.time * 0.5) * 0.15
+    ctx.globalAlpha = ta
+    ctx.font = `900 84px ${CONFIG.FONT_MAIN}`
+    ctx.fillStyle = '#00e5ff'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    prepTextRender(ctx)
+    ctx.fillStyle = '#00e5ff'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('AKMIND', W/2, 180)
+    doneTextRender(ctx)
+
+    ctx.font = `700 40px ${CONFIG.FONT_MAIN}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#a29bfe'
+    ctx.fillText('S I G N A L', W/2, 250)
+    doneTextRender(ctx)
+
+    ctx.font = `400 19px ${CONFIG.FONT_BODY}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#8892b0'
+    ctx.fillText('Choose a lesson to begin', W/2, 510)
+    doneTextRender(ctx)
+    ctx.globalAlpha = 1
+
+    this.nova.render(ctx)
+
+    for (let i = 0; i < this.buttons.length; i++) {
+      const b = this.buttons[i]
+      const hovered = this.hoveredBtn === i
+      const bx = W/2 - 380, by = b.y - 40, bw = 760, bh = Math.max(Math.round(80), 48)
+
+      ctx.fillStyle = hovered ? 'rgba(0,229,255,0.14)' : 'rgba(255,255,255,0.04)'
+      drawRoundRect(ctx, bx, by, bw, bh, 16)
+      ctx.fill()
+
+      ctx.strokeStyle = hovered ? '#00e5ff' : 'rgba(255,255,255,0.15)'
+      ctx.lineWidth = hovered ? 2.5 : 1
+      drawRoundRect(ctx, bx, by, bw, bh, 16)
+      ctx.stroke()
+
+      ctx.font = `700 22px ${CONFIG.FONT_MAIN}`
+      ctx.fillStyle = hovered ? '#00e5ff' : '#cbd5e1'
+      prepTextRender(ctx)
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(b.label, W/2, b.y)
+      doneTextRender(ctx)
+    }
+
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+    ctx.restore()
+  }
+}
+
+// --- MEMORY WALL ERA SETS (Lesson 2) ---
+const MEMORY_WALL_ERAS_R1 = [
+  { year: '1950', label: 'TURING TEST', color: '#ff6b6b', fact: 'Alan Turing asked: Can machines think? This question started everything.' },
+  { year: '1956', label: 'AI IS BORN', color: '#ffd93d', fact: 'Scientists at Dartmouth officially named the field "Artificial Intelligence".' },
+  { year: '1997', label: 'DEEP BLUE', color: '#6bcbff', fact: 'Deep Blue defeated world chess champion Kasparov. Machines could beat humans at complex games.' },
+  { year: '2012', label: 'DEEP LEARNING', color: '#a29bfe', fact: 'Deep learning let AI see images better than humans. The revolution began.' },
+  { year: '2022', label: 'CHATGPT', color: '#55efc4', fact: '100 million people used ChatGPT in 2 months. AI reached everyone overnight.' },
+]
+const MEMORY_WALL_ERAS_R2 = [
+  { year: '1943', label: 'FIRST NEURAL NET', color: '#ff9f43', fact: 'Warren McCulloch and Walter Pitts created the first mathematical model of a neuron.' },
+  { year: '1966', label: 'ELIZA CHATBOT', color: '#ee5a24', fact: 'Joseph Weizenbaum built ELIZA — the first chatbot that could hold a conversation.' },
+  { year: '2011', label: 'WATSON WINS', color: '#0652DD', fact: 'IBM Watson defeated human champions on Jeopardy! AI could now understand language.' },
+  { year: '2016', label: 'ALPHAGO', color: '#9980FA', fact: 'AlphaGo defeated the world Go champion — a game with more moves than atoms in the universe.' },
+  { year: '2020', label: 'GPT-3 LAUNCHED', color: '#FDA7DF', fact: 'OpenAI released GPT-3 — an AI that could write essays, code, and poetry.' },
+]
+
+// --- VERSUS MACHINE TASK SETS (Lesson 3) ---
+const VERSUS_TASKS_R1 = [
+  { text: 'Process 1 billion records in 1 second', answer: 'AI', emoji: '⚡', failAI: null, failHuman: 'Human collapses from exhaustion!' },
+  { text: 'Write a poem that makes someone cry', answer: 'HUMAN', emoji: '🎵', failAI: 'Robot outputs: ERROR — EMOTION NOT FOUND', failHuman: null },
+  { text: 'Play chess at grandmaster level', answer: 'AI', emoji: '♟️', failAI: null, failHuman: 'Human is defeated in 3 moves!' },
+  { text: 'Comfort a friend who is grieving', answer: 'HUMAN', emoji: '🤗', failAI: 'Robot says: CALCULATING OPTIMAL HUG DURATION...', failHuman: null },
+  { text: 'Translate 50 languages instantly', answer: 'AI', emoji: '🌍', failAI: null, failHuman: 'Human needs 200 years of study!' },
+]
+const VERSUS_TASKS_R2 = [
+  { text: 'Detect cancer in an X-ray scan', answer: 'AI', emoji: '🩺', failAI: null, failHuman: 'Human doctors cannot scan millions of images per second!' },
+  { text: 'Understand when someone is being sarcastic', answer: 'HUMAN', emoji: '🙄', failAI: 'Robot takes response literally. Forever.', failHuman: null },
+  { text: 'Find patterns in 10 million data points', answer: 'AI', emoji: '📊', failAI: null, failHuman: 'Human would need a thousand lifetimes!' },
+  { text: 'Forgive someone who hurt you deeply', answer: 'HUMAN', emoji: '💔', failAI: 'Robot outputs: FORGIVENESS PROTOCOL NOT FOUND', failHuman: null },
+  { text: 'Recommend the perfect movie for your mood', answer: 'AI', emoji: '🎬', failAI: null, failHuman: 'Human has not seen every movie ever made!' },
+]
+
+// --- THREE DOORS CARD SETS (Lesson 4) ---
+const THREE_DOORS_R1 = [
+  { text: 'ChatGPT writes essays but cannot drive', answer: 'NARROW', emoji: '💬' },
+  { text: 'Chess robot beats grandmasters only', answer: 'NARROW', emoji: '♟️' },
+  { text: 'Face unlock on your phone', answer: 'NARROW', emoji: '👁️' },
+  { text: 'Spotify recommends your music', answer: 'NARROW', emoji: '🎵' },
+  { text: 'An AI smarter than all humans combined', answer: 'SUPER', emoji: '⚡' },
+  { text: 'An AI that can do everything a human can', answer: 'GENERAL', emoji: '🤖' },
+  { text: 'An AI that destroys all human intelligence', answer: 'SUPER', emoji: '☠️' },
+]
+const THREE_DOORS_R2 = [
+  { text: 'Siri answers questions but cannot feel lonely', answer: 'NARROW', emoji: '🗣️' },
+  { text: 'Google Maps finds routes but cannot cook', answer: 'NARROW', emoji: '🗺️' },
+  { text: 'An AI scientist that invents cures for all diseases', answer: 'GENERAL', emoji: '🧪' },
+  { text: 'Netflix recommends shows but cannot write one', answer: 'NARROW', emoji: '📺' },
+  { text: 'An AI that controls all computers on Earth', answer: 'SUPER', emoji: '🌐' },
+  { text: 'Autocorrect fixes spelling but cannot understand jokes', answer: 'NARROW', emoji: '✏️' },
+  { text: 'An AI with goals that humans cannot understand or stop', answer: 'SUPER', emoji: '❓' },
+  { text: 'YouTube algorithm suggests videos but cannot feel bored', answer: 'NARROW', emoji: '▶️' },
+]
+function uniqueCardsMerge(a, b) {
+  const seen = new Set()
+  const out = []
+  for (const c of [...a, ...b]) {
+    if (seen.has(c.text)) continue
+    seen.add(c.text)
+    out.push({ ...c })
+  }
+  return out
+}
+
+// ============================================================
+// LESSON 2 — THE MEMORY WALL (History of AI) — 3 ROUNDS
+// ============================================================
+class Lesson2Scene {
+  constructor() {
+    this.time = 0
+    this.bg = new Background('lesson2')
+    this.nova = new Nova(120, 540, 0.15)
+    this.hud = new HUD()
+    this.dialogue = new DialogueBox()
+    this.transition = new Transition()
+    this.missionCard = new MissionCard()
+    this.roundBanner = new RoundBanner()
+    this.phase = 'mission' // mission, play, banner, finalDialogue, complete
+
+    this.hud.setWorld('THE MEMORY WALL')
+    this.hud.setObjective('TAP A FRAGMENT TO REVEAL — DRAG TO THE CORRECT YEAR')
+    this.hud.setNovaPower(0.15)
+
+    this.eras = MEMORY_WALL_ERAS_R1.slice()
+    this.round3DialogueDone = false
+
+    this.round = 0
+    this.totalRounds = 3
+    this.roundXP = 0
+    this.totalXP = 0
+    this.slots = []
+    this.fragments = []
+    this.cracks = []
+    this.heldFragment = null
+    this.placedCount = 0
+
+    this.missionCard.show(
+      'THE MEMORY WALL',
+      "NOVA's memories of AI history have shattered into fragments. Five key moments are floating in the void — out of order, glitching, lost.",
+      'TAP each fragment to reveal the year. DRAG it to the correct slot on the timeline wall. Restore all 5 memories to heal the wall.',
+      () => { this.startRound(1) }
+    )
+  }
+
+  startRound(n) {
+    this.round = n
+    this.roundXP = 0
+    this.placedCount = 0
+    this.heldFragment = null
+    this.hud.setRound(n, this.totalRounds)
+    this.nova.setExpression('idle')
+
+    if (n === 1) this.eras = MEMORY_WALL_ERAS_R1.slice()
+    else if (n === 2) this.eras = MEMORY_WALL_ERAS_R2.slice()
+    else {
+      this.eras = MEMORY_WALL_ERAS_R1.slice()
+      this.round3DialogueDone = false
+    }
+
+    // Slots
+    const slotW = 240, slotH = 140
+    const totalW = this.eras.length * slotW + (this.eras.length - 1) * 24
+    const pad = 60
+    const startX = Math.max(pad, (CONFIG.W - totalW) / 2)
+
+    let order = this.eras.map((_, i) => i)
+    if (n >= 2) {
+      for (let i = order.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [order[i], order[j]] = [order[j], order[i]]
+      }
+    }
+    this.slots = order.map((eraIdx, i) => ({
+      x: startX + i * (slotW + 24),
+      y: CONFIG.H - 200,
+      w: slotW, h: slotH,
+      era: this.eras[eraIdx],
+      filled: false,
+      wrongFlash: 0, correctAnim: 0,
+    }))
+
+    this.cracks = Array.from({length: 8}, () => ({
+      x: 400 + Math.random() * (CONFIG.W - 800),
+      y: CONFIG.H - 200 - 40 - Math.random() * 220,
+      len: 30 + Math.random() * 80,
+      angle: Math.random() * Math.PI,
+      healing: false,
+    }))
+
+    if (n === 3) {
+      this.fragments = []
+      this.phase = 'round3NovaDialogue'
+      this.dialogue.show([
+        { speaker: 'NOVA', text: 'Now the real test begins. I will show each memory for 5 seconds. Watch carefully then place from memory.' },
+      ], () => {
+        this.round3DialogueDone = true
+        this.buildRound3Fragments()
+        this.phase = 'play'
+      })
+      return
+    }
+
+    this.phase = 'play'
+    this.spawnFragmentsForRound(n)
+
+    if (n === 1) {
+      this.dialogue.show([
+        { speaker: 'NOVA', text: 'Round 1: Tap each fragment to flip it. Then drag it to its year on the wall.' },
+      ])
+    } else if (n === 2) {
+      this.dialogue.show([
+        { speaker: 'NOVA', text: 'Round 2: The years are now shuffled on the wall. Fragments fall faster too. Pay attention!' },
+      ])
+    }
+  }
+
+  spawnFragmentsForRound(n) {
+    const showFaceUp = false
+    this.fragments = this.eras.map((era, i) => {
+      let x, y, vx, vy
+      if (n === 2) {
+        x = 240 + i * ((CONFIG.W - 480) / (this.eras.length - 1)) + (Math.random() - 0.5) * 90
+        y = -60 - Math.random() * 60 - i * 30
+        vx = (Math.random() - 0.5) * 30
+        vy = 45 + Math.random() * 20
+      } else {
+        x = 220 + Math.random() * (CONFIG.W - 440)
+        y = 180 + Math.random() * 280
+        const vyMag = 15 + Math.random() * 10
+        vx = (Math.random() - 0.5) * 30
+        vy = (Math.random() < 0.5 ? -1 : 1) * vyMag
+      }
+      return {
+        id: i,
+        era,
+        x, y, vx, vy,
+        rotation: (Math.random() - 0.5) * 0.3,
+        rotSpeed: (Math.random() - 0.5) * 0.4,
+        scale: 1, targetScale: 1,
+        wobbleT: Math.random() * Math.PI * 2,
+        flipped: showFaceUp,
+        flipAnim: showFaceUp ? 1 : 0,
+        flipping: false,
+        memoryTimer: 0,
+        memoryDuration: 0,
+        held: false, placed: false,
+        dragOX: 0, dragOY: 0,
+      }
+    })
+  }
+
+  buildRound3Fragments() {
+    const memoryDuration = 5.0
+    const showFaceUp = true
+    this.fragments = this.eras.map((era, i) => {
+      const x = 240 + Math.random() * (CONFIG.W - 480)
+      const y = 200 + Math.random() * 240
+      const vx = (Math.random() - 0.5) * 15
+      const vy = (Math.random() - 0.5) * 12
+      return {
+        id: i,
+        era,
+        x, y, vx, vy,
+        rotation: (Math.random() - 0.5) * 0.3,
+        rotSpeed: (Math.random() - 0.5) * 0.4,
+        scale: 1, targetScale: 1,
+        wobbleT: Math.random() * Math.PI * 2,
+        flipped: showFaceUp,
+        flipAnim: showFaceUp ? 1 : 0,
+        flipping: false,
+        memoryTimer: memoryDuration,
+        memoryDuration,
+        held: false, placed: false,
+        dragOX: 0, dragOY: 0,
+      }
+    })
+  }
+
+  update(dt) {
+    this.time += dt
+    this.bg.update(dt)
+    this.nova.update(dt)
+    this.hud.update(dt)
+    this.dialogue.update(dt)
+    this.transition.update(dt)
+
+    if (this.missionCard.isVisible()) { this.missionCard.update(dt); return }
+    if (this.roundBanner.isVisible()) { this.roundBanner.update(dt); return }
+
+    if (pointer.justDown && this.hud.hitMuteBtn(pointer.x, pointer.y)) {
+      this.hud.setMuted(Audio.toggle()); return
+    }
+
+    if (pointer.justDown && this.dialogue.isVisible()) {
+      this.dialogue.advance(); return
+    }
+
+    if (this.phase === 'round3NovaDialogue') return
+
+    if (this.phase !== 'play') return
+
+    this.nova.moveTo(120, 540)
+
+    // Slot anims
+    for (const s of this.slots) {
+      if (s.wrongFlash > 0) s.wrongFlash -= dt
+      if (s.filled && s.correctAnim < 1) s.correctAnim = Math.min(1, s.correctAnim + dt * 3)
+    }
+
+    // Memory-mode auto-flip (Round 3 only after NOVA intro dismissed)
+    if (this.round === 3 && this.round3DialogueDone) {
+      for (const f of this.fragments) {
+        if (f.placed) continue
+        if (f.memoryTimer > 0) {
+          f.memoryTimer -= dt
+          if (f.memoryTimer <= 0 && f.flipped && !f.flipping) {
+            f.flipping = true
+            f.flipAnim = 0
+            f.flipped = false
+            Audio.play('flip', 0.4)
+          }
+        }
+      }
+    }
+
+    // Fragment physics
+    for (const f of this.fragments) {
+      if (f.placed) continue
+      f.wobbleT += dt * 1.5
+      f.scale += (f.targetScale - f.scale) * dt * 8
+
+      if (f.flipping) {
+        f.flipAnim += dt / 0.25
+        if (f.flipAnim >= 1) {
+          f.flipAnim = 1
+          f.flipping = false
+        }
+      }
+
+      if (f.held) {
+        f.x += (pointer.x - f.dragOX - f.x) * dt * 14
+        f.y += (pointer.y - f.dragOY - f.y) * dt * 14
+        f.rotation *= 0.9
+      } else {
+        f.x += f.vx * dt
+        f.y += f.vy * dt
+        // R2 fragments need to fall in without immediate decay — preserve speed until settled
+        if (this.round === 2 && f.y < 160) {
+          f.vx *= 0.998; f.vy *= 0.998
+        } else {
+          f.vx *= 0.985; f.vy *= 0.985
+        }
+        f.rotation += f.rotSpeed * dt
+        const margin = 120
+        if (f.x < margin) { f.x = margin; f.vx = Math.abs(f.vx) }
+        if (f.x > CONFIG.W - margin) { f.x = CONFIG.W - margin; f.vx = -Math.abs(f.vx) }
+        // Only bounce off top once fragment is on-screen and moving up — allows R2 fall-in
+        if (f.y < 160 && f.vy < 0) { f.y = 160; f.vy = Math.abs(f.vy) }
+        if (f.y > CONFIG.H - 360) { f.y = CONFIG.H - 360; f.vy = -Math.abs(f.vy) }
+      }
+    }
+
+    // Input
+    if (pointer.justDown && !this.heldFragment) {
+      for (const f of this.fragments) {
+        if (f.placed || f.flipping) continue
+        if (circleHit(f.x, f.y, 100, pointer.x, pointer.y)) {
+          if (!f.flipped) {
+            if (this.round === 3) {
+              // Memory mode — drag the face-down fragment directly
+              f.held = true; f.targetScale = 1.2
+              f.dragOX = pointer.x - f.x
+              f.dragOY = pointer.y - f.y
+              this.heldFragment = f
+              Audio.play('whoosh')
+            } else {
+              // Flip face-up
+              f.flipping = true; f.flipAnim = 0; f.flipped = true
+              Audio.play('flip')
+              Particles.spawn(f.x, f.y, 10, [f.era.color], { speed: 100, size: 5, life: 0.45 })
+            }
+          } else {
+            f.held = true; f.targetScale = 1.2
+            f.dragOX = pointer.x - f.x
+            f.dragOY = pointer.y - f.y
+            this.heldFragment = f
+            Audio.play('whoosh')
+          }
+          break
+        }
+      }
+    }
+
+    if (pointer.justUp && this.heldFragment) {
+      const f = this.heldFragment
+      f.held = false; f.targetScale = 1
+      this.heldFragment = null
+
+      let placed = false
+      for (const s of this.slots) {
+        if (s.filled) continue
+        if (rectHit(s.x, s.y, s.w, s.h, f.x, f.y)) {
+          if (f.era === s.era) {
+            // CORRECT
+            s.filled = true; f.placed = true
+            f.x = s.x + s.w / 2; f.y = s.y + s.h / 2
+            f.rotation = 0; f.targetScale = 0.85
+            this.placedCount++
+            const xp = 100
+            this.roundXP += xp
+            this.totalXP += xp
+            Audio.play('correct')
+            vibrateCorrect()
+            Particles.correct(f.x, f.y)
+            Particles.burst(f.x, f.y, [f.era.color])
+            s.correctAnim = 0
+            const crack = this.cracks.find(c => !c.healing)
+            if (crack) crack.healing = true
+            const power = 0.15 + ((this.round - 1) * 5 + this.placedCount) / 15 * 0.35
+            this.nova.setPower(power)
+            this.hud.setNovaPower(power)
+            this.nova.bounce()
+            this.hud.addXP(xp)
+            this.dialogue.show([{ speaker: 'NOVA', text: f.era.fact }])
+
+            if (this.placedCount >= 5) {
+              setTimeout(() => this.finishRound(), 1200)
+            }
+          } else {
+            s.wrongFlash = 0.6
+            f.vx = (Math.random() - 0.5) * 200
+            f.vy = -150
+            Audio.play('wrong')
+            vibrateWrong()
+            Particles.wrong(f.x, f.y)
+            this.nova.shake()
+            this.hud.showMessage('WRONG YEAR — TRY AGAIN', FAIL_PAUSE_MIN, '#ff6b6b')
+          }
+          placed = true; break
+        }
+      }
+      if (!placed) {
+        f.vx = (Math.random() - 0.5) * 80
+        f.vy = -80
+      }
+    }
+  }
+
+  finishRound() {
+    if (this.dialogue.isVisible()) this.dialogue.hide()
+    if (this.round < this.totalRounds) {
+      this.phase = 'banner'
+      this.roundBanner.show(this.round, this.roundXP, () => {
+        this.startRound(this.round + 1)
+      })
+    } else {
+      this.complete()
+    }
+  }
+
+  complete() {
+    this.phase = 'finalDialogue'
+    Audio.play('victory')
+    this.nova.setExpression('excited')
+    this.nova.setPower(0.55)
+    this.hud.setNovaPower(0.55)
+    Particles.confetti(CONFIG.W / 2, CONFIG.H / 2)
+
+    this.dialogue.show([
+      { speaker: 'NOVA', text: 'All three rounds cleared! You pieced together milestones from Turing and the birth of AI to neural nets, Watson, AlphaGo, GPT-3, and the ChatGPT era.' },
+      { speaker: 'NOVA', text: 'And in Round 3 you remembered every year from a flicker. That is real learning.' },
+      { speaker: 'NOVA', text: 'Remember: AI history is not over. YOU are the next chapter.' },
+    ], () => {
+      this.transition.trigger(0.8, () => {
+        if (!embeddedLessonDone()) currentScene = new MenuScene()
+      })
+    })
+  }
+
+  render(ctx) {
+    const W = CONFIG.W, H = CONFIG.H
+    this.bg.render(ctx)
+    ctx.save()
+    const safePad = 60
+    ctx.beginPath()
+    ctx.rect(safePad, safePad, W - 2 * safePad, H - 2 * safePad)
+    ctx.clip()
+    ctx.textBaseline = 'middle'
+
+    // Wall base
+    const wallY = H - 300
+    ctx.fillStyle = 'rgba(10, 8, 32, 0.85)'
+    ctx.fillRect(0, wallY - 20, W, 320)
+    ctx.strokeStyle = 'rgba(162,155,254,0.25)'
+    ctx.lineWidth = 2
+    ctx.beginPath(); ctx.moveTo(0, wallY - 20); ctx.lineTo(W, wallY - 20); ctx.stroke()
+
+    // Cracks
+    for (const c of this.cracks) {
+      if (c.healing) continue
+      ctx.save()
+      ctx.translate(c.x, c.y)
+      ctx.rotate(c.angle)
+      ctx.strokeStyle = 'rgba(255,100,100,0.3)'
+      ctx.lineWidth = 1.5
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(c.len, 0); ctx.stroke()
+      ctx.restore()
+    }
+
+    // Slots
+    for (const s of this.slots) {
+      const glowA = 0.35 + Math.sin(this.time * PULSE_SLOW * 0.5) * 0.15
+      ctx.fillStyle = s.filled ? s.era.color + '22' : 'rgba(255,255,255,0.04)'
+      drawRoundRect(ctx, s.x, s.y, s.w, s.h, 12)
+      ctx.fill()
+      ctx.strokeStyle = s.filled ? s.era.color : `rgba(255,255,255,${glowA})`
+      ctx.lineWidth = s.filled ? 3 : 1.5
+      drawRoundRect(ctx, s.x, s.y, s.w, s.h, 12)
+      ctx.stroke()
+
+      if (s.wrongFlash > 0) {
+        ctx.fillStyle = '#ff4444'
+        ctx.globalAlpha = s.wrongFlash * 0.35
+        drawRoundRect(ctx, s.x, s.y, s.w, s.h, 12)
+        ctx.fill()
+        ctx.globalAlpha = 1
+      }
+
+      ctx.font = `900 56px ${CONFIG.FONT_MAIN}`
+      prepTextRender(ctx)
+      ctx.fillStyle = s.filled ? s.era.color : 'rgba(255,255,255,0.42)'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      const sc = s.filled ? 1 + (1 - s.correctAnim) * 0.2 : 1
+      ctx.save()
+      ctx.translate(s.x + s.w/2, s.y + s.h/2 - 14)
+      ctx.scale(sc, sc)
+      ctx.fillText(s.era.year, 0, 0)
+      doneTextRender(ctx)
+      ctx.restore()
+
+      ctx.font = `600 16px ${CONFIG.FONT_BODY}`
+      prepTextRender(ctx)
+      ctx.fillStyle = s.filled ? s.era.color : 'rgba(255,255,255,0.3)'
+      ctx.fillText(s.era.label, s.x + s.w/2, s.y + s.h/2 + 26)
+      doneTextRender(ctx)
+
+      if (s.filled) {
+        ctx.font = '22px sans-serif'
+        ctx.fillText('✓', s.x + s.w - 16, s.y + 28)
+      }
+    }
+
+    // Fragments (200x110)
+    for (const f of this.fragments) {
+      if (f.placed) continue
+      const fw = 200, fh = 110
+      const wobble = Math.sin(f.wobbleT) * (f.held ? 0 : 5)
+
+      ctx.save()
+      ctx.translate(f.x, f.y + wobble)
+      // straighten when held
+      const rot = f.held ? f.rotation * 0.2 : f.rotation
+      ctx.rotate(rot)
+      ctx.scale(f.scale, f.scale)
+
+      if (f.flipping) {
+        const scaleX = Math.abs(Math.cos(f.flipAnim * Math.PI))
+        ctx.scale(scaleX, 1)
+      }
+
+      // Card shell (no shadow blur — crisp stroke)
+      ctx.fillStyle = 'rgba(5, 5, 22, 0.97)'
+      ctx.strokeStyle = f.era.color
+      ctx.lineWidth = f.held ? 3 : 2
+      drawRoundRect(ctx, -fw/2, -fh/2, fw, fh, 14)
+      ctx.fill()
+      ctx.stroke()
+
+      // During flip: first half shows the OLD side, second half shows the TARGET (f.flipped)
+      const showTarget = !f.flipping || f.flipAnim > 0.5
+      const showAsUp = showTarget ? f.flipped : !f.flipped
+
+      if (showAsUp) {
+        // Face up — year 900 56px Orbitron, label 600 16px Inter
+        const colorPulse = 0.7 + Math.sin(this.time * PULSE_SLOW + f.id) * 0.3
+        ctx.font = `900 56px ${CONFIG.FONT_MAIN}`
+        ctx.fillStyle = f.era.color
+        ctx.globalAlpha = colorPulse
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        prepTextRender(ctx)
+        ctx.fillText(f.era.year, 0, -14)
+        doneTextRender(ctx)
+        ctx.globalAlpha = 1
+        ctx.font = `600 16px ${CONFIG.FONT_BODY}`
+        prepTextRender(ctx)
+        ctx.fillStyle = '#ffffff'
+        ctx.globalAlpha = 0.85
+        ctx.fillText(f.era.label, 0, 28)
+        ctx.globalAlpha = 1
+        doneTextRender(ctx)
+
+        // Round-3 memory-preview timer ring on each card
+        if (this.round === 3 && f.memoryTimer > 0 && f.memoryDuration > 0) {
+          const tProg = f.memoryTimer / f.memoryDuration
+          const rcx = 72, rcy = -28, rcr = 14
+          ctx.beginPath()
+          ctx.arc(rcx, rcy, rcr, 0, Math.PI * 2)
+          ctx.strokeStyle = 'rgba(255,255,255,0.18)'
+          ctx.lineWidth = 3
+          ctx.stroke()
+          ctx.beginPath()
+          ctx.arc(rcx, rcy, rcr, -Math.PI/2, -Math.PI/2 + tProg * Math.PI * 2)
+          ctx.strokeStyle = tProg < 0.3 ? '#ff6b6b' : '#ffd700'
+          ctx.lineWidth = 3
+          ctx.lineCap = 'round'
+          ctx.stroke()
+          ctx.lineCap = 'butt'
+          ctx.font = `700 13px ${CONFIG.FONT_MAIN}`
+          prepTextRender(ctx)
+          ctx.fillStyle = tProg < 0.3 ? '#ff6b6b' : '#ffd700'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(Math.ceil(f.memoryTimer).toString(), rcx, rcy)
+          doneTextRender(ctx)
+        }
+      } else {
+        // Face down — procedural circuit pattern
+        const t = this.time + f.id * 0.5
+        const pulse = 0.4 + Math.sin(t * PULSE_SLOW * 0.5) * 0.3
+
+        ctx.strokeStyle = f.era.color
+        ctx.globalAlpha = pulse * 0.6
+        ctx.lineWidth = 1.5
+
+        // 4 lines crossing
+        const w2 = fw/2 - 18, h2 = fh/2 - 14
+        const lines = [
+          [-w2, -h2, w2, 0],
+          [w2, -h2, -w2, 0],
+          [-w2, h2, w2, 0],
+          [w2, h2, -w2, 0],
+        ]
+        for (const [x1, y1, x2, y2] of lines) {
+          ctx.beginPath()
+          ctx.moveTo(x1, y1); ctx.lineTo(x2, y2)
+          ctx.stroke()
+        }
+        // Center node
+        ctx.fillStyle = f.era.color
+        ctx.globalAlpha = pulse
+        ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill()
+        // Corner dots
+        for (const [x, y] of [[-w2,-h2],[w2,-h2],[-w2,h2],[w2,h2]]) {
+          ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill()
+        }
+        ctx.globalAlpha = 1
+
+        // Tap hint (only round 1/2, not memory test once revealed)
+        if (this.round !== 3 || f.memoryTimer === 0) {
+          ctx.font = `600 12px ${CONFIG.FONT_BODY}`
+          prepTextRender(ctx)
+          ctx.fillStyle = 'rgba(255,255,255,0.5)'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(this.round === 3 ? 'REMEMBER ME' : 'TAP TO REVEAL', 0, h2 - 6)
+          doneTextRender(ctx)
+        }
+      }
+
+      ctx.restore()
+    }
+
+    this.nova.render(ctx)
+    this.hud.render(ctx)
+
+    if (this.dialogue.isVisible()) {
+      this.dialogue.setPosition(this.nova.y > CONFIG.H * 0.5 ? 'top' : 'bottom')
+      this.dialogue.render(ctx)
+    }
+
+    // Progress
+    if (this.phase === 'play') {
+      ctx.font = `600 16px ${CONFIG.FONT_MAIN}`
+      ctx.fillStyle = '#00e5ff'
+      ctx.globalAlpha = 0.85
+      ctx.textAlign = 'right'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(`${this.placedCount}/5 MEMORIES RESTORED`, W - 28, 150)
+      ctx.globalAlpha = 1
+    }
+
+    this.transition.render(ctx)
+    this.missionCard.render(ctx)
+    this.roundBanner.render(ctx)
+    ctx.restore()
+  }
+}
+
+// ============================================================
+// LESSON 3 — THE VERSUS MACHINE — 3 ROUNDS
+// ============================================================
+class Lesson3Scene {
+  constructor() {
+    this.time = 0
+    this.bg = new Background('lesson3')
+    this.nova = new Nova(120, 540, 0.25)
+    this.hud = new HUD()
+    this.dialogue = new DialogueBox()
+    this.transition = new Transition()
+    this.missionCard = new MissionCard()
+    this.roundBanner = new RoundBanner()
+    this.phase = 'mission'
+    this.dialogueBlocksCards = false
+
+    this.hud.setWorld('THE VERSUS MACHINE')
+    this.hud.setObjective('SWIPE LEFT FOR AI · SWIPE RIGHT FOR HUMAN')
+    this.hud.setNovaPower(0.25)
+
+    this.round = 0
+    this.totalRounds = 3
+    this.roundXP = 0
+    this.totalXP = 0
+    this.totalCorrect = 0
+    this.streak = 0
+
+    this.taskQueue = []
+    this.currentTask = null
+    this.taskX = 0
+    this.taskY = 0
+    this.taskBaseY = CONFIG.H * 0.40
+    this.taskFallSpeed = 0
+    this.taskDragging = false
+    this.taskDragOX = 0
+    this.taskVX = 0
+    this.failMsg = ''
+    this.failTimer = 0
+    this.failDuration = FAIL_PAUSE_MIN
+    this.lives = 3
+    this.maxLives = 3
+    this.swipeThreshold = 220
+
+    this.countdownT = 0
+    this.countdownDuration = 2.0
+
+    this.missionCard.show(
+      'THE VERSUS MACHINE',
+      "A great debate is happening. Can AI do everything humans can? Or do humans still have the edge? The Versus Machine needs a judge.",
+      'SWIPE each task LEFT for AI or RIGHT for HUMAN before it falls. Wrong choice = see exactly why it fails. 3 lives. 10 tasks.',
+      () => { this.startRound(1) }
+    )
+  }
+
+  startRound(n) {
+    this.round = n
+    this.roundXP = 0
+    this.streak = 0
+    this.hud.setRound(n, this.totalRounds)
+    this.currentTask = null
+    this.failTimer = 0
+
+    if (n === 1) {
+      this.taskFallSpeed = 40
+      this.maxLives = 3
+    } else if (n === 2) {
+      this.taskFallSpeed = 95
+      this.maxLives = 3
+    } else {
+      this.taskFallSpeed = 180
+      this.maxLives = 5
+    }
+    this.lives = this.maxLives
+    this.failDuration = FAIL_PAUSE_MIN
+
+    let pool
+    if (n === 1) pool = VERSUS_TASKS_R1.map(t => ({ ...t }))
+    else if (n === 2) pool = VERSUS_TASKS_R2.map(t => ({ ...t }))
+    else pool = [...VERSUS_TASKS_R1, ...VERSUS_TASKS_R2].map(t => ({ ...t })).sort(() => Math.random() - 0.5)
+    this.taskQueue = pool
+
+    this.phase = 'countdown'
+    this.countdownT = this.countdownDuration
+  }
+
+  spawnTask() {
+    if (this.taskQueue.length === 0) {
+      this.finishRound()
+      return
+    }
+    this.currentTask = this.taskQueue.shift()
+    this.taskX = CONFIG.W / 2
+    this.taskY = this.taskBaseY - 200 // start above
+    this.taskDragging = false
+    this.taskVX = 0
+  }
+
+  update(dt) {
+    this.time += dt
+    this.bg.update(dt)
+    this.nova.update(dt)
+    this.hud.update(dt)
+    this.dialogue.update(dt)
+    this.transition.update(dt)
+
+    if (this.missionCard.isVisible()) { this.missionCard.update(dt); return }
+    if (this.roundBanner.isVisible()) { this.roundBanner.update(dt); return }
+
+    if (pointer.justDown && this.hud.hitMuteBtn(pointer.x, pointer.y)) {
+      this.hud.setMuted(Audio.toggle()); return
+    }
+
+    if (pointer.justDown && this.dialogue.isVisible()) {
+      this.dialogue.advance(); return
+    }
+
+    if (this.phase === 'interRound') return
+
+    // GET READY countdown — must complete before any cards appear
+    if (this.phase === 'countdown') {
+      this.countdownT -= dt
+      if (this.countdownT <= 0) {
+        this.phase = 'play'
+        this.spawnTask()
+      }
+      return
+    }
+
+    if (this.phase !== 'play' || !this.currentTask || this.dialogueBlocksCards) return
+
+    this.nova.moveTo(120, 540)
+
+    if (this.failTimer > 0) {
+      this.failTimer -= dt
+      return
+    }
+
+    // Card falls
+    if (!this.taskDragging) {
+      this.taskY += this.taskFallSpeed * dt
+      // Drift back to horizontal center if not being held
+      this.taskX += (CONFIG.W / 2 - this.taskX) * dt * 6
+
+      // Missed (off-bottom)
+      if (this.taskY > CONFIG.H - 80) {
+        this.handleMiss()
+        return
+      }
+    }
+
+    const tw = 480, th = 220
+
+    if (pointer.justDown) {
+      if (rectHit(this.taskX - tw/2, this.taskY - th/2, tw, th, pointer.x, pointer.y)) {
+        this.taskDragging = true
+        this.taskDragOX = pointer.x - this.taskX
+      }
+    }
+
+    if (pointer.down && this.taskDragging) {
+      const prevX = this.taskX
+      this.taskX = pointer.x - this.taskDragOX
+      this.taskVX = (this.taskX - prevX) / dt
+    }
+
+    if (pointer.justUp && this.taskDragging) {
+      this.taskDragging = false
+      const offset = this.taskX - CONFIG.W / 2
+      if (Math.abs(offset) > this.swipeThreshold || Math.abs(this.taskVX) > 400) {
+        const swipedLeft = offset < 0 || this.taskVX < -400
+        const answer = swipedLeft ? 'AI' : 'HUMAN'
+        this.resolveTask(answer)
+      } else {
+        this.taskVX = 0
+      }
+    }
+  }
+
+  handleMiss() {
+    this.lives--
+    Audio.play('wrong')
+    vibrateWrong()
+    Particles.wrong(this.taskX, this.taskY)
+    this.nova.shake()
+    this.streak = 0
+    this.failMsg = 'TIME UP! Task fell through.'
+    this.failTimer = this.failDuration
+    this.hud.showMessage('MISSED — LIFE LOST', FAIL_PAUSE_MIN, '#ff6b6b')
+    this.currentTask = null
+
+    if (this.lives <= 0) {
+      this.gameOver()
+      return
+    }
+    setTimeout(() => this.spawnTask(), Math.max(300, this.failDuration * 1000 + 200))
+  }
+
+  resolveTask(answer) {
+    const task = this.currentTask
+    const correct = answer === task.answer
+
+    if (correct) {
+      this.streak++
+      let mult = 1
+      if (this.round === 3) {
+        if (this.streak >= 4) mult = 4
+        else if (this.streak === 3) mult = 3
+        else if (this.streak === 2) mult = 2
+      }
+      const xp = 75 * mult
+      this.roundXP += xp
+      this.totalXP += xp
+      this.totalCorrect++
+      Audio.play('correct')
+      vibrateCorrect()
+      Particles.correct(this.taskX, this.taskY)
+      this.nova.bounce()
+      this.hud.addXP(xp)
+      const power = 0.25 + Math.min(0.5, this.totalCorrect / 30 * 0.5)
+      this.nova.setPower(power)
+      this.hud.setNovaPower(power)
+      if (this.round === 3 && mult > 1) this.hud.showMessage(`STREAK x${mult}!`, FAIL_PAUSE_MIN, '#ffd700')
+      this.currentTask = null
+      setTimeout(() => this.spawnTask(), 500)
+    } else {
+      this.streak = 0
+      this.lives--
+      Audio.play('wrong')
+      vibrateWrong()
+      Particles.wrong(this.taskX, this.taskY)
+      this.nova.shake()
+      const failMsg = answer === 'AI' ? task.failAI : task.failHuman
+      this.failMsg = failMsg || 'Not quite right!'
+      this.failTimer = this.failDuration
+      this.hud.showMessage(this.failMsg, this.failDuration, '#ff6b6b')
+
+      if (this.lives <= 0) {
+        this.gameOver()
+        return
+      }
+      setTimeout(() => this.spawnTask(), Math.max(300, this.failDuration * 1000 + 200))
+      this.currentTask = null
+    }
+  }
+
+  gameOver() {
+    this.phase = 'over'
+    this.dialogue.show([
+      { speaker: 'NOVA', text: 'No lives left! But every mistake teaches us something. Try again!' }
+    ], () => { currentScene = new MenuScene() })
+  }
+
+  finishRound() {
+    if (this.dialogue.isVisible()) this.dialogue.hide()
+    if (this.round < this.totalRounds) {
+      this.phase = 'banner'
+      this.roundBanner.show(this.round, this.roundXP, () => {
+        this.phase = 'interRound'
+        this.dialogueBlocksCards = true
+        const lines = this.round === 1
+          ? [{ speaker: 'NOVA', text: 'Round 1 complete! Round 2 brings five brand-new tasks — medium difficulty. Get ready!' }]
+          : [{ speaker: 'NOVA', text: 'Round 2 complete! Round 3 is the SPEED ROUND — all ten tasks combined. Build streaks for bonus XP!' }]
+        this.dialogue.show(lines, () => {
+          this.dialogueBlocksCards = false
+          this.startRound(this.round + 1)
+        })
+      })
+    } else {
+      this.complete()
+    }
+  }
+
+  complete() {
+    this.phase = 'finalDialogue'
+    Audio.play('victory')
+    this.nova.setExpression('excited')
+    this.nova.setPower(0.7)
+    this.hud.setNovaPower(0.7)
+    Particles.confetti(CONFIG.W/2, CONFIG.H/2)
+    this.dialogue.show([
+      { speaker: 'NOVA', text: `Three rounds done! You sorted ${this.totalCorrect} tasks correctly.` },
+      { speaker: 'NOVA', text: 'The truth is: AI wins at speed, memory, and data. Humans win at empathy, creativity, and understanding.' },
+      { speaker: 'NOVA', text: 'The future is not AI versus humans. It is AI PLUS humans. That is where you come in.' },
+    ], () => { this.transition.trigger(0.8, () => { if (!embeddedLessonDone()) currentScene = new MenuScene() }) })
+  }
+
+  render(ctx) {
+    const W = CONFIG.W, H = CONFIG.H
+    this.bg.render(ctx)
+    ctx.save()
+    ctx.textBaseline = 'middle'
+
+    // Vertical zone dividers
+    ctx.strokeStyle = 'rgba(0,229,255,0.3)'
+    ctx.lineWidth = 2
+    ctx.beginPath(); ctx.moveTo(W * 0.3, 100); ctx.lineTo(W * 0.3, H); ctx.stroke()
+    ctx.strokeStyle = 'rgba(255,215,0,0.3)'
+    ctx.beginPath(); ctx.moveTo(W * 0.7, 100); ctx.lineTo(W * 0.7, H); ctx.stroke()
+
+    // Lives
+    ctx.font = '34px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    for (let i = 0; i < this.maxLives; i++) {
+      ctx.globalAlpha = i < this.lives ? 1 : 0.2
+      ctx.fillText('❤️', W/2 - (this.maxLives - 1) * 22 + i * 44, 156)
+    }
+    ctx.globalAlpha = 1
+
+    // Zone mascots (top of zones — before labels)
+    const imgS = 100
+    if (gameSprites.robot.complete && gameSprites.robot.naturalWidth > 0) {
+      ctx.drawImage(gameSprites.robot, 260, H * 0.25, imgS, imgS)
+    }
+    if (gameSprites.human.complete && gameSprites.human.naturalWidth > 0) {
+      ctx.drawImage(gameSprites.human, CONFIG.W - 260 - imgS, H * 0.25, imgS, imgS)
+    }
+
+    // Funnel labels at bottom of zones (y = 0.75 H)
+    const labelY = H * 0.75
+    const hintY = labelY + 42
+    ctx.font = `900 56px ${CONFIG.FONT_MAIN}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#00e5ff'
+    ctx.globalAlpha = 0.55
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('AI', W * 0.15, labelY)
+    ctx.font = `600 18px ${CONFIG.FONT_BODY}`
+    ctx.fillText('← SWIPE LEFT', W * 0.15, hintY)
+    doneTextRender(ctx)
+
+    ctx.font = `900 56px ${CONFIG.FONT_MAIN}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#ffd700'
+    ctx.fillText('HUMAN', W * 0.85, labelY)
+    ctx.font = `600 18px ${CONFIG.FONT_BODY}`
+    ctx.fillText('SWIPE RIGHT →', W * 0.85, hintY)
+    doneTextRender(ctx)
+    ctx.globalAlpha = 1
+
+    // Card — only when actively playing and not blocked by between-round dialogue
+    if (this.phase === 'play' && this.currentTask && this.failTimer <= 0 && !this.dialogueBlocksCards) {
+      const task = this.currentTask
+      const tw = 480, th = 220
+      const tx = this.taskX, ty = this.taskY
+      const tilt = (tx - W/2) / W * 0.3
+
+      ctx.save()
+      ctx.translate(tx, ty)
+      ctx.rotate(tilt)
+
+      // Background gradient on card
+      const cardCol = tx < W/2 - 20 ? '#00e5ff' : (tx > W/2 + 20 ? '#ffd700' : '#00e5ff')
+      const g = ctx.createLinearGradient(-tw/2, -th/2, tw/2, th/2)
+      g.addColorStop(0, 'rgba(10, 8, 30, 0.97)')
+      g.addColorStop(1, `${cardCol}22`)
+      ctx.fillStyle = g
+      drawRoundRect(ctx, -tw/2, -th/2, tw, th, 18)
+      ctx.fill()
+
+      ctx.strokeStyle = cardCol
+      ctx.lineWidth = 2.5
+      drawRoundRect(ctx, -tw/2, -th/2, tw, th, 18)
+      ctx.stroke()
+      // Thick color bar on left
+      ctx.fillStyle = cardCol
+      ctx.fillRect(-tw/2, -th/2, 12, th)
+
+      // Emoji
+      ctx.font = '64px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(task.emoji, 0, -50)
+
+      // Text — 700  Inter
+      ctx.font = `700 26px ${CONFIG.FONT_BODY}`
+      prepTextRender(ctx)
+      ctx.fillStyle = '#f1f5f9'
+      const rows = wrapText(ctx, task.text, 400)
+      let ry = rows.length > 1 ? 22 : 36
+      for (const r of rows) { ctx.fillText(r, 0, ry); ry += 36 }
+      doneTextRender(ctx)
+
+      const swipeOffset = Math.abs(tx - W/2)
+      if (swipeOffset > 90) {
+        ctx.globalAlpha = Math.min(1, (swipeOffset - 90) / 130)
+        ctx.font = `900 28px ${CONFIG.FONT_MAIN}`
+        ctx.fillStyle = cardCol
+        ctx.fillText(tx < W/2 ? '← AI' : 'HUMAN →', 0, 86)
+        ctx.globalAlpha = 1
+      }
+
+      ctx.restore()
+    }
+
+    // Streak indicator (round 3)
+    if (this.round === 3 && this.streak >= 2) {
+      const mult = Math.min(4, this.streak)
+      ctx.font = `900 40px ${CONFIG.FONT_MAIN}`
+      prepTextRender(ctx)
+      ctx.fillStyle = '#ffd700'
+      ctx.globalAlpha = 0.85 + Math.sin(this.time * PULSE_SLOW) * 0.15
+      ctx.textAlign = 'center'
+      ctx.fillText(`STREAK x${mult}`, W/2, 220)
+      doneTextRender(ctx)
+      ctx.globalAlpha = 1
+    }
+
+    // GET READY countdown overlay
+    if (this.phase === 'countdown') {
+      const remain = Math.max(0, this.countdownT)
+      const a = Math.min(1, (this.countdownDuration - remain) * 3, remain * 3)
+      ctx.save()
+      ctx.globalAlpha = a
+      ctx.fillStyle = 'rgba(0, 0, 8, 0.55)'
+      ctx.fillRect(0, 0, W, H)
+      ctx.globalAlpha = 1
+
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.font = `900 72px ${CONFIG.FONT_MAIN}`
+      prepTextRender(ctx)
+      ctx.fillStyle = '#00e5ff'
+      ctx.fillText('GET READY', W/2, H/2 - 60)
+      doneTextRender(ctx)
+
+      const num = Math.max(1, Math.ceil(remain))
+      const scale = 1 + (1 - (remain - Math.floor(remain))) * 0.4
+      ctx.save()
+      ctx.translate(W/2, H/2 + 50)
+      ctx.scale(scale, scale)
+      ctx.font = `900 120px ${CONFIG.FONT_MAIN}`
+      prepTextRender(ctx)
+      ctx.fillStyle = '#ffd700'
+      ctx.fillText(num.toString(), 0, 0)
+      ctx.restore()
+      doneTextRender(ctx)
+      ctx.restore()
+    }
+
+    // Fail message
+    if (this.failTimer > 0) {
+      const a = Math.min(1, this.failTimer / 0.3)
+      ctx.save()
+      ctx.globalAlpha = a
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.font = `700 24px ${CONFIG.FONT_BODY}`
+      const mw = Math.min(ctx.measureText(this.failMsg).width + 80, W - 100)
+      ctx.fillStyle = 'rgba(0,0,0,0.92)'
+      ctx.fillRect(W/2 - mw/2, H/2 - 50, mw, 100)
+      ctx.strokeStyle = '#ff6b6b'
+      ctx.lineWidth = 2.5
+      ctx.strokeRect(W/2 - mw/2, H/2 - 50, mw, 100)
+      prepTextRender(ctx)
+      ctx.fillStyle = '#ff6b6b'
+      ctx.fillText(this.failMsg, W/2, H/2)
+      doneTextRender(ctx)
+      ctx.restore()
+    }
+
+    // Score
+    ctx.font = `600 17px ${CONFIG.FONT_MAIN}`
+    ctx.fillStyle = '#00e5ff'
+    ctx.globalAlpha = 0.85
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(`${this.totalCorrect}/20 TOTAL`, W - 28, 150)
+    ctx.globalAlpha = 1
+
+    this.nova.render(ctx)
+    this.hud.render(ctx)
+    if (this.dialogue.isVisible()) this.dialogue.render(ctx)
+    this.transition.render(ctx)
+    this.missionCard.render(ctx)
+    this.roundBanner.render(ctx)
+
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+    ctx.restore()
+  }
+}
+
+// ============================================================
+// LESSON 4 — THE THREE DOORS — 3 ROUNDS
+// ============================================================
+class Lesson4Scene {
+  constructor() {
+    this.time = 0
+    this.bg = new Background('lesson4')
+    this.nova = new Nova(120, 540, 0.3)
+    this.hud = new HUD()
+    this.dialogue = new DialogueBox()
+    this.transition = new Transition()
+    this.missionCard = new MissionCard()
+    this.roundBanner = new RoundBanner()
+    this.phase = 'mission'
+    this.dialogueBlocksCards = false
+
+    this.hud.setWorld('THE THREE DOORS')
+    this.hud.setObjective('READ EACH CARD · DRAG IT TO THE CORRECT DOOR')
+    this.hud.setNovaPower(0.3)
+
+    this.generalRejects = [
+      'Not invented yet! Scientists are still working!',
+      'Nope! General AI does not exist in 2024!',
+      'Maybe in your lifetime — but not today!',
+      'Still just a dream! Try another door!',
+      'Researchers have been trying since 1956!',
+    ]
+    this.generalRejectIdx = 0
+
+    this.round = 0
+    this.totalRounds = 3
+    this.roundXP = 0
+    this.totalXP = 0
+    this.placedCount = 0
+    this.totalToPlace = 0
+    this.heldCard = null
+    this.dragOX = 0; this.dragOY = 0
+    this.blastTimer = 0
+    this.doors = []
+    this.cards = []
+    this.mode = 'grid' // 'grid' (R1) | 'sequential' (R2) | 'speed' (R3)
+
+    // Sequential mode (R2)
+    this.seqQueue = []
+
+    // Speed-sort mode state (R3)
+    this.speedQueue = []
+    this.speedCurrent = null
+    this.speedTimer = 0
+    this.speedLimit = 8.0
+    this.speedFailDelay = 0
+    this.speedRevealTimer = 0
+    this.speedRevealAnswer = ''
+    this.speedLives = 5
+    this.speedButtons = []
+    this.speedAnswered = 0
+    this.speedCorrect = 0
+
+    this.missionCard.show(
+      'THE THREE DOORS',
+      'Three types of AI exist — Narrow, General, and Super. But they have escaped their enclosures and the cards describing them are scattered everywhere.',
+      'READ each card carefully. DRAG it to the correct door. Warning: the General AI door has a surprise waiting for you.',
+      () => { this.startRound(1) }
+    )
+  }
+
+  startRound(n) {
+    this.round = n
+    this.roundXP = 0
+    this.placedCount = 0
+    this.heldCard = null
+    this.hud.setRound(n, this.totalRounds)
+    this.phase = 'play'
+
+    // Doors (taller, wider)
+    const doorW = 220, doorH = 380
+    this.doors = [
+      { id: 'NARROW', label: 'NARROW AI', sublabel: 'One task only', color: '#6bcbff', x: CONFIG.W * 0.22, y: CONFIG.H * 0.34, w: doorW, h: doorH, count: 0, maxCount: 0, shakeT: 0, glowT: 0, rejectMsg: '', rejectTimer: 0 },
+      { id: 'GENERAL', label: 'GENERAL AI', sublabel: 'Does NOT exist yet', color: '#ffd700', x: CONFIG.W * 0.5, y: CONFIG.H * 0.34, w: doorW, h: doorH, count: 0, maxCount: 0, shakeT: 0, glowT: 0, rejectMsg: '', rejectTimer: 0 },
+      { id: 'SUPER', label: 'SUPER AI', sublabel: 'Smarter than all humans', color: '#ff6b6b', x: CONFIG.W * 0.78, y: CONFIG.H * 0.34, w: doorW, h: doorH, count: 0, maxCount: 0, shakeT: 0, glowT: 0, rejectMsg: '', rejectTimer: 0 },
+    ]
+
+    if (n === 1) {
+      this.mode = 'grid'
+      this.setupGridCards(THREE_DOORS_R1.map(c => ({ ...c })))
+      this.totalToPlace = this.cards.filter(c => c.answer !== 'GENERAL').length
+    } else if (n === 2) {
+      this.mode = 'sequential'
+      this.seqQueue = THREE_DOORS_R2.map(c => ({ ...c }))
+      this.cards = []
+      this.totalToPlace = THREE_DOORS_R2.filter(c => c.answer !== 'GENERAL').length
+      this.spawnSeqCard()
+    } else {
+      this.mode = 'speed'
+      this.speedQueue = uniqueCardsMerge(THREE_DOORS_R1, THREE_DOORS_R2).sort(() => Math.random() - 0.5)
+      this.speedAnswered = 0
+      this.speedCorrect = 0
+      this.speedLives = 5
+      this.speedLimit = 8.0
+      this.speedFailDelay = 0
+      this.speedRevealTimer = 0
+      this.speedRevealAnswer = ''
+      this.totalToPlace = 0
+      this.spawnSpeedCard()
+    }
+
+    // Count expected per door
+    let allCardsForRound
+    if (n === 1) allCardsForRound = THREE_DOORS_R1
+    else if (n === 2) allCardsForRound = THREE_DOORS_R2
+    else allCardsForRound = []
+    for (const d of this.doors) {
+      if (d.id === 'GENERAL') {
+        d.maxCount = 0
+        d.expectedCount = 0
+      } else {
+        d.expectedCount = allCardsForRound.filter(c => c.answer === d.id).length
+        d.maxCount = d.expectedCount
+      }
+    }
+  }
+
+  setupGridCards(subset) {
+    const pad = 60
+    const cardW = 280
+    const cardH = 110
+    const rowGap = 16
+    const cols = 4
+    const startX = pad + cardW / 2
+    this.cards = subset.map(c => ({
+      text: c.text, answer: c.answer, emoji: c.emoji,
+      held: false, placed: false, x: 0, y: 0, placedDoor: null
+    }))
+    const totalRows = Math.ceil(this.cards.length / cols)
+    const gridTop = CONFIG.H - totalRows * cardH - (totalRows - 1) * rowGap - 60
+    this.cards.forEach((c, i) => {
+      const col = i % cols
+      const row = Math.floor(i / cols)
+      c.x = startX + col * (cardW + rowGap)
+      c.y = gridTop + row * (cardH + rowGap) + cardH / 2
+    })
+    this._cardW = cardW
+    this._cardH = cardH
+    this._gridRowGap = rowGap
+  }
+
+  spawnSeqCard() {
+    if (this.seqQueue.length === 0) {
+      this.finishRound()
+      return
+    }
+    const raw = this.seqQueue.shift()
+    this.cards = [{
+      text: raw.text, answer: raw.answer, emoji: raw.emoji,
+      held: false, placed: false,
+      x: CONFIG.W / 2, y: CONFIG.H * 0.86,
+      placedDoor: null,
+      isSeq: true
+    }]
+    this._cardW = 480
+    this._cardH = 140
+  }
+
+  spawnSpeedCard() {
+    if (this.speedQueue.length === 0) {
+      this.finishRound()
+      return
+    }
+    this.speedCurrent = this.speedQueue.pop()
+    this.speedTimer = this.speedLimit
+    this.speedFailDelay = 0
+    this.speedRevealTimer = 0
+    this.speedRevealAnswer = ''
+    // Three buttons:  × 
+    const bw = Math.round(280)
+    const bh = Math.round(100)
+    const gap = Math.max(40, Math.round(60))
+    const totalW = 3 * bw + 2 * gap
+    const sx = (CONFIG.W - totalW) / 2
+    const by = CONFIG.H * 0.78
+    this.speedButtons = [
+      { id: 'NARROW', label: 'NARROW', color: '#6bcbff', x: sx, y: by, w: bw, h: bh, hover: false },
+      { id: 'GENERAL', label: 'GENERAL', color: '#ffd700', x: sx + bw + gap, y: by, w: bw, h: bh, hover: false },
+      { id: 'SUPER', label: 'SUPER', color: '#ff6b6b', x: sx + (bw + gap) * 2, y: by, w: bw, h: bh, hover: false },
+    ]
+  }
+
+  resolveSpeed(answer) {
+    const card = this.speedCurrent
+    this.speedAnswered++
+    if (answer === card.answer) {
+      this.speedCorrect++
+      const xp = 100
+      this.roundXP += xp
+      this.totalXP += xp
+      Audio.play('correct')
+      vibrateCorrect()
+      Particles.correct(CONFIG.W/2, CONFIG.H/2)
+      this.nova.bounce()
+      this.hud.addXP(xp)
+      const power = Math.min(0.85, 0.3 + this.speedCorrect / 10 * 0.55)
+      this.nova.setPower(power)
+      this.hud.setNovaPower(power)
+      this.speedCurrent = null
+      setTimeout(() => this.spawnSpeedCard(), 350)
+    } else {
+      this.speedLives--
+      Audio.play('wrong')
+      vibrateWrong()
+      Particles.wrong(CONFIG.W/2, CONFIG.H/2)
+      this.nova.shake()
+      this.speedRevealTimer = 2
+      this.speedRevealAnswer = card.answer
+    }
+  }
+
+  update(dt) {
+    this.time += dt
+    this.bg.update(dt)
+    this.nova.update(dt)
+    this.hud.update(dt)
+    this.dialogue.update(dt)
+    this.transition.update(dt)
+
+    if (this.missionCard.isVisible()) { this.missionCard.update(dt); return }
+    if (this.roundBanner.isVisible()) { this.roundBanner.update(dt); return }
+
+    if (pointer.justDown && this.hud.hitMuteBtn(pointer.x, pointer.y)) {
+      this.hud.setMuted(Audio.toggle()); return
+    }
+
+    if (pointer.justDown && this.dialogue.isVisible()) {
+      this.dialogue.advance(); return
+    }
+
+    if (this.phase === 'interRound') return
+
+    if (this.phase !== 'play') return
+
+    this.nova.moveTo(120, 540)
+
+    // Update door state
+    for (const d of this.doors) {
+      if (d.shakeT > 0) d.shakeT -= dt
+      if (d.glowT > 0) d.glowT -= dt
+      if (d.rejectTimer > 0) d.rejectTimer -= dt
+    }
+
+    if (this.blastTimer > 0) this.blastTimer -= dt
+
+    if (this.mode === 'speed') {
+      this.updateSpeed(dt)
+    } else {
+      this.updateDrag(dt)
+    }
+  }
+
+  updateDrag(dt) {
+    const cardHitW = (this._cardW || 320) - 20
+    const cardHitH = (this._cardH || 110) + 10
+
+    if (pointer.justDown && !this.heldCard) {
+      for (const c of this.cards) {
+        if (c.placed) continue
+        if (rectHit(c.x - cardHitW/2, c.y - cardHitH/2, cardHitW, cardHitH, pointer.x, pointer.y)) {
+          c.held = true
+          this.heldCard = c
+          this.dragOX = pointer.x - c.x
+          this.dragOY = pointer.y - c.y
+          Audio.play('click')
+          break
+        }
+      }
+    }
+
+    if (pointer.down && this.heldCard) {
+      this.heldCard.x = pointer.x - this.dragOX
+      this.heldCard.y = pointer.y - this.dragOY
+    }
+
+    const isSeq = this.mode === 'sequential'
+    const resetCard = (c) => {
+      if (isSeq) {
+        c.x = CONFIG.W / 2
+        c.y = CONFIG.H * 0.86
+      } else {
+        // Snap back to original grid slot
+        const idx = this.cards.indexOf(c)
+        const cols = 4
+        const col = idx % cols
+        const row = Math.floor(idx / cols)
+        const cardW = this._cardW
+        const cardH = this._cardH
+        const rowGap = this._gridRowGap || 16
+        const totalRows = Math.ceil(this.cards.length / cols)
+        const gridTop = CONFIG.H - totalRows * cardH - (totalRows - 1) * rowGap - 60
+        const pad = 60
+        const startX = pad + cardW / 2
+        c.x = startX + col * (cardW + rowGap)
+        c.y = gridTop + row * (cardH + rowGap) + cardH / 2
+      }
+    }
+
+    if (pointer.justUp && this.heldCard) {
+      const c = this.heldCard
+      c.held = false
+      this.heldCard = null
+
+      let dropped = false
+      for (const d of this.doors) {
+        const dx = d.x - d.w/2, dy = d.y
+        if (rectHit(dx, dy, d.w, d.h, c.x, c.y)) {
+          dropped = true
+
+          if (d.id === 'GENERAL') {
+            d.shakeT = 0.5
+            d.rejectMsg = this.generalRejects[this.generalRejectIdx % this.generalRejects.length]
+            d.rejectTimer = 2.5
+            this.generalRejectIdx++
+            Audio.play('wrong')
+            vibrateWrong()
+            Particles.wrong(c.x, c.y)
+            this.nova.shake()
+            if (isSeq) {
+              // Sequential cards must always advance — general door is the "learn & move on"
+              c.placed = true
+              setTimeout(() => this.spawnSeqCard(), 900)
+            } else {
+              resetCard(c)
+            }
+          } else if (d.id === c.answer) {
+            c.placed = true
+            c.placedDoor = d.id
+            d.count++
+            d.glowT = 1.0
+            this.placedCount++
+            const xp = 100
+            this.roundXP += xp
+            this.totalXP += xp
+            Audio.play('correct')
+            vibrateCorrect()
+            Particles.correct(c.x, c.y)
+            Particles.burst(d.x, d.y + d.h/2, [d.color])
+            this.nova.bounce()
+            this.hud.addXP(xp)
+            const power = Math.min(0.85, 0.3 + this.placedCount / Math.max(1, this.totalToPlace) * 0.55)
+            this.nova.setPower(power)
+            this.hud.setNovaPower(power)
+            if (d.id === 'SUPER') this.blastTimer = 0.8
+
+            if (isSeq) {
+              // Sequential: spawn next or finish
+              if (this.placedCount >= this.totalToPlace) {
+                setTimeout(() => this.finishRound(), 800)
+              } else {
+                setTimeout(() => this.spawnSeqCard(), 500)
+              }
+            } else {
+              const placeable = this.cards.filter(cc => cc.answer !== 'GENERAL')
+              if (placeable.every(cc => cc.placed)) {
+                setTimeout(() => this.finishRound(), 900)
+              }
+            }
+          } else {
+            d.shakeT = 0.45
+            Audio.play('wrong')
+            vibrateWrong()
+            Particles.wrong(c.x, c.y)
+            this.nova.shake()
+            this.hud.showMessage('WRONG DOOR — READ THE CARD AGAIN!', FAIL_PAUSE_MIN, '#ff6b6b')
+            resetCard(c)
+          }
+          break
+        }
+      }
+      if (!dropped) {
+        resetCard(c)
+      }
+    }
+  }
+
+  updateSpeed(dt) {
+    if (this.speedRevealTimer > 0) {
+      this.speedRevealTimer -= dt
+      if (this.speedRevealTimer <= 0) {
+        this.speedRevealAnswer = ''
+        this.speedCurrent = null
+        if (this.speedLives <= 0) {
+          this.phase = 'over'
+          setTimeout(() => { currentScene = new MenuScene() }, 200)
+          return
+        }
+        this.spawnSpeedCard()
+      }
+      return
+    }
+
+    if (this.speedFailDelay > 0) {
+      this.speedFailDelay -= dt
+      if (this.speedFailDelay <= 0) {
+        this.speedCurrent = null
+        if (this.speedLives <= 0) {
+          this.phase = 'over'
+          setTimeout(() => { currentScene = new MenuScene() }, 200)
+          return
+        }
+        this.spawnSpeedCard()
+      }
+      return
+    }
+
+    if (!this.speedCurrent) return
+
+    this.speedTimer -= dt
+
+    for (const b of this.speedButtons) {
+      b.hover = rectHit(b.x, b.y, b.w, b.h, pointer.x, pointer.y)
+    }
+
+    if (this.speedTimer <= 0) {
+      this.speedLives--
+      this.hud.showMessage('TIME UP — LIFE LOST', FAIL_PAUSE_MIN, '#ff6b6b')
+      Audio.play('wrong')
+      vibrateWrong()
+      this.nova.shake()
+      this.speedFailDelay = 2
+      return
+    }
+
+    if (pointer.justDown) {
+      for (const b of this.speedButtons) {
+        if (rectHit(b.x, b.y, b.w, b.h, pointer.x, pointer.y)) {
+          Audio.play('click')
+          this.resolveSpeed(b.id)
+          break
+        }
+      }
+    }
+  }
+
+  finishRound() {
+    if (this.dialogue.isVisible()) this.dialogue.hide()
+    if (this.round < this.totalRounds) {
+      this.phase = 'banner'
+      this.roundBanner.show(this.round, this.roundXP, () => {
+        this.phase = 'interRound'
+        this.dialogueBlocksCards = true
+        const lines = this.round === 1
+          ? [{ speaker: 'NOVA', text: 'Round 1 complete! Round 2 brings eight tougher cards — one at a time. Read each one carefully.' }]
+          : [{ speaker: 'NOVA', text: 'Round 2 complete! Round 3 is SPEED SORT — all fifteen unique cards, eight seconds each. Good luck!' }]
+        this.dialogue.show(lines, () => {
+          this.dialogueBlocksCards = false
+          this.startRound(this.round + 1)
+        })
+      })
+    } else {
+      this.complete()
+    }
+  }
+
+  complete() {
+    this.phase = 'finalDialogue'
+    Audio.play('victory')
+    this.nova.setExpression('excited')
+    this.nova.setPower(0.85)
+    this.hud.setNovaPower(0.85)
+    Particles.confetti(CONFIG.W/2, CONFIG.H/2)
+    this.dialogue.show([
+      { speaker: 'NOVA', text: 'All three rounds cleared! You know the three types of AI inside and out.' },
+      { speaker: 'NOVA', text: 'Remember: NARROW AI is what exists today. GENERAL AI and SUPER AI are still in the future. And YOU are learning to build that future right now.' },
+    ], () => { this.transition.trigger(0.8, () => { if (!embeddedLessonDone()) currentScene = new MenuScene() }) })
+  }
+
+  drawDoor(ctx, d) {
+    const dx = d.x - d.w/2, dy = d.y
+    const shake = d.shakeT > 0 ? Math.sin(d.shakeT * 45) * 9 : 0
+    const archH = 80
+
+    ctx.save()
+    ctx.translate(shake, 0)
+
+    // Build door path with arched top
+    const path = () => {
+      ctx.beginPath()
+      ctx.moveTo(dx, dy + d.h)            // bottom-left
+      ctx.lineTo(dx, dy + archH)          // up left side
+      ctx.quadraticCurveTo(dx, dy, d.x, dy)         // arch up-left
+      ctx.quadraticCurveTo(dx + d.w, dy, dx + d.w, dy + archH) // arch up-right
+      ctx.lineTo(dx + d.w, dy + d.h)      // down right side
+      ctx.closePath()
+    }
+
+    // Atmospheric layer clipped to door silhouette (drawn behind panel)
+    ctx.save()
+    path()
+    ctx.clip()
+    if (d.id === 'NARROW') {
+      const rg = ctx.createRadialGradient(d.x, dy + d.h * 0.42, 0, d.x, dy + d.h * 0.42, 200)
+      rg.addColorStop(0, 'rgba(107, 203, 255, 0.12)')
+      rg.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = rg
+      ctx.fillRect(dx - 40, dy - 40, d.w + 80, d.h + 80)
+    } else if (d.id === 'GENERAL') {
+      for (let i = 0; i < 5; i++) {
+        const ox = Math.sin(this.time * 0.8 + i * 1.7) * (d.w * 0.32)
+        const oy = Math.cos(this.time * 0.65 + i * 1.4) * (d.h * 0.22)
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.3)'
+        ctx.beginPath()
+        ctx.arc(d.x + ox, dy + d.h * 0.38 + oy, 4, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    } else if (d.id === 'SUPER') {
+      for (let i = 0; i < 3; i++) {
+        const r = (18 + (this.time * 40 + i * 55) % 140)
+        ctx.strokeStyle = `rgba(255, 107, 107, ${0.08 * (1 - r / 140)})`
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.arc(d.x, dy + d.h * 0.48, r, 0, Math.PI * 2)
+        ctx.stroke()
+      }
+    }
+    ctx.restore()
+
+    // Door bg fill
+    ctx.fillStyle = 'rgba(8, 6, 30, 0.92)'
+    path(); ctx.fill()
+
+    // Glow (when recently correct)
+    if (d.glowT > 0) {
+      ctx.fillStyle = d.color
+      ctx.globalAlpha = d.glowT * 0.35
+      path(); ctx.fill()
+      ctx.globalAlpha = 1
+    }
+
+    // Inner ambient glow
+    ctx.fillStyle = d.color
+    ctx.globalAlpha = 0.07 + Math.sin(this.time * PULSE_SLOW + d.x * 0.01) * 0.04
+    path(); ctx.fill()
+    ctx.globalAlpha = 1
+
+    // Outline
+    ctx.strokeStyle = d.color
+    ctx.lineWidth = d.id === 'GENERAL' ? 2 : 3
+    ctx.globalAlpha = d.id === 'GENERAL' ? 0.55 : 1
+    if (d.id === 'GENERAL') ctx.setLineDash([10, 8])
+    path(); ctx.stroke()
+    ctx.setLineDash([])
+    ctx.globalAlpha = 1
+
+    // Keyhole — circle + rectangle
+    const khX = d.x, khY = dy + archH + 90
+    ctx.fillStyle = d.color
+    ctx.globalAlpha = 0.55
+    ctx.beginPath()
+    ctx.arc(khX, khY, 11, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillRect(khX - 4, khY, 8, 18)
+    ctx.globalAlpha = 1
+
+    // Count badges (only for placeable doors)
+    if (d.id !== 'GENERAL' && d.expectedCount > 0) {
+      const badgeY = dy + archH + 36
+      const badgeStartX = dx + 20
+      for (let i = 0; i < d.expectedCount; i++) {
+        const bx = badgeStartX + i * 22
+        ctx.fillStyle = i < d.count ? d.color : 'rgba(255,255,255,0.13)'
+        ctx.beginPath(); ctx.arc(bx + 8, badgeY, 8, 0, Math.PI * 2); ctx.fill()
+      }
+    }
+
+    // Door mascot (images when loaded)
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    if (d.id === 'NARROW' && gameSprites.robot.complete && gameSprites.robot.naturalWidth > 0) {
+      ctx.drawImage(gameSprites.robot, d.x - 40, dy + 160, 80, 80)
+    } else if (d.id === 'GENERAL' && gameSprites.brain.complete && gameSprites.brain.naturalWidth > 0) {
+      ctx.globalAlpha = 0.5 + Math.sin(this.time * PULSE_SLOW) * 0.2
+      ctx.drawImage(gameSprites.brain, d.x - 40, dy + 160, 80, 80)
+      ctx.globalAlpha = 1
+    } else {
+      ctx.font = '56px sans-serif'
+      if (d.id === 'NARROW') {
+        ctx.fillText('🤖', d.x, dy + 200)
+      } else if (d.id === 'GENERAL') {
+        ctx.globalAlpha = 0.4 + Math.sin(this.time * PULSE_SLOW) * 0.25
+        ctx.fillText('❓', d.x, dy + 200)
+        ctx.globalAlpha = 1
+      } else {
+        ctx.globalAlpha = 0.65 + Math.sin(this.time * PULSE_SLOW) * 0.3
+        ctx.fillText('⚡', d.x, dy + 200)
+        ctx.globalAlpha = 1
+      }
+    }
+
+    // Label / sublabel
+    ctx.font = `700 24px ${CONFIG.FONT_MAIN}`
+    prepTextRender(ctx)
+    ctx.fillStyle = d.color
+    ctx.globalAlpha = d.id === 'GENERAL' ? 0.75 : 1
+    ctx.fillText(d.label, d.x, dy + 290)
+    doneTextRender(ctx)
+    ctx.font = `500 16px ${CONFIG.FONT_BODY}`
+    prepTextRender(ctx)
+    ctx.fillStyle = '#a0a8c0'
+    ctx.fillText(d.sublabel, d.x, dy + 320)
+    doneTextRender(ctx)
+    ctx.globalAlpha = 1
+
+    // GENERAL: COMING SOON + floating question marks
+    if (d.id === 'GENERAL') {
+      ctx.font = `700 16px ${CONFIG.FONT_MAIN}`
+      prepTextRender(ctx)
+      ctx.fillStyle = '#ffd700'
+      ctx.globalAlpha = 0.65 + Math.sin(this.time * PULSE_SLOW) * 0.35
+      ctx.fillText('COMING SOON', d.x, dy + 350)
+      doneTextRender(ctx)
+      ctx.globalAlpha = 1
+      // Floating ?'s
+      for (let i = 0; i < 5; i++) {
+        const a = (this.time * 0.5 + i / 5) * Math.PI * 2
+        const px = d.x + Math.cos(a) * (80 + i * 6)
+        const py = dy + 200 + Math.sin(a) * (60 + i * 4)
+        ctx.font = '22px sans-serif'
+        ctx.globalAlpha = 0.25 + Math.sin(this.time * PULSE_SLOW + i) * 0.2
+        ctx.fillStyle = '#ffd700'
+        ctx.fillText('?', px, py)
+      }
+      ctx.globalAlpha = 1
+    }
+
+    // Reject message above door
+    if (d.id === 'GENERAL' && d.rejectTimer > 0) {
+      const a = Math.min(1, d.rejectTimer)
+      ctx.save()
+      ctx.globalAlpha = a
+      ctx.font = `600 17px ${CONFIG.FONT_BODY}`
+      prepTextRender(ctx)
+      ctx.fillStyle = '#ffd700'
+      ctx.textAlign = 'center'
+      const rows = wrapText(ctx, d.rejectMsg, 280)
+      let ry = dy - 20 - rows.length * 24
+      for (const r of rows) { ctx.fillText(r, d.x, ry); ry += Math.max(20, Math.round(24)) }
+      doneTextRender(ctx)
+      ctx.restore()
+    }
+
+    ctx.restore()
+  }
+
+  render(ctx) {
+    const W = CONFIG.W, H = CONFIG.H
+    this.bg.render(ctx)
+    ctx.save()
+    ctx.textBaseline = 'middle'
+
+    if (this.blastTimer > 0) {
+      ctx.fillStyle = '#ffffff'
+      ctx.globalAlpha = this.blastTimer * 0.6
+      ctx.fillRect(0, 0, W, H)
+      ctx.globalAlpha = 1
+    }
+
+    // Doors (drawn except in speed-sort mode)
+    if (this.mode !== 'speed') {
+      for (const d of this.doors) this.drawDoor(ctx, d)
+    }
+
+    if (this.mode !== 'speed') {
+      // Cards (grid in R1, sequential centered in R2)
+      const cw = this._cardW || 320
+      const ch = this._cardH || 110
+      for (const c of this.cards) {
+        if (c.placed) continue
+        const cx = c.x, cy = c.y
+        const isHeld = c.held
+
+        ctx.save()
+        if (isHeld) {
+          const tilt = (cx - W/2) / W * 0.18
+          ctx.translate(cx, cy); ctx.rotate(tilt); ctx.translate(-cx, -cy)
+        }
+        ctx.fillStyle = isHeld ? 'rgba(0,229,255,0.10)' : 'rgba(8,6,28,0.95)'
+        drawRoundRect(ctx, cx - cw/2, cy - ch/2, cw, ch, 14)
+        ctx.fill()
+        ctx.strokeStyle = isHeld ? '#00e5ff' : 'rgba(255,255,255,0.18)'
+        ctx.lineWidth = isHeld ? 2.5 : 1
+        drawRoundRect(ctx, cx - cw/2, cy - ch/2, cw, ch, 14)
+        ctx.stroke()
+
+        const emojiSize = c.isSeq ? 44 : 32
+        ctx.font = `${emojiSize}px sans-serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        const emojiX = cx - cw/2 + (c.isSeq ? 50 : 36)
+        ctx.fillText(c.emoji, emojiX, cy)
+
+        // Game 3 grid card text — 600 26px Inter
+        ctx.font = `600 26px ${CONFIG.FONT_BODY}`
+        prepTextRender(ctx)
+        ctx.fillStyle = '#f1f5f9'
+        const textMaxW = cw - (c.isSeq ? 120 : 90)
+        const textStartX = cx - cw/2 + (c.isSeq ? 110 : 80)
+        const rows = wrapText(ctx, c.text, textMaxW)
+        ctx.textAlign = 'left'
+        let ty = cy - (rows.length - 1) * 12
+        for (const r of rows) { ctx.fillText(r, textStartX, ty); ty += Math.max(28, 30) }
+        doneTextRender(ctx)
+        ctx.restore()
+      }
+    } else {
+      // SPEED SORT mode (R3)
+      if (this.speedCurrent) {
+        const card = this.speedCurrent
+        const cw = 700
+        const ch = 320
+        const cx = W / 2, cy = H * 0.46
+        const wrapW = Math.max(200, cw - 80)
+
+        // Timer bar ABOVE card
+        const tbW = cw, tbH = Math.max(12, Math.round(16))
+        const tbX = cx - tbW / 2
+        const tbY = cy - ch / 2 - Math.round(36)
+        const prog = Math.max(0, this.speedTimer / this.speedLimit)
+        ctx.fillStyle = 'rgba(255,255,255,0.10)'
+        drawRoundRect(ctx, tbX, tbY, tbW, tbH, 8)
+        ctx.fill()
+        const warnR = this.speedLimit * 0.2
+        const warnY = this.speedLimit * 0.42
+        const barCol = this.speedTimer < warnR ? '#ff6b6b' : (this.speedTimer < warnY ? '#ffd700' : '#00e5ff')
+        ctx.fillStyle = barCol
+        drawRoundRect(ctx, tbX, tbY, tbW * prog, tbH, 8)
+        ctx.fill()
+        ctx.font = `700 15px ${CONFIG.FONT_MAIN}`
+        prepTextRender(ctx)
+        ctx.fillStyle = barCol
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(`${Math.max(0, this.speedTimer).toFixed(1)}s`, cx, tbY - Math.round(14))
+        doneTextRender(ctx)
+
+        ctx.save()
+        const g = ctx.createLinearGradient(cx - cw / 2, cy - ch / 2, cx + cw / 2, cy + ch / 2)
+        g.addColorStop(0, 'rgba(10, 8, 30, 0.98)')
+        g.addColorStop(1, 'rgba(20, 12, 50, 0.96)')
+        ctx.fillStyle = g
+        drawRoundRect(ctx, cx - cw / 2, cy - ch / 2, cw, ch, 22)
+        ctx.fill()
+        ctx.strokeStyle = '#00e5ff'
+        ctx.lineWidth = 3
+        drawRoundRect(ctx, cx - cw / 2, cy - ch / 2, cw, ch, 22)
+        ctx.stroke()
+
+        if (this.speedFailDelay > 0 && !this.speedRevealAnswer) {
+          ctx.fillStyle = `rgba(255, 107, 107, ${0.22 * Math.min(1, this.speedFailDelay)})`
+          drawRoundRect(ctx, cx - cw / 2, cy - ch / 2, cw, ch, 22)
+          ctx.fill()
+        }
+
+        ctx.font = '80px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(card.emoji, cx, cy - 70)
+
+        ctx.font = `700 26px ${CONFIG.FONT_BODY}`
+        prepTextRender(ctx)
+        ctx.fillStyle = '#f1f5f9'
+        const rows = wrapText(ctx, card.text, wrapW)
+        const lineStep = Math.max(Math.round(26), Math.round(34))
+        let ry = cy + 30
+        for (const r of rows) { ctx.fillText(r, cx, ry); ry += lineStep }
+        doneTextRender(ctx)
+
+        if (this.speedRevealTimer > 0 && this.speedRevealAnswer) {
+          ctx.font = `900 32px ${CONFIG.FONT_MAIN}`
+          prepTextRender(ctx)
+          ctx.fillStyle = '#55efc4'
+          ctx.fillText(`ANSWER: ${this.speedRevealAnswer}`, cx, cy + ch / 2 - 28)
+          doneTextRender(ctx)
+        }
+        ctx.restore()
+      }
+
+      for (const b of this.speedButtons) {
+        ctx.fillStyle = b.hover ? `${b.color}33` : 'rgba(10, 8, 30, 0.95)'
+        drawRoundRect(ctx, b.x, b.y, b.w, b.h, 16)
+        ctx.fill()
+        ctx.strokeStyle = b.color
+        ctx.lineWidth = b.hover ? 3.5 : 2
+        drawRoundRect(ctx, b.x, b.y, b.w, b.h, 16)
+        ctx.stroke()
+        ctx.font = `700 26px ${CONFIG.FONT_MAIN}`
+        prepTextRender(ctx)
+        ctx.fillStyle = b.color
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2)
+        doneTextRender(ctx)
+      }
+
+      ctx.font = '30px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      for (let i = 0; i < 5; i++) {
+        ctx.globalAlpha = i < this.speedLives ? 1 : 0.2
+        ctx.fillText('❤️', W / 2 - 88 + i * 44, 156)
+      }
+      ctx.globalAlpha = 1
+
+      ctx.font = `600 17px ${CONFIG.FONT_MAIN}`
+      ctx.fillStyle = '#00e5ff'
+      ctx.globalAlpha = 0.85
+      ctx.textAlign = 'right'
+      ctx.fillText(`${this.speedCorrect} / ${this.speedAnswered}`, W - 28, 150)
+      ctx.globalAlpha = 1
+    }
+
+    this.nova.render(ctx)
+    this.hud.render(ctx)
+    if (this.dialogue.isVisible()) this.dialogue.render(ctx)
+    this.transition.render(ctx)
+    this.missionCard.render(ctx)
+    this.roundBanner.render(ctx)
+
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+    ctx.restore()
+  }
+}
+
+// ============================================================
+// START
+// ============================================================
+window.addEventListener('click', () => { if (Audio.ctx?.state === 'suspended') Audio.ctx.resume() }, { once: true })
+boot()
+</script>
+</body>
+</html>

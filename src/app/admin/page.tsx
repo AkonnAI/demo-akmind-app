@@ -219,7 +219,7 @@ export default function AdminPage() {
             >
               AI Explorers
               <span style={{ display: "block", fontWeight: "normal", fontSize: "11px", marginTop: "6px", opacity: 0.85 }}>
-                Lessons 1–3 · Neuropolis games
+                Lessons 1–3 · AKMIND SIGNAL games
               </span>
             </button>
             <button

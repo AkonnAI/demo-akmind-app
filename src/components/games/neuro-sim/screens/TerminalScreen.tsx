@@ -10,7 +10,6 @@ import MissionIntro from '../components/MissionIntro'
 import NovaHUD from '../components/NovaHUD'
 import { LESSONS } from '../data/lessons'
 import { lastPythonErrorLine, stripNovaPrefix } from '../lib/briefUtils'
-import { wrapPyodideStudentCode } from '../lib/pyodideStudentCode'
 import {
   CITY_FAR,
   CITY_LAYER_FILTER,
@@ -19,17 +18,18 @@ import {
 } from '../lib/cityLayers'
 import { Audio } from '../lib/audio'
 import { useGameStore } from '../store/useGameStore'
-import Sim1SceneView from '../sims/Sim1SceneView'
-import Sim2SceneView from '../sims/Sim2SceneView'
+import Sim1Scene from '../sims/Sim1Scene'
+import Sim2Scene from '../sims/Sim2Scene'
 import type { Sim2GraderResult } from '../sims/sim2-grader'
 import {
   gradeSim2WithAge,
   SIM2_TEST_CASES,
   staticGradeSim2,
 } from '../sims/sim2-grader'
-import Sim3SceneView from '../sims/Sim3SceneView'
+import Sim3Scene from '../sims/Sim3Scene'
 import type { Sim3GraderResult } from '../sims/sim3-grader'
 import { gradeSim3 } from '../sims/sim3-grader'
+import { wrapPyodideStudentCode } from '../lib/pyodideStudentCode'
 
 const WARNING_ICON =
   '/assets/icons/kenney_game-icons/PNG/White/2x/warning.png'
@@ -250,12 +250,7 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
         return
       }
       const result = await gradeSim2WithAge(code, age, py)
-      setSim2Result({
-        ...result,
-        age,
-        error: result.error ?? null,
-        _timestamp: stamp,
-      })
+      setSim2Result({ ...result, age, error: result.error ?? null, _timestamp: stamp })
     },
     [activeLesson, code],
   )
@@ -269,7 +264,6 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
     embedOnComplete?.()
   }, [activeLesson, addXP, unlockLesson, completeLesson, setScreen, embedOnComplete])
 
-  /** Sim3: "APPLY TO CODE" — just load the template into the editor */
   const handleSim3TestInput = useCallback(
     (templateCode: string) => {
       setCode(templateCode)
@@ -374,7 +368,13 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
         string,
         { type: string; value: string }
       >
-      const entries = Object.entries(parsed)
+      const rawEntries = Object.entries(parsed)
+      // Sim 1: ignore imported modules (sys/io from stdin mock, json from INSPECT).
+      // Count only learner-defined values, not the Pyodide harness.
+      const entries =
+        activeLesson.id === 1
+          ? rawEntries.filter(([, meta]) => meta.type !== 'module')
+          : rawEntries
 
       if (activeLesson.id === 1) {
         setVariableCount(entries.length)
@@ -724,24 +724,18 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
           background: '#050A0F',
         }}
       >
-        {activeLessonId === 1 && (
-          <Sim1SceneView
-            executeResult={executeResult}
-            liveCode={liveCode}
-            onComplete={embedOnComplete}
-          />
-        )}
+        {activeLessonId === 1 && <Sim1Scene executeResult={executeResult} liveCode={liveCode} />}
         {activeLessonId === 2 && (
-          <Sim2SceneView
+          <Sim2Scene
             executeResult={sim2Result}
             liveCode={liveCode}
             sessionKey={sim2SessionKey}
-            onTestInput={handleSim2Test}
             onComplete={handleSim2Complete}
+            onTestInput={handleSim2Test}
           />
         )}
         {activeLessonId === 3 && (
-          <Sim3SceneView
+          <Sim3Scene
             executeResult={sim3Result}
             liveCode={liveCode}
             onTestInput={handleSim3TestInput}
@@ -815,7 +809,9 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
 
         {/* Output panel for non-sim-1 lessons */}
         <AnimatePresence>
-          {outputText && activeLessonId !== 1 && activeLessonId !== 2 && (
+          {outputText &&
+            activeLessonId !== 1 &&
+            activeLessonId !== 2 && (
             <motion.div
               key="out"
               initial={{ y: -10, opacity: 0 }}
@@ -844,15 +840,15 @@ export default function TerminalScreen({ embedOnComplete }: TerminalScreenProps 
         </AnimatePresence>
 
         {activeLessonId !== 2 && (
-        <NovaHUD
-          className="nova-hud"
-          text={
-            activeLesson?.briefText
-              ? activeLesson.briefText.replace(/^NOVA:\s*/i, '')
-              : 'Welcome to the terminal.'
-          }
-          autoHide={6000}
-        />
+          <NovaHUD
+            className="nova-hud"
+            text={
+              activeLesson?.briefText
+                ? activeLesson.briefText.replace(/^NOVA:\s*/i, '')
+                : 'Welcome to the terminal.'
+            }
+            autoHide={6000}
+          />
         )}
       </div>
     </div>

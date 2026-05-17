@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>AKMIND — Explore</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: radial-gradient(circle at 50% 20%, #1e1b4b 0%, #05050f 55%);
+        color: #e2e8f0;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          Segoe UI,
+          Roboto,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .shell {
+        max-width: 42rem;
+        margin: 0 auto;
+        padding: clamp(1.25rem, 4vw, 2rem);
+      }
+      h1 {
+        font-size: clamp(1.75rem, 4vw, 2.25rem);
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        color: #00e5ff;
+        text-align: center;
+        margin: 0 0 0.25rem;
+      }
+      .subtitle {
+        text-align: center;
+        color: #a29bfe;
+        font-size: 0.95rem;
+        margin-bottom: 2rem;
+      }
+      p.lede {
+        text-align: center;
+        color: #94a3b8;
+        line-height: 1.55;
+        font-size: 0.9375rem;
+        margin-bottom: 1.75rem;
+      }
+      .lesson-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .lesson-btn {
+        display: block;
+        padding: 1rem 1.25rem;
+        border-radius: 14px;
+        border: 1px solid rgba(0, 229, 255, 0.35);
+        background: rgba(0, 229, 255, 0.08);
+        color: #ecfeff;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 0.95rem;
+        text-align: center;
+        transition:
+          border-color 0.15s,
+          background 0.15s;
+      }
+      .lesson-btn:hover {
+        border-color: #00e5ff;
+        background: rgba(0, 229, 255, 0.14);
+      }
+      .lesson-btn:active {
+        transform: scale(0.99);
+      }
+      .lesson-btn small {
+        display: block;
+        margin-top: 0.35rem;
+        font-weight: 600;
+        font-size: 0.8rem;
+        color: #94a3b8;
+      }
+      .footer {
+        margin-top: 2rem;
+        text-align: center;
+        font-size: 0.8rem;
+        color: #64748b;
+        line-height: 1.5;
+      }
+      .footer a {
+        color: #7dd3fc;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <h1>AKMIND</h1>
+      <div class="subtitle">SIGNAL — post-lesson games (AI Explorers)</div>
+      <p class="lede">
+        After each lesson video, open the matching interactive. Game 1 lines up
+        with lesson 2, game 2 with lesson 3, and game 3 with lesson 4 (same as
+        <code>?lesson=</code> or legacy <code>?level=</code> from the old
+        Neuropolis links).
+      </p>
+      <nav class="lesson-list" aria-label="Games">
+        <a class="lesson-btn" href="./signal.html?lesson=2">
+          Lesson 2 — History of AI
+          <small>Interactive game 1 · <code>?game=1</code> or <code>?level=1</code></small>
+        </a>
+        <a class="lesson-btn" href="./signal.html?lesson=3">
+          Lesson 3 — AI vs human strengths
+          <small>Interactive game 2 · <code>?game=2</code> or <code>?level=2</code></small>
+        </a>
+        <a class="lesson-btn" href="./signal.html?lesson=4">
+          Lesson 4 — Types of AI
+          <small>Interactive game 3 · <code>?game=3</code> or <code>?level=3</code></small>
+        </a>
+      </nav>
+      <div class="footer">
+        Full menu (pick a lesson in-game):
+        <a href="./signal.html">signal.html</a>
+      </div>
+    </div>
+  </body>
+</html>

@@ -67,34 +67,34 @@ const LESSONS_EXPLORERS = [
 const LESSONS_BUILDERS = [
   {
     id: 11,
-    title: "Variables : Storing What You Know",
+    title: "Variable Machine",
     type: "Self-Paced + Game",
     description:
-      "Learn how Python stores data using variables. The building block of every AI program.",
+      "Power the Terminal City grid — define five Python variables to restore the towers.",
     duration: "6+ min",
-    xpReward: 300,
+    xpReward: 150,
     color: "purple" as const,
     hasGame: true,
   },
   {
     id: 12,
-    title: "Decisions : Teaching Code to Choose",
+    title: "Decision Tower",
     type: "Self-Paced + Game",
     description:
-      "Write if-else logic that mirrors how AI classifiers make decisions on real data.",
+      "Route three passengers with if / elif / else — the same branching idea behind classifiers.",
     duration: "6+ min",
-    xpReward: 300,
+    xpReward: 175,
     color: "cyan" as const,
     hasGame: true,
   },
   {
     id: 13,
-    title: "Loops : Making Code Work Smarter",
+    title: "Loop Engine",
     type: "Self-Paced + Game",
     description:
-      "Use loops to process data automatically — the same way AI models train on thousands of examples.",
+      "Repair towers with for-loops and range() — repetition like training over many examples.",
     duration: "6+ min",
-    xpReward: 300,
+    xpReward: 175,
     color: "amber" as const,
     hasGame: true,
   },

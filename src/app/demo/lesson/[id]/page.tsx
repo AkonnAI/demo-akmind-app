@@ -341,46 +341,49 @@ const BUILDERS_QUIZ_13: QuizItem[] = [
 
 const LESSONS_BUILDERS: Record<number, LessonContent> = {
   11: {
-    title: "AI Builders — Foundations (placeholder)",
+    title: "Variable Machine",
     type: "self-paced",
     videoUrl: "https://www.youtube.com/embed/JMUxmLyrhSk",
     durationLabel: "6+ min",
-    xpReward: 300,
-    description: "Placeholder lesson content for AI Builders track (lesson 11).",
+    xpReward: 150,
+    description:
+      "Power the Terminal City grid: learn Python variables while NOVA coaches you in the Variable Machine simulation.",
     summaryBullets: [
-      "Placeholder takeaway one for Builders lesson 11.",
-      "Placeholder takeaway two for Builders lesson 11.",
-      "Placeholder takeaway three for Builders lesson 11.",
+      "Variables store labeled values (strings, ints, floats, bools).",
+      "Naming and types help humans and compilers understand your code.",
+      "Five working variables flip the towers from blackout to fully online.",
     ],
     hasGame: true,
     quiz: BUILDERS_QUIZ_11,
   },
   12: {
-    title: "AI Builders — Build & iterate (placeholder)",
+    title: "Decision Tower",
     type: "self-paced",
     videoUrl: "https://www.youtube.com/embed/JMUxmLyrhSk",
     durationLabel: "6+ min",
-    xpReward: 300,
-    description: "Placeholder lesson content for AI Builders track (lesson 12).",
+    xpReward: 175,
+    description:
+      "Practice branching logic with if / elif / else to route trains to the correct fare for each passenger.",
     summaryBullets: [
-      "Placeholder takeaway one for Builders lesson 12.",
-      "Placeholder takeaway two for Builders lesson 12.",
-      "Placeholder takeaway three for Builders lesson 12.",
+      "Conditions choose different paths — like rules in apps and assistants.",
+      "elif chains handle more than two outcomes cleanly.",
+      "Testing several ages validates your conductor logic.",
     ],
     hasGame: true,
     quiz: BUILDERS_QUIZ_12,
   },
   13: {
-    title: "AI Builders — Ship responsibly (placeholder)",
+    title: "Loop Engine",
     type: "self-paced",
     videoUrl: "https://www.youtube.com/embed/JMUxmLyrhSk",
     durationLabel: "6+ min",
-    xpReward: 300,
-    description: "Placeholder lesson content for AI Builders track (lesson 13).",
+    xpReward: 175,
+    description:
+      "Use for-loops and range() to bring the Loop Engine towers back online across three escalating challenges.",
     summaryBullets: [
-      "Placeholder takeaway one for Builders lesson 13.",
-      "Placeholder takeaway two for Builders lesson 13.",
-      "Placeholder takeaway three for Builders lesson 13.",
+      "Loops repeat instructions without copying and pasting code.",
+      "range(stop) and range(start, stop) control how many times you iterate.",
+      "Training models similarly runs epochs over batches — repetition scales learning.",
     ],
     hasGame: true,
     quiz: BUILDERS_QUIZ_13,
@@ -388,34 +391,26 @@ const LESSONS_BUILDERS: Record<number, LessonContent> = {
 };
 
 const GAME_MECHANICS: Record<number, string> = {
-  1: "Neuropolis Level 2 — The Vault: timelines, ciphers, and the Glitch Twin.",
-  2: "Neuropolis Level 3 — The Divide: switch modes and cross Human vs AI zones.",
-  3: "Neuropolis Level 4 — classify Narrow, General, and Super AI in the wild.",
-  11: "AI Builders simulation — foundations track (coming soon).",
-  12: "AI Builders simulation — build & iterate (coming soon).",
-  13: "AI Builders simulation — ship responsibly (coming soon).",
+  1: "AKMIND SIGNAL — Memory Wall: drag AI history fragments to the correct years (3 rounds).",
+  2: "AKMIND SIGNAL — Versus machine: sort whether each task is stronger for AI or humans (3 rounds).",
+  3: "AKMIND SIGNAL — Three doors taxonomy: classify Narrow, General, and Super AI (3 rounds).",
+  11: "Variable Machine — define 5 variables to restore the Terminal City power grid.",
+  12: "Decision Tower — route three passengers with if / elif / else fare logic.",
+  13: "Loop Engine — repair towers with Python for-loops and range().",
 };
 
 const GAME_BONUS_XP = 200;
 
-const NeuropolisShell = dynamic(
-  () => import("@/components/games/neuropolis/NeuropolisShell"),
-  { ssr: false }
+const AkmindSignalShell = dynamic(
+  () => import("@/components/games/akmind-signal/AkmindSignalShell"),
+  { ssr: false },
 );
 const LandscapeWrapper = dynamic(
   () => import("@/components/games/shared/LandscapeWrapper"),
   { ssr: false }
 );
-const Sim1Scene = dynamic(
-  () => import("@/components/games/neuro-sim/sims/Sim1Scene"),
-  { ssr: false }
-);
-const Sim2Scene = dynamic(
-  () => import("@/components/games/neuro-sim/sims/Sim2Scene"),
-  { ssr: false }
-);
-const Sim3Scene = dynamic(
-  () => import("@/components/games/neuro-sim/sims/Sim3Scene"),
+const NeuroSimEmbedded = dynamic(
+  () => import("@/components/games/neuro-sim/NeuroSimEmbedded"),
   { ssr: false }
 );
 
@@ -913,7 +908,7 @@ function LessonPageInner() {
     }
   }
 
-  // Hide lesson NOVA widget during fullscreen Neuropolis so it never steals taps
+  // Hide lesson NOVA widget during fullscreen game (SIGNAL iframe / neuro-sim) so it never steals taps
   // (including dialogue-advance and canvas input). Admins use Exit + dashboard for chat.
   const suppressNovaChatFab =
     (phase === "game" && gameActive) || showXPOverlay;
@@ -1281,7 +1276,7 @@ function LessonPageInner() {
               }}
             >
               <LandscapeWrapper>
-                <NeuropolisShell
+                <AkmindSignalShell
                   level={lessonId as 1 | 2 | 3}
                   onComplete={async () => {
                     await exitGame();
@@ -1303,36 +1298,17 @@ function LessonPageInner() {
                 height: "100%",
               }}
             >
-              {lessonId === 11 && (
-                <Sim1Scene
-                  onComplete={async () => {
-                    await exitGame();
-                    setGameComplete(true);
-                    setPhase("quiz");
-                  }}
-                  onExit={exitGame}
-                />
-              )}
-              {lessonId === 12 && (
-                <Sim2Scene
-                  onComplete={async () => {
-                    await exitGame();
-                    setGameComplete(true);
-                    setPhase("quiz");
-                  }}
-                  onExit={exitGame}
-                />
-              )}
-              {lessonId === 13 && (
-                <Sim3Scene
-                  onComplete={async () => {
-                    await exitGame();
-                    setGameComplete(true);
-                    setPhase("quiz");
-                  }}
-                  onExit={exitGame}
-                />
-              )}
+              <NeuroSimEmbedded
+                innerLessonId={
+                  lessonId === 11 ? 1 : lessonId === 12 ? 2 : 3
+                }
+                onComplete={async () => {
+                  await exitGame();
+                  setGameComplete(true);
+                  setPhase("quiz");
+                }}
+                onExit={exitGame}
+              />
             </div>
           )}
 

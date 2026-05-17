@@ -225,7 +225,12 @@ export default function SuccessScreen() {
             className="success-xp"
             initial={{ scale: 0.5 }}
             animate={{ scale: [0.5, 1.2, 1] }}
-            transition={{ type: 'spring', stiffness: 400, damping: 18 }}
+            transition={{
+              type: 'tween',
+              duration: 0.55,
+              times: [0, 0.5, 1],
+              ease: ['easeOut', 'easeOut', 'easeInOut'],
+            }}
             style={{
               fontFamily: 'SpaceGrotesk, sans-serif',
               fontWeight: 700,
