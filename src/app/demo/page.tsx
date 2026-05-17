@@ -4,6 +4,7 @@ import AkmindLogo from "@/components/AkmindLogo";
 import NOVAChat from "@/components/NOVAChat";
 import NOVACharacter from "@/components/NOVACharacter";
 import { DEMO_BADGES } from "@/lib/demo-badges";
+import { applyDemoCoursePreference } from "@/lib/demo-course-preference-client";
 import { normalizeClientDemoToken } from "@/lib/demo-token-client";
 import type { DemoUser } from "@/types/demo";
 import {
@@ -200,10 +201,11 @@ function DemoDashboardInner() {
       }
       const data = (await res.json()) as DemoUser;
       setAuthIssue(null);
-      setUser({
+      const merged = applyDemoCoursePreference(t, {
         ...data,
         earnedBadges: data.earnedBadges ?? [],
       });
+      setUser(merged);
     } catch {
       setAuthIssue("Network error — check that the dev server is running.");
       setUser(null);

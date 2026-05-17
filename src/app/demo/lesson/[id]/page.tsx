@@ -4,6 +4,7 @@ import VideoPlayer from "@/components/lesson/VideoPlayer";
 import NOVAChat from "@/components/NOVAChat";
 import type { DemoUser } from "@/types/demo";
 import { DEMO_BADGES } from "@/lib/demo-badges";
+import { applyDemoCoursePreference } from "@/lib/demo-course-preference-client";
 import { normalizeClientDemoToken } from "@/lib/demo-token-client";
 import dynamic from "next/dynamic";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
@@ -543,7 +544,12 @@ function LessonPageInner() {
       }
       setLoadError(false);
       const data = (await res.json()) as DemoUser;
-      setUser({ ...data, earnedBadges: data.earnedBadges ?? [] });
+      setUser(
+        applyDemoCoursePreference(t, {
+          ...data,
+          earnedBadges: data.earnedBadges ?? [],
+        }),
+      );
     } catch {
       setUser(null);
       setLoadError(true);

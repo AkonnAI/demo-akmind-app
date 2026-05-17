@@ -2,6 +2,8 @@
 
 import AkmindLogo from "@/components/AkmindLogo";
 import { DEMO_BADGES } from "@/lib/demo-badges";
+import { applyDemoCoursePreference } from "@/lib/demo-course-preference-client";
+import { normalizeClientDemoToken } from "@/lib/demo-token-client";
 import type { DemoUser } from "@/types/demo";
 import {
   ArrowLeft,
@@ -15,7 +17,6 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { normalizeClientDemoToken } from "@/lib/demo-token-client";
 
 function isAdminTester(user: import("@/types/demo").DemoUser | null): boolean {
   if (!user) return false;
@@ -142,10 +143,11 @@ function DemoBadgesInner() {
       }
       setAuthIssue(null);
       const data = (await res.json()) as DemoUser;
-      setUser({
+      const merged = applyDemoCoursePreference(t, {
         ...data,
         earnedBadges: data.earnedBadges ?? [],
       });
+      setUser(merged);
     } catch {
       setAuthIssue("Network error — check that the dev server is running.");
       setUser(null);

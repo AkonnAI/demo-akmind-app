@@ -1,6 +1,10 @@
 "use client";
 
 import AkmindLogo from "@/components/AkmindLogo";
+import {
+  applyDemoCoursePreference,
+  writeDemoCoursePreference,
+} from "@/lib/demo-course-preference-client";
 import { normalizeClientDemoToken } from "@/lib/demo-token-client";
 import type { DemoUser } from "@/types/demo";
 import {
@@ -87,11 +91,12 @@ function DemoProgramsInner() {
         return;
       }
       const data = (await res.json()) as DemoUser;
-      setUser({
+      const merged = applyDemoCoursePreference(t, {
         ...data,
         earnedBadges: data.earnedBadges ?? [],
       });
-      setSavedCourse(data.course ?? null);
+      setUser(merged);
+      setSavedCourse(merged.course ?? null);
     } catch {
       setAuthIssue("Network error — check that the dev server is running.");
     } finally {
@@ -121,11 +126,17 @@ function DemoProgramsInner() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ course }),
         });
-        if (!res.ok) throw new Error("Failed");
-        setSavedCourse(course);
-        setToast(`Switched to ${course} ✓`);
+        const body = (await res.json()) as { course?: string; error?: string };
+        if (!res.ok) throw new Error(body.error ?? "Failed");
+        const nextCourse =
+          body.course === "AI Explorers" || body.course === "AI Builders"
+            ? body.course
+            : course;
+        writeDemoCoursePreference(token, nextCourse);
+        setSavedCourse(nextCourse);
+        setUser((prev) => (prev ? { ...prev, course: nextCourse } : prev));
+        setToast(`Switched to ${nextCourse} ✓`);
         setTimeout(() => setToast(null), 2800);
-        await load(token, { silent: true });
       } catch {
         setToast("Error saving — please try again");
         setTimeout(() => setToast(null), 3000);
@@ -133,7 +144,7 @@ function DemoProgramsInner() {
         setSaving(null);
       }
     },
-    [token, load]
+    [token]
   );
 
   const adminMode = isAdminTester(user);

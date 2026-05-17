@@ -1,6 +1,7 @@
 "use client";
 
 import DemoCompleteCelebration from "@/components/demo/DemoCompleteCelebration";
+import { writeDemoCoursePreference } from "@/lib/demo-course-preference-client";
 import { DEMO_COMPLETE_PREVIEW_USER } from "@/lib/demo-complete-preview-user";
 import type { DemoUser } from "@/types/demo";
 import { useCallback, useEffect, useState } from "react";
@@ -67,8 +68,10 @@ export default function AdminPage() {
       });
       const data = (await res.json()) as { course?: DemoProgram; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Could not update program");
-      setAdminCourse(data.course ?? next);
-      setMessage(`Program saved: ${data.course ?? next}. Use Open Demo or your token — lessons match this track.`);
+      const saved = data.course ?? next;
+      setAdminCourse(saved);
+      if (token.trim()) writeDemoCoursePreference(token, saved);
+      setMessage(`Program saved: ${saved}. Use Open Demo or your token — lessons match this track.`);
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Could not update program");
     } finally {

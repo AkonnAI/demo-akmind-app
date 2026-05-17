@@ -1,6 +1,7 @@
 "use client";
 
 import DemoCompleteCelebration from "@/components/demo/DemoCompleteCelebration";
+import { applyDemoCoursePreference } from "@/lib/demo-course-preference-client";
 import type { DemoUser } from "@/types/demo";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -48,14 +49,15 @@ function CompletePageInner() {
           return;
         }
         const data = (await res.json()) as DemoUser;
-        if (!isCourseDemoComplete(data.course, data.lessonsComplete ?? [])) {
+        const merged = applyDemoCoursePreference(t, data);
+        if (!isCourseDemoComplete(merged.course, merged.lessonsComplete ?? [])) {
           setBootStatus("noop");
           router.replace(`/demo${t ? `?token=${encodeURIComponent(t)}` : ""}`);
           return;
         }
         setUser({
-          ...data,
-          earnedBadges: data.earnedBadges ?? [],
+          ...merged,
+          earnedBadges: merged.earnedBadges ?? [],
         });
         setBootStatus("ready");
       } catch {
