@@ -79,7 +79,7 @@ type ParticleData = {
 function buildParticles(): ParticleData[] {
   // Pseudo-random using deterministic seed so SSR/render stable
   const s = (n: number) => {
-    let x = Math.sin(n * 9301 + 49297) * 233280
+    const x = Math.sin(n * 9301 + 49297) * 233280
     return x - Math.floor(x)
   }
   return Array.from({ length: 25 }, (_, i) => ({

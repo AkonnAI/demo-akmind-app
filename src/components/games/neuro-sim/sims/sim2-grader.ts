@@ -12,7 +12,7 @@ export interface Sim2GraderResult {
  * Map Python stdout text + fallback age to a Sim2 route.
  * Called after capturing Pyodide stdout for a test age.
  */
-export function mapOutputToRoute(output: string, _fallbackAge: number): Sim2Route {
+export function mapOutputToRoute(output: string): Sim2Route {
   const lo = output.toLowerCase()
 
   if (lo.includes('senior') || lo.includes('50')) return 'senior'

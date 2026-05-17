@@ -604,7 +604,6 @@ function LessonPageInner() {
       });
     }, 1000);
     return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [minVideoRequired, videoWatchSatisfied, phase, lessonId]);
 
   const stepMeta = useMemo(() => {
